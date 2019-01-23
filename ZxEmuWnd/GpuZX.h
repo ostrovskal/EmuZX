@@ -1,37 +1,38 @@
 #pragma once
 
+#pragma pack(push, 1)
 struct HEADER_TGA {
-	byte	bIdLength;		// 
-	byte	bColorMapType;	// тип цветовой карты ()
-	byte	bType;			// тип файла ()
-	word	wCmIndex;		// тип индексов в палитре
-	word	wCmLength;		// длина палитры
-	byte	bCmEntrySize;	// число бит на элемент палитры
-	word	wXorg;			// 
-	word	wYorg;			// 
-	word	wWidth;			// ширина
-	word	wHeight;		// высота
-	byte	bBitesPerPixel;	// бит на пиксель
-	byte	bFlags;			// 
+	ssh_b	bIdLength;		// 
+	ssh_b	bColorMapType;	// тип цветовой карты ()
+	ssh_b	bType;			// тип файла ()
+	ssh_w	wCmIndex;		// тип индексов в палитре
+	ssh_w	wCmLength;		// длина палитры
+	ssh_b	bCmEntrySize;	// число бит на элемент палитры
+	ssh_w	wXorg;			// 
+	ssh_w	wYorg;			// 
+	ssh_w	wWidth;			// ширина
+	ssh_w	wHeight;		// высота
+	ssh_b	bBitesPerPixel;	// бит на пиксель
+	ssh_b	bFlags;			// 
 };
+#pragma pack(pop)
 
 class GpuZX {
 public:
 	GpuZX();
 	virtual ~GpuZX();
 	void execute();
-	void saveBitmap(const wchar_t* path);
-	void write(byte* address, byte val);
+	bool saveScreen(ssh_cws path);
+	void write(ssh_b* address, ssh_b val);
 	void showScreen();
-	dword* memory;
-	static int frames;
+	ssh_d* memory;
 protected:
-	void drawLine(dword* addr, byte val);
-	void decodeColor(byte color);
+	void drawLine(ssh_d* addr, ssh_b val);
+	void decodeColor(ssh_b color);
 	void makeCanvas();
-	byte invert;
-	dword ink;
-	dword paper;
+	ssh_b invert;
+	ssh_d ink;
+	ssh_d paper;
 	HBITMAP hbmpMem;
 	HDC hdcMem;
 };

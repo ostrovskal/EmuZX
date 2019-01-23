@@ -2,14 +2,14 @@
 #include "stdafx.h"
 #include "BorderZX.h"
 #include "CpuZX.h"
+#include "GpuZX.h"
 
-int BorderZX::frames = 0;
-
-extern dword colours[];
+extern GpuZX* gpu;
+extern ssh_d colours[];
 
 void BorderZX::draw() {
-	dword* p = &gpu->memory[y * 320];
-	dword c = colours[CpuZX::border];
+	ssh_d* p = &gpu->memory[y * 320];
+	ssh_d c = colours[CpuZX::portFE & 7];
 
 	for(int x = 0; x < 320; x++) {
 		if(y < 32 || y > 223) *p = c;
@@ -20,7 +20,6 @@ void BorderZX::draw() {
 
 void BorderZX::execute() {
 	if(!gpu->memory) return;
-	frames++;
 	if((CpuZX::STATE & CpuZX::BORDER) == 0 && y == 0) {
 		if(redraw) {
 			start++;
@@ -33,12 +32,12 @@ void BorderZX::execute() {
 		}
 		return;
 	}
+	CpuZX::STATE &= ~CpuZX::BORDER;
 	redraw = false;
 	draw();
 	y++;
 	if(y >= 256) {
 		gpu->showScreen();
-		CpuZX::STATE &= ~CpuZX::BORDER;
 		y = 0;
 		redraw = true;
 		start = 0;

@@ -11,25 +11,25 @@ void DecoderZX::funcN00_000() {
 		// NOP
 		case 0: break;
 			// EX AF, AF'
-		case 1: swapReg((word*)&CpuZX::cpu[RA], (word*)&CpuZX::cpu[RA + 14]); break;
+		case 1: swapReg((ssh_w*)&CpuZX::cpu[RA], (ssh_w*)&CpuZX::cpu[RA + 14]); break;
 			// DJNZ
-		case 2: (*CpuZX::B)--; if(*CpuZX::B) CpuZX::RPC += d; break;
+		case 2: (*CpuZX::B)--; if(*CpuZX::B) CpuZX::PC += d; break;
 			// JR
-		case 3: CpuZX::RPC += d; break;
+		case 3: CpuZX::PC += d; break;
 			// JR CCC
-		default: if(isFlag(ops & 3)) CpuZX::RPC += d;
+		default: if(isFlag(ops & 3)) CpuZX::PC += d;
 	}
 }
 
 void DecoderZX::funcN00_010() {
 	if(ops < 4) {
 		// LD (BC/DE), A | LD A, (BC/DE)
-		word reg = *fromRP_AF(ops);
+		ssh_w reg = *fromRP_AF(ops);
 		if(ops & 1) *CpuZX::A = read_mem8(reg); else write_mem8(reg, *CpuZX::A);
 	} else {
 		// LD [nn], HL/A | LD A/HL, [nn]
-		word nn = read_mem16PC();
-		word* reg = fromRP_AF(4);
+		ssh_w nn = read_mem16PC();
+		ssh_w* reg = fromRP_AF(4);
 		bool d = ops & 2;
 		if(ops & 1) {
 			if(d) *CpuZX::A = read_mem8(nn); else *reg = read_mem16(nn);
@@ -40,18 +40,18 @@ void DecoderZX::funcN00_010() {
 }
 
 void DecoderZX::funcN00_111() {
-	byte a = *CpuZX::A;
-	byte oldFc = getFlag(FC);
+	ssh_b a = *CpuZX::A;
+	ssh_b oldFc = getFlag(FC);
 	switch(ops) {
 		// DAA SZ5*3P-*
 		case 4: {
-			byte oldA = a;
-			byte fh = getFlag(FH);
-			byte fn = getFlag(FN);
-			byte fc = 0;
+			ssh_b oldA = a;
+			ssh_b fh = getFlag(FH);
+			ssh_b fn = getFlag(FN);
+			ssh_b fc = 0;
 			if(((a & 15) > 9) || fh) {
-				word val = a + (fn ? -6 : 6);
-				a = (byte)val;
+				ssh_w val = a + (fn ? -6 : 6);
+				a = (ssh_b)val;
 				fc = oldFc | (val > 255 ? 1 : 0);
 				fh = 16;
 			} else fh = 0;
@@ -75,13 +75,13 @@ void DecoderZX::funcN00_111() {
 }
 
 void DecoderZX::ldRp() {
-	word* reg = fromRP_SP(ops);
+	ssh_w* reg = fromRP_SP(ops);
 	if(ops & 1) {
 		// ADD HL, RP; --***-0C	F5,H,F3 берутся по результатам сложения старших байтов
-		word* hl = fromRP_SP(4);
-		word valHL = *hl;
-		dword val = valHL + *reg;
-		*hl = (word)val;
+		ssh_w* hl = fromRP_SP(4);
+		ssh_w valHL = *hl;
+		ssh_d val = valHL + *reg;
+		*hl = (ssh_w)val;
 		update_flags(F5 | FH | F3 | FN | FC, ((val >> 8) & 0b00101000) | calcFH(valHL >> 8, (*reg) >> 8, 0) | (val > 65535));
 	} else {
 		// LD RP, NN
@@ -95,17 +95,17 @@ void DecoderZX::incRp() {
 
 void DecoderZX::incSSS() {
 	// SZ5H3VN-
-	byte n = typeOps & 1;
-	byte* reg = fromRON(ops);
-	byte valReg = *reg;
-	byte d = (n ? -1 : 1);
-	byte val = valReg + d;
+	ssh_b n = typeOps & 1;
+	ssh_b* reg = fromRON(ops);
+	ssh_b valReg = *reg;
+	ssh_b d = (n ? -1 : 1);
+	ssh_b val = valReg + d;
 	write_mem8(reg, val, ops);
 	update_flags(FS | FZ | F5 | FH | F3 | FPV | FN,
 		(val & 0b00101000) | (val & 128) | GET_FZ(val) | calcFH(valReg, d, n) | GET_FV(valReg, val) | GET_FN(n));
 }
 
 void DecoderZX::ldSSS() {
-	byte* reg = fromRON(ops);
+	ssh_b* reg = fromRON(ops);
 	write_mem8(reg, read_mem8PC(), ops);
 }

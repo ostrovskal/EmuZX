@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010"> 
+<Type Name="ssh::String">
+	<DisplayString Condition="_str.len_buf &gt; SSH_BUFFER_LENGTH">{_str.ptr,su}</DisplayString>
+	<DisplayString Condition="_str.len_buf &lt;= SSH_BUFFER_LENGTH">{_str.str,su}</DisplayString>
+		<Expand>
+			<Item Name="[длина]">_str.len,d</Item> 
+			<Item Name="[буфер]">_str.len_buf,d</Item> 
+			<Item Name="[хэш]">_str.hash,x</Item> 
+				<ArrayItems>
+					<Size>_str.len</Size> 
+					<ValuePointer Condition="_str.len_buf &gt; SSH_BUFFER_LENGTH">_str.ptr</ValuePointer>
+					<ValuePointer Condition="_str.len_buf &lt;= SSH_BUFFER_LENGTH">_str.str</ValuePointer>
+				</ArrayItems>
+		</Expand>
+</Type>
+<Type Name="ssh::_Buffer &lt; unsigned char &gt; ">
+	<DisplayString>{data,s}, {sz,d}, {is_owner}</DisplayString>
+	<Expand>
+		<ArrayItems>
+		<Size>sz</Size> 
+				<ValuePointer>data</ValuePointer>
+		</ArrayItems>
+	</Expand>
+</Type>
+<Type Name="ssh::_Buffer &lt; unsigned short &gt; ">
+	<DisplayString>{data,su}, {sz / 2,d}, {is_owner}</DisplayString>
+	<Expand>
+		<ArrayItems>
+		<Size>sz / 2</Size> 
+				<ValuePointer>data</ValuePointer>
+		</ArrayItems>
+	</Expand>
+</Type>
+<Type Name="ssh::_Buffer &lt; unsigned long &gt; ">
+	<DisplayString>{data}, {sz / 4,d}, {is_owner}</DisplayString>
+	<Expand>
+		<ArrayItems>
+		<Size>sz / 4</Size> 
+				<ValuePointer>data</ValuePointer>
+		</ArrayItems>
+	</Expand>
+</Type>
+<Type Name="ssh::File">
+	<DisplayString>{path}, {h}</DisplayString>		
+</Type>
+<Type Name="ssh::Bbox">
+	<DisplayString>{{ min: {mn} max:{mx} }}</DisplayString>
+	<Expand>
+		<Item Name="x1:y1:z1">corners[0]</Item>
+		<Item Name="x1:y2:z1">corners[1]</Item>
+		<Item Name="x2:y2:z1">corners[2]</Item>
+		<Item Name="x2:y1:z1">corners[3]</Item>
+		<Item Name="x2:y2:z2">corners[4]</Item>
+		<Item Name="x1:y2:z2">corners[5]</Item>
+		<Item Name="x1:y1:z2">corners[6]</Item>
+		<Item Name="x2:y1:z2">corners[7]</Item>
+	</Expand>
+</Type>
+<Type Name="ssh::Color">
+	<DisplayString>{{ {(int)(r*255),d} {(int)(g*255),d} {(int)(b*255),d} {(int)(a*255),d} }}</DisplayString>
+	<Expand>
+		<Item Name="[Красный]">r</Item>
+		<Item Name="[Зелёный]">g</Item>
+		<Item Name="[Синий]">b</Item>
+		<Item Name="[Прозрачный]">a</Item>
+	</Expand>
+</Type>
+<Type Name="ssh::Dual_quat">
+	<DisplayString>Двойной кватернион</DisplayString>
+	<Expand>
+		<ArrayItems>
+			<Size>8</Size>
+			<ValuePointer>flt</ValuePointer>
+		</ArrayItems>
+	</Expand>
+</Type>
+<Type Name="ssh::Half">
+	<DisplayString>{{ {val} }}</DisplayString>		
+</Type>
+<Type Name="ssh::Mtx">
+	<DisplayString>Матрица 4х4</DisplayString>
+	<Expand>
+		<ArrayItems>
+			<Direction>Forward</Direction>
+			<Rank>2</Rank>
+			<Size>4</Size>
+			<ValuePointer>m</ValuePointer>
+		</ArrayItems>
+	</Expand>
+</Type>
+<Type Name="ssh::Obox">
+	<DisplayString>{{ min: {corners[X1Y1Z1]} max: {corners[X2Y2Z2]} }}</DisplayString>
+	<Expand>
+		<Item Name="x1:y1:z1">corners[X1Y1Z1]</Item>
+		<Item Name="x1:y2:z1">corners[X1Y2Z1]</Item>
+		<Item Name="x2:y2:z1">corners[X2Y2Z1]</Item>
+		<Item Name="x2:y1:z1">corners[X2Y1Z1]</Item>
+		<Item Name="x2:y2:z2">corners[X2Y2Z2]</Item>
+		<Item Name="x1:y2:z2">corners[X1Y2Z2]</Item>
+		<Item Name="x1:y1:z2">corners[X1Y1Z2]</Item>
+		<Item Name="x2:y1:z2">corners[X2Y1Z2]</Item>
+	</Expand>
+</Type>
+<Type Name="ssh::Plane">
+	<Expand>
+		<Item Name="[Нормаль]">normal</Item>
+		<Item Name="[Скаляр]">scalar</Item>
+	</Expand>
+</Type>
+<Type Name="ssh::Quat">
+	<DisplayString>{{ {x} {y} {z} {w} }}</DisplayString>
+</Type>
+<Type Name="ssh::Ray">
+	<Expand>
+		<Item Name="[Позиция]">pos</Item>
+		<Item Name="[Направление]">dir</Item>
+	</Expand>
+</Type>
+<Type Name="ssh::Sphere">
+	<Expand>
+		<Item Name="[Центр]">c</Item>
+		<Item Name="[Радиус]">r</Item>
+	</Expand>
+</Type>
+<Type Name="ssh::Vec2">
+	<DisplayString>{{ {x} {y} }}</DisplayString>
+</Type>
+<Type Name="ssh::Vec3">
+	<DisplayString>{{ {x} {y} {z} }}</DisplayString>
+</Type>
+<Type Name="ssh::Vec4">
+	<DisplayString>{{ {x} {y} {z} {w} }}</DisplayString>
+</Type>
+<Type Name="ssh::Gamepad">
+	<DisplayString></DisplayString>
+</Type>
+<Type Name="ssh::Mouse">
+	<DisplayString></DisplayString>
+</Type>
+<Type Name="ssh::Keyboard">
+	<DisplayString></DisplayString>
+</Type>
+<Type Name="ssh::Angle">
+	<DisplayString>degree = {angle * 180.0f / 3.1459,f} radian = {angle * 3.1459 / 180.0,f}</DisplayString>
+</Type>
+<Type Name="ssh::Time">
+	<DisplayString></DisplayString>
+</Type>
+<Type Name="ssh::Bits">
+	<DisplayString>{val}</DisplayString>		
+</Type>
+<Type Name="ssh::Xml">
+	<DisplayString>{tree}</DisplayString>
+</Type>
+<Type Name="ssh::Regx">
+	<DisplayString>{{ result = {result}, re = {re} }}</DisplayString>
+	<Expand>
+		<Item Name="[Субъект]">subj</Item>
+		<ArrayItems>
+			<Size>32</Size>
+			<ValuePointer>patterns</ValuePointer>
+		</ArrayItems>
+		<ArrayItems>
+			<Size>256</Size>
+			<ValuePointer>vector,d</ValuePointer>
+		</ArrayItems>
+	</Expand>
+</Type>
+<Type Name="ssh::Bar&lt;*&gt;">
+	<Expand>
+		<Item Name="[Позиция]">pt</Item>
+		<Item Name="[Габариты]">rg</Item>
+	</Expand>
+</Type>
+<Type Name="ssh::Pts&lt;*&gt;">
+	<DisplayString>{{ {x,d} {y,d} }}</DisplayString>
+</Type>
+<Type Name="ssh::Range&lt;*&gt;">
+	<DisplayString>{{ {w,d} {h,d} }}</DisplayString>
+</Type>
+<Type Name="ssh::Box&lt;*,*&gt;">
+	<Expand>
+		<Item Name="[Позиция]">pt</Item>
+		<Item Name="[Габариты]">rg</Item>
+		<Item Name="[Глубина]">depth</Item>
+	</Expand>
+</Type>
+
+
+</AutoVisualizer>

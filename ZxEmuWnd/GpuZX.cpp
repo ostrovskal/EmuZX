@@ -3,10 +3,9 @@
 #include "GpuZX.h"
 #include "CpuZX.h"
 #include "BorderZX.h"
+#include "SoundZX.h"
 
-int GpuZX::frames = 0;
-
-dword colours[] = {	0xff000000, 0xff0000c0, 0xffc00000, 0xffc000c0, 0xff00c000, 0xff00c0c0, 0xffc0c000, 0xffc0c0c0,
+ssh_d colours[] = {	0xff000000, 0xff0000c0, 0xffc00000, 0xffc000c0, 0xff00c000, 0xff00c0c0, 0xffc0c000, 0xffc0c0c0,
 					0xff000000, 0xff0000e8, 0xffe80000, 0xffe800e8, 0xff00e800, 0xff00e8e8, 0xffe8e800, 0xffe8e8e8};
 
 extern HWND hWnd;
@@ -14,8 +13,8 @@ extern RECT rectWnd;
 
 GpuZX::GpuZX() {
 	invert = 0;
-	hbmpMem = NULL;
-	hdcMem = NULL;
+	hbmpMem = nullptr;
+	hdcMem = nullptr;
 	memory = nullptr;
 }
 
@@ -48,10 +47,8 @@ void GpuZX::showScreen() {
 		StretchBlt(hdc, 0, 0, rectWnd.right - rectWnd.left, rectWnd.bottom - rectWnd.top, hdcMem, 0, 0, 320, 256, SRCCOPY);
 		SelectObject(hdcMem, h);
 		::DeleteObject(hdc);
-		wsprintf(str, L"PC: %d cpu: %d gpu: %d border: %d", CpuZX::RPC, CpuZX::frames, GpuZX::frames, BorderZX::frames);
+		wsprintf(str, L"PC: %d", CpuZX::PC);
 		SetWindowText(hWnd, (LPCWSTR)str);
-	} else {
-		SetWindowText(hWnd, L"HDC не доступен!!!");
 	}
 }
 
@@ -59,18 +56,16 @@ void GpuZX::execute() {
 
 	if(!hbmpMem) makeCanvas();
 	
-	frames++;
-
 	int graph = 16384;
 	int colors = 22528;
 	
-	dword* dest = &memory[223 * 320 + 32];
+	ssh_d* dest = &memory[223 * 320 + 32];
 	for(int bank = 0; bank < 3; bank++) {
 		int graphN = graph;
 		for(int znak = 0; znak < 8; znak++) {
 			int graphZ = graphN;
 			for(int line = 0; line < 8; line++) {
-				dword* graphics = dest;
+				ssh_d* graphics = dest;
 				for(int x = 0; x < 32; x++) {
 					decodeColor(CpuZX::memory[colors + x]);
 					drawLine(graphics, CpuZX::memory[graphZ + x]);
@@ -92,27 +87,27 @@ void GpuZX::execute() {
 	CpuZX::trap = 1;
 }
 
-void GpuZX::decodeColor(byte color) {
+void GpuZX::decodeColor(ssh_b color) {
 	bool inv = ((color & 128) ? ((invert & 15) >> 3) == 0 : false);
-	byte bright = ((bool)(color & 64) << 3);
-	dword ink1 = colours[(color & 7) + bright];
-	dword pap1 = colours[((color & 56) >> 3) + bright];
+	ssh_b bright = ((bool)(color & 64) << 3);
+	ssh_d ink1 = colours[(color & 7) + bright];
+	ssh_d pap1 = colours[((color & 56) >> 3) + bright];
 	ink = (inv ? pap1 : ink1);
 	paper = (inv ? ink1 : pap1);
 }
 
-void GpuZX::write(byte* address, byte val) {
+void GpuZX::write(ssh_b* address, ssh_b val) {
 	return;
-	word offs = (address - &CpuZX::memory[16384]);
+	ssh_w offs = (ssh_w)(address - &CpuZX::memory[16384]);
 	int x, y;
-	dword* addr = &memory[32 * 320 + 32];
+	ssh_d* addr = &memory[32 * 320 + 32];
 	if(offs >= 6144) {
 		// атрибуты
 		offs -= 6144;
 		x = offs & 31;
 		y = (offs / 32);
 		decodeColor(val);
-		byte* screen = &CpuZX::memory[16384 + ((y / 8) * 2048 + ((y & 7) * 32)) + x];
+		ssh_b* screen = &CpuZX::memory[16384 + ((y / 8) * 2048 + ((y & 7) * 32)) + x];
 		addr += ((24 - y) * 8 * 320 + x * 8 - 320);
 		for(int n = 0; n < 8; n++) {
 			drawLine(addr, *screen);
@@ -135,37 +130,53 @@ void GpuZX::write(byte* address, byte val) {
 	}
 }
 
-void GpuZX::drawLine(dword* addr, byte val) {
+void GpuZX::drawLine(ssh_d* addr, ssh_b val) {
 	for(int bit = 128; bit > 0; bit >>= 1) {
 		*addr++ = ((val & bit) ? ink : paper);
 	}
 }
 
-void GpuZX::saveBitmap(const wchar_t* path) {
-	int h;
-	if((_wsopen_s(&h, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE)) != -1) {
+bool GpuZX::saveScreen(ssh_cws path) {
+	int h = 0;
+	bool result = true;
+	bool exec = CpuZX::isExec;
 
-		HEADER_TGA head;
+	CpuZX::isExec = false;
 
-		head.bIdLength = 0;
-		head.bColorMapType = 0;
-		head.bType = 2;
+	try {
+		_wsopen_s(&h, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
+		if(h) {
+			HEADER_TGA head;
 
-		head.wCmIndex = 0;
-		head.wCmLength = 0;
-		head.bCmEntrySize = 0;
+			head.bIdLength = 0;
+			head.bColorMapType = 0;
+			head.bType = 2;
 
-		head.wXorg = 0;
-		head.wYorg = 0;
-		head.wWidth = 320;
-		head.wHeight = 256;
+			head.wCmIndex = 0;
+			head.wCmLength = 0;
+			head.bCmEntrySize = 0;
 
-		head.bBitesPerPixel = 32;
-		head.bFlags = 0x28;
+			head.wXorg = 0;
+			head.wYorg = 0;
+			head.wWidth = 320;
+			head.wHeight = 256;
 
-		if(_write(h, &head, sizeof(HEADER_TGA)) == sizeof(HEADER_TGA)) {
-			_write(h, memory, sizeof(memory));
+			head.bBitesPerPixel = 32;
+			head.bFlags = 0x28;
+
+			if(_write(h, &head, sizeof(HEADER_TGA)) != sizeof(HEADER_TGA)) throw(0);
+			ssh_d* ptr = (memory + 320 * 255);
+			for(int i = 0; i < 256; i++) {
+				if(_write(h, ptr, 1280) != 1280) throw(0);
+				ptr -= 320;
+			}
 		}
-		_close(h);
+	} catch(...) {
+		result = false;
 	}
+	if(h) _close(h);
+
+	CpuZX::isExec = exec;
+
+	return result;
 }

@@ -2,12 +2,14 @@
 
 class KeyboardZX {
 public:
-	KeyboardZX() : spec(-1), prevKey(-1) {}
+	KeyboardZX() : pnum(-1), pkey(255), pkey1(255), pkey2(255) {}
 	virtual ~KeyboardZX() {}
 
-	void execute(int key, bool pressed);
+	void execute(ssh_b key, bool pressed);
 protected:
-	void setKey(int num, bool pressed);
-	void remapping(byte* map, int key, bool pressed);
-	byte spec, prevKey;
+	void writePort(ssh_b num, bool pressed);
+	bool remapping(ssh_b* map, ssh_b key, bool pressed);
+	//ssh_b spec, prevKey;
+	ssh_b pkey, pkey1, pkey2;
+	int pnum;
 };

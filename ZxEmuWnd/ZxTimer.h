@@ -87,7 +87,7 @@ public:
 		return timeDelta;
 	}
 
-	long samplePerformanceCounter() {
+	DWORD samplePerformanceCounter() {
 		LARGE_INTEGER sample;
 		QueryPerformanceCounter(&sample);
 		return sample.LowPart;

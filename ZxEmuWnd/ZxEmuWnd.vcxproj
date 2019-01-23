@@ -76,12 +76,14 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <OutDir>e:\Dev\VC\Bin\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <OutDir>e:\Dev\VC\Bin\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -156,8 +158,10 @@
     <ClInclude Include="GpuZX.h" />
     <ClInclude Include="KeyboardZX.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="SettingsZX.h" />
     <ClInclude Include="SoundZX.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="StringZX.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="ZxEmuWnd.h" />
     <ClInclude Include="ZxTimer.h" />
@@ -173,6 +177,7 @@
     <ClCompile Include="DecoderZX_No11.cpp" />
     <ClCompile Include="GpuZX.cpp" />
     <ClCompile Include="KeyboardZX.cpp" />
+    <ClCompile Include="SettingsZX.cpp" />
     <ClCompile Include="SoundZX.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -180,6 +185,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="StringZX.cpp" />
     <ClCompile Include="ZxEmuWnd.cpp" />
     <ClCompile Include="ZxTimer.cpp" />
   </ItemGroup>
@@ -187,6 +193,7 @@
     <ResourceCompile Include="ZxEmuWnd.rc" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="bitmap1.bmp" />
     <Image Include="small.ico" />
     <Image Include="ZxEmuWnd.ico" />
   </ItemGroup>
@@ -194,9 +201,7 @@
     <Text Include="plan.txt" />
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="asm_func.asm">
-      <FileType>Document</FileType>
-    </MASM>
+    <MASM Include="asm_ssh_common.asm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

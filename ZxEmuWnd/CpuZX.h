@@ -1,12 +1,6 @@
 #pragma once
 
-#include "GpuZX.h"
-
 class DecoderZX;
-class GpuZX;
-class BorderZX;
-class KeyboardZX;
-class SoundZX;
 class CpuZX {
 public:
 	enum {
@@ -24,88 +18,61 @@ public:
 	// выполнение
 	void execute();
 
-	// обновление графики
-	void updateGpu();
+	// загрузка/сохранение состояния
+	bool loadStateZX(const StringZX& path);
+	bool saveStateZX(const StringZX& path);
 
-	// перерисовка бордера
-	void redrawBorder();
-	
-	// проигрывание звука
-	void playSound();
-
-	// обновление клавиш
-	void updateKey(int key, bool pressed);
-	
-	// сохранение состояния
-	bool saveStateZX(const wchar_t* path);
-
-	// загрузка состояния
-	bool loadStateZX(const wchar_t* path);
+	bool loadZ80(const StringZX& path);
+	bool saveZ80(const StringZX& path);
 
 	// дешифратор
 	DecoderZX* decoder;
 
-	// графическая карта
-	GpuZX* gpu;
-
-	// бордер
-	BorderZX* brd;
-
-	// клавиатура
-	KeyboardZX* key;
-
-	// бипер
-	SoundZX* snd;
-
 	// содержмое памяти
-	static byte memory[65536];
+	static ssh_b memory[65536];
 
-	static int frames;
+	// ПЗУ
+	ssh_b* ROM;
+	long szROM;
 
-	static int keyd;
-	static int keyu;
-	
 	static bool isExec;
 
 	// триггеры
-	static byte IFF1;
-	static byte IFF2;
+	static ssh_b IFF1;
+	static ssh_b IFF2;
 
 	// статус
-	static byte STATE;
+	static ssh_b STATE;
 
-	// цвет бордера
-	static byte border;
-
-	// статус звука
-	static byte sound;
+	// содержимое порта FE
+	static ssh_b portFE;
 
 	// признак наличия прерывания INT
-	static byte trap;
+	static ssh_b trap;
 
 	// прерывания
-	static byte RI;
+	static ssh_b RI;
 
 	// регенерация
-	static byte RR;
+	static ssh_b RR;
 
 	// режим прерываний
-	static byte IM;
+	static ssh_b IM;
 
 	// счетчик комманд
-	static word RPC;
+	static ssh_w PC;
 
 	// регистры
-	static byte cpu[22];
+	static ssh_b cpu[22];
 
 	// порты
-	static byte port[65536];
+	static ssh_b port[65536];
 
-	static byte* A;
-	static byte* B;
+	static ssh_b* A;
+	static ssh_b* B;
 
-	static word* BC;
-	static word* DE;
-	static word* HL;
-	static word* SP;
+	static ssh_w* BC;
+	static ssh_w* DE;
+	static ssh_w* HL;
+	static ssh_w* SP;
 };

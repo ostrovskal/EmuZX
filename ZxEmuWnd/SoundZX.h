@@ -10,14 +10,13 @@ public:
 	struct SOUNDBUFFER {
 		LPDIRECTSOUNDBUFFER		lp;
 		void*					address;
-		DWORD					nNewSize;
-		DWORD					nSize;
+		long					nNewSize;
+		long					nSize;
 	};
 
 	SoundZX() : dSnd(nullptr), sndBuf0(nullptr) { sndStk.lp = nullptr; init(44100); }
 	virtual ~SoundZX() { uninit();  }
-	
-	void execute();
+	void execute(DWORD tm);
 protected:
 	LPDIRECTSOUND dSnd;
 	LPDIRECTSOUNDBUFFER	sndBuf0;

@@ -2,12 +2,13 @@
 #pragma once
 
 #include "CpuZX.h"
+#include "GpuZX.h"
 
-extern byte flags_cond[4];
-extern byte cnvPrefixSP[];
-extern byte cnvPrefixAF[];
+extern ssh_b flags_cond[4];
+extern ssh_b cnvPrefixSP[];
+extern ssh_b cnvPrefixAF[];
+extern GpuZX* gpu;
 
-class GpuZX;
 class DecoderZX {
 	friend class CpuZX;
 public:
@@ -48,12 +49,10 @@ public:
 	// opsED01_XXX
 	void funcED01_000();
 	void funcED01_111();
-
-	GpuZX* gpu;
 protected:
 	// читаем операцию
-	inline byte readOps() { 
-		byte v = read_mem8PC();
+	inline ssh_b readOps() { 
+		ssh_b v = read_mem8PC();
 		typeOps = (v & 0b00000111);
 		ops = (v & 0b00111000) >> 3;
 		return ((v & 0b11000000) >> 6);
@@ -63,25 +62,25 @@ protected:
 	bool isFlag(int num) { return ((CpuZX::cpu[RF] & flags_cond[(num & 7) >> 1]) ? 1 : 0) == (num & 1); }
 
 	// получить значение флага
-	byte getFlag(byte fl) { return ((CpuZX::cpu[RF] & fl) ? 1 : 0); }
+	ssh_b getFlag(ssh_b fl) { return ((CpuZX::cpu[RF] & fl) ? 1 : 0); }
 
 	// установка флагов по маске
-	void update_flags(int msk, byte val) { CpuZX::cpu[RF] = (CpuZX::cpu[RF] & ~msk) | val; }
+	void update_flags(int msk, ssh_b val) { CpuZX::cpu[RF] = (CpuZX::cpu[RF] & ~msk) | val; }
 
 	// читаем 16 бит из памяти
-	inline word read_mem16(word address) { return *(word*)(CpuZX::memory + address); }
+	inline ssh_w read_mem16(ssh_w address) { return *(ssh_w*)(CpuZX::memory + address); }
 
 	// читаем 16 бит из памяти
-	inline word read_mem16PC() { word mem = *(word*)(CpuZX::memory + CpuZX::RPC); CpuZX::RPC += 2; return mem; }
+	inline ssh_w read_mem16PC() { ssh_w mem = *(ssh_w*)(CpuZX::memory + CpuZX::PC); CpuZX::PC += 2; return mem; }
 
 	// читаем 8 бит из памяти
-	inline byte read_mem8(word address) { return CpuZX::memory[address]; }
+	inline ssh_b read_mem8(ssh_w address) { return CpuZX::memory[address]; }
 
 	// читаем 8 бит из памяти
-	inline byte read_mem8PC() { return CpuZX::memory[CpuZX::RPC++]; }
+	inline ssh_b read_mem8PC() { return CpuZX::memory[CpuZX::PC++]; }
 
 	// пишем в память 8 битное значение
-	void write_mem8(byte* address, byte val, word ron) {
+	void write_mem8(ssh_b* address, ssh_b val, ssh_w ron) {
 		if(address < &CpuZX::memory[16384]) {
 			write_rom(address); 
 			return; 
@@ -91,72 +90,76 @@ protected:
 	}
 
 	// пишем в память 8 битное значение
-	inline void write_mem8(word address, byte val) { write_mem8(&CpuZX::memory[address], val, 6); }
+	inline void write_mem8(ssh_w address, ssh_b val) { write_mem8(&CpuZX::memory[address], val, 6); }
 
 	// пишем в память 16 битное значение
-	void write_mem16(word address, word val) {
-		byte* mem = &CpuZX::memory[address];
+	void write_mem16(ssh_w address, ssh_w val) {
+		ssh_b* mem = &CpuZX::memory[address];
 		if(address < 16384) { write_rom(&CpuZX::memory[address]); return; }
 		else if(address < 23296) {
-			gpu->write(mem, (byte)val);
+			gpu->write(mem, (ssh_b)val);
 			gpu->write(mem + 1, val >> 8);
 		}
-		*(word*)mem = val;
+		*(ssh_w*)mem = val;
 	}
 
 	// преобразуем 2 битный номер регистровой пары в указатель на регистр(с учетом SP)
-	inline word* fromRP_SP(int rp) { return (word*)&CpuZX::cpu[cnvPrefixSP[(prefix << 3) + (RC + (rp & 6))]]; }
+	inline ssh_w* fromRP_SP(int rp) { return (ssh_w*)&CpuZX::cpu[cnvPrefixSP[(prefix << 3) + (RC + (rp & 6))]]; }
 	
 	// преобразуем 2 битный номер регистровой пары в указатель на регистр(с учетом AF)
-	inline word* fromRP_AF(int rp) { return (word*)&CpuZX::cpu[cnvPrefixAF[(prefix << 3) + (RC + (rp & 6))]]; }
+	inline ssh_w* fromRP_AF(int rp) { return (ssh_w*)&CpuZX::cpu[cnvPrefixAF[(prefix << 3) + (RC + (rp & 6))]]; }
 
 	// преобразуем 3 битный номер половинки регистра в указатель на регистр
-	inline byte* fromRON(int ron) {
+	inline ssh_b* fromRON(int ron) {
 		if(ron == 6) return (preg = &CpuZX::memory[*fromRP_SP(4) + (char)(prefix ? read_mem8PC() : 0)]);
 		return &CpuZX::cpu[cnvPrefixAF[(prefix << 3) + (RC + ((ron & 7) ^ 1))]];
 	}
 
 	// преобразуем 3 битный номер половинки регистра в указатель на регистр
-	inline byte* fromRON1(int ron) {
+	inline ssh_b* fromRON1(int ron) {
 		if(ron == 6) return &CpuZX::memory[*CpuZX::HL];
 		return &CpuZX::cpu[(RC + ((ron & 7) ^ 1))];
 	}
 
 	// адрес последнего (HL)
-	byte* preg;
+	ssh_b* preg;
 
 	// префикс комманды DD/FD
-	byte prefix = 0;
+	ssh_b prefix = 0;
 
 	// тип операции
-	byte typeOps = 0;
+	ssh_b typeOps = 0;
 
 	// текущая операция
-	byte ops = 0;
+	ssh_b ops = 0;
 private:
 	// арифметические операции с аккумулятором
-	void opsAccum(byte d);
+	void opsAccum(ssh_b d);
 
 	// сдвиги
-	byte rotate(byte val, int msk);
+	ssh_b rotate(ssh_b val, int msk);
 
 	// вызов подпрограммы
-	void execCALL(word address);
+	void execCALL(ssh_w address);
 
 	// обмен значений регистров
-	void swapReg(word* r1, word* r2);
+	void swapReg(ssh_w* r1, ssh_w* r2);
 
 	// выполнение операции
 	void execOps(int prefix1, int prefix2);
 
 	// запись в ROM(запрещено)
-	void write_rom(byte* address) {}
+	void write_rom(ssh_b* address) {}
 
-	inline void flagsIR(byte bt) { update_flags(FS | FZ | F5 | FH | F3 | FPV | FN, (bt & 128) | GET_FZ(bt) | (bt & 0b00101000) | (CpuZX::IFF2 << 2)); }
+	inline void flagsIR(ssh_b bt) { update_flags(FS | FZ | F5 | FH | F3 | FPV | FN, (bt & 128) | GET_FZ(bt) | (bt & 0b00101000) | (CpuZX::IFF2 << 2)); }
 
 	inline void noni() { CpuZX::STATE &= ~CpuZX::INT; }
 
 	inline void nop() { }
+
+	void writePort(ssh_w address, ssh_b val);
+
+	ssh_b readPort(ssh_w address);
 };
 
 typedef void(DecoderZX::*funcOps)();
