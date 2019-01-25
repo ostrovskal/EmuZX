@@ -8,11 +8,22 @@ ssh_cws options[] = {
 	L"soundEnable",
 	L"monitorEnable",
 	L"keyboardEnable",
+	L"turboEnable",
 	L"soundFraquency",
 	L"delayCPU",
 	L"delayGPU",
 	L"path",
 	L"model",
+	L"mru0",
+	L"mru1",
+	L"mru2",
+	L"mru3",
+	L"mru4",
+	L"mru5",
+	L"mru6",
+	L"mru7",
+	L"mru8",
+	L"mru9",
 	nullptr
 };
 
@@ -60,15 +71,18 @@ void SettingsZX::load(const StringZX& path) {
 				num++;
 			}
 			ssh_d val = *(ssh_d*)asm_ssh_wton(value.buffer(), (ssh_u)Radix::_dec);
+			bool bval = value == L"true";
 			switch(num) {
-				case 0: isSound = value == L"true"; break;
-				case 1: isMonitor = value == L"true"; break;
-				case 2: isKeyboard = value == L"true"; break;
-				case 3: sndFreq = val; break;
-				case 4: delayCPU = val; break;
-				case 5: delayGPU = val; break;
-				case 6: curPath = value; break;
-				case 7: modelZX = val; break;
+				case 0: isSound = bval; break;
+				case 1: isMonitor = bval; break;
+				case 2: isKeyboard = bval; break;
+				case 3: isTurbo = bval; break;
+				case 4: sndFreq = val; break;
+				case 5: delayCPU = val; break;
+				case 6: delayGPU = val; break;
+				case 7: curPath = value; break;
+				case 8: modelZX = (ssh_b)val; break;
+				default: mru[num - 9] = value; break;
 			}
 		}
 		fclose(hh);
@@ -92,11 +106,13 @@ void SettingsZX::save(const StringZX& path) {
 				case 0: bval = isSound; break;
 				case 1: bval = isMonitor; break;
 				case 2: bval = isKeyboard; break;
-				case 3: val = sndFreq; break;
-				case 4: val = delayCPU; break;
-				case 5: val = delayGPU; break;
-				case 6: sval = curPath; break;
-				case 7: val = modelZX; break;
+				case 3: bval = isTurbo; break;
+				case 4: val = sndFreq; break;
+				case 5: val = delayCPU; break;
+				case 6: val = delayGPU; break;
+				case 7: sval = curPath; break;
+				case 8: val = modelZX; break;
+				default: sval = mru[num - 9]; break;
 			}
 			if(val != -1) line += asm_ssh_ntow(&val, (ssh_u)Radix::_dec);
 			else if(sval) line += sval;

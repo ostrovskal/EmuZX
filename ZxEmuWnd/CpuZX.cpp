@@ -42,7 +42,6 @@ ssh_b CpuZX::port[65536];
 CpuZX::CpuZX() {
 	decoder = new DecoderZX();
 	ROM = nullptr; szROM = 0;
-	isExec = true;
 	signalRESET();
 }
 
@@ -58,7 +57,6 @@ void CpuZX::signalRESET() {
 	IFF1 = IFF2 = 0;
 	STATE = 0;
 	portFE = 224;
-	//isExec = true;
 
 	delete ROM; ROM = nullptr;
 	szROM = 0;
@@ -94,6 +92,7 @@ void CpuZX::signalRESET() {
 	}
 	if(hh) _close(hh);
 	memcpy(memory, ROM, szROM >= 16384 ? 16384 : szROM);
+	isExec = true;
 }
 
 void CpuZX::signalINT() {
@@ -164,8 +163,6 @@ bool CpuZX::saveStateZX(const StringZX& path) {
 	return result;
 }
 
-void CheckedMenuModel(int rom);
-	
 bool CpuZX::loadStateZX(const StringZX& path) {
 	FILE* hh = nullptr;
 	bool result = true;
@@ -189,9 +186,7 @@ bool CpuZX::loadStateZX(const StringZX& path) {
 			STATE = temp[5]; portFE = temp[6]; trap = temp[7]; settings.modelZX = temp[8];
 			PC = *(ssh_w*)(temp + 9);
 			
-			CpuZX::STATE |= (BORDER | SOUND);
-
-			CheckedMenuModel(settings.modelZX);
+			STATE |= (BORDER | SOUND);
 		}
 	} catch(...) {
 		result = false;
@@ -204,19 +199,46 @@ bool CpuZX::loadStateZX(const StringZX& path) {
 	return result;
 }
 
+void decodePage(ssh_b* ptr, ssh_b* dst, ssh_b* dstE, int sz, bool packed) {
+	if(packed) {
+		while(sz > 0) {
+			ssh_b b = *ptr++;
+			ssh_b c = 1;
+			sz--;
+			if(b == 0xed) {
+				c = *ptr++;
+				if(c == 0xed) {
+					c = *ptr++;
+					b = *ptr++;
+					sz -= 3;
+				} else {
+					ptr--;
+					c = 1;
+				}
+			}
+			memset(dst, b, c);
+			dst += c;
+		}
+	} else {
+		memcpy(dst, ptr, sz);
+	}
+}
+
 bool CpuZX::loadZ80(const StringZX& path) {
 	int hh = 0;
 	ssh_b* pptr = nullptr;
 	bool result = true;
 	bool exec = isExec;
+	ssh_b* ptr;
+	long sz;
 
 	isExec = false;
 	try {
 		_wsopen_s(&hh, path, _O_RDONLY | _O_BINARY, _SH_DENYRD, _S_IREAD);
 		if(hh) {
-			long sz = _filelength(hh);
+			sz = _filelength(hh);
 			pptr = new ssh_b[sz];
-			ssh_b* ptr = pptr;
+			ptr = pptr;
 			if(_read(hh, ptr, sz) != sz) throw(0);
 			// AF, CB, LH, PC, SP
 			*(ssh_w*)&cpu[RA] = *(ssh_w*)ptr;
@@ -229,6 +251,7 @@ bool CpuZX::loadZ80(const StringZX& path) {
 			RI = *ptr++; RR = *ptr++;
 			// state1
 			ssh_b state1 = *ptr++;
+			if(state1 == 255) state1 = 1;
 			RR |= (state1 & 1) << 7;
 			portFE &= ~7;
 			portFE |= (state1 & 14) >> 1;
@@ -246,30 +269,56 @@ bool CpuZX::loadZ80(const StringZX& path) {
 			// state2
 			ssh_b state2 = *ptr++;
 			IM = state2 & 3;
-			// RAM 48k
-			ssh_b* dst = &memory[16384];
 			sz -= 30;
-			if((state1 & 32) == 32) {
-				while(sz > 0) {
-					ssh_b b = *ptr++;
-					ssh_b c = 1;
-					sz--;
-					if(b == 0xed) {
-						c = *ptr++;
-						if(c == 0xed) {
-							c = *ptr++;
-							b = *ptr++;
-							sz -= 3;
-						} else {
-							ptr--;
-							c = 1;
-						}
+			if(PC == 0) {
+				// version 2
+				int len = *(ssh_w*)ptr; ptr += 2;
+				PC = *(ssh_w*)ptr;
+				ssh_b h_mode = *(ptr + 2);
+				ssh_b h_state = *(ptr + 3);
+				ssh_b i_state = *(ptr + 4);
+				ssh_b emu = *(ptr + 5);
+				ssh_b son = *(ptr + 6);
+				byte* s_regs = ptr + 7;
+				if(len > 23) {
+					ptr += 23;
+					// version 3
+					ssh_w low_tstate = *(ssh_w*)ptr;
+					ssh_b high_tstate = *(ptr + 2);
+					ssh_b mgt_rom_page = *(ptr + 4);
+					ssh_b multiface_rom_page = *(ptr + 5);
+					ssh_b mem_0000_1fff = *(ptr + 6);
+					ssh_b mem_2000_3fff = *(ptr + 7);
+					ssh_b * _5x_key_maps = ptr + 8;
+					ssh_b * _5x_ascii_vals = ptr + 18;
+					ssh_b mgt_type = *(ptr + 28);
+					ssh_b inhibitor_but = *(ptr + 29);
+					ssh_b inhibitor_flg = *(ptr + 30);
+					ptr += 31;
+					if(len > 54) {
+						ssh_b port_1ffd = *ptr++;
 					}
-					memset(dst, b, c);
-					dst += c;
+				}
+				sz -= len;
+				while(sz > 0) {
+					ssh_w size = *(ssh_w*)ptr;
+					ssh_b* pageS = nullptr;
+					int szData = (size == 65535 ? 16384 : size);
+					int page = *(ptr + 2);
+					switch(page) {
+						case 8: pageS = &memory[16384]; break;
+						case 4: pageS = &memory[0x8000]; break;
+						case 5: pageS = &memory[0xc000]; break;
+					}
+					ptr += 3;
+					if(pageS != nullptr)
+						decodePage(ptr, pageS, pageS + 16384, szData, size != 65535);
+					ptr += szData;
+					sz -= szData;
 				}
 			} else {
-				memcpy(dst, ptr, sz);
+				// RAM 48k
+				decodePage(ptr, &memory[16384], &memory[65535], sz, (state1 & 32) == 32);
 			}
 		}
 	} catch(...) {
@@ -313,17 +362,44 @@ bool CpuZX::saveZ80(const StringZX& path) {
 			ssh_b* srcE = src + 49152;
 
 			pptr = new ssh_b[65535];
-			ssh_b* dst = pptr;
-			while(src < srcE) {
-				ssh_b b1 = *src++;
-				ssh_b b2 = *src;
-				if(b1 != b2) {
-					*dst++ = b1;
-				} else {
 
+			ssh_b* dst = pptr;
+			ssh_b b1;
+			int c = 1;
+			while(src < srcE) {
+				b1 = *src++;
+				if(b1 != *src) {
+					if(c > 1) {
+						if(c < 5 && b1 != 0xed) {
+							memset(dst, b1, c);
+							dst += c;
+						} else {
+							*dst++ = 0xed;
+							*dst++ = 0xed;
+							*dst++ = c;
+							*dst++ = b1;
+						}
+					} else {
+						*dst++ = b1;
+					}
+				} else {
+					c++;
+					if(c < 256) continue;
+					*dst++ = 0xed;
+					*dst++ = 0xed;
+					*dst++ = c - 1;
+					*dst++ = b1;
 				}
+				c = 1;
 			}
-			long sz = dst - pptr;
+			c--;
+			if(c > 1) {
+				*dst++ = 0xed;
+				*dst++ = 0xed;
+				*dst++ = c;
+				*dst++ = b1;
+			} else if(c == 1) *dst++ = b1;
+			ssh_d sz = (ssh_d)(dst - pptr);
 			if(_write(h, pptr, sz) != sz) throw(0);
 		}
 	} catch(...) {
@@ -334,4 +410,3 @@ bool CpuZX::saveZ80(const StringZX& path) {
 	delete pptr;
 	return result;
 }
-

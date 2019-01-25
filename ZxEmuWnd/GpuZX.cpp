@@ -44,7 +44,7 @@ void GpuZX::showScreen() {
 	HDC hdc;
 	if((hdc = ::GetDC(hWnd))) {
 		HGDIOBJ h = SelectObject(hdcMem, hbmpMem);
-		StretchBlt(hdc, 0, 0, rectWnd.right - rectWnd.left, rectWnd.bottom - rectWnd.top, hdcMem, 0, 0, 320, 256, SRCCOPY);
+		StretchBlt(hdc, rectWnd.left, rectWnd.top, rectWnd.right - rectWnd.left, rectWnd.bottom - rectWnd.top, hdcMem, 0, 0, 320, 256, SRCCOPY);
 		SelectObject(hdcMem, h);
 		::DeleteObject(hdc);
 		wsprintf(str, L"PC: %d", CpuZX::PC);
@@ -89,9 +89,8 @@ void GpuZX::execute() {
 
 void GpuZX::decodeColor(ssh_b color) {
 	bool inv = ((color & 128) ? ((invert & 15) >> 3) == 0 : false);
-	ssh_b bright = ((bool)(color & 64) << 3);
-	ssh_d ink1 = colours[(color & 7) + bright];
-	ssh_d pap1 = colours[((color & 56) >> 3) + bright];
+	ssh_d ink1 = colours[(color & 7) | (color & 64) >> 3];
+	ssh_d pap1 = colours[(color & 120) >> 3];
 	ink = (inv ? pap1 : ink1);
 	paper = (inv ? ink1 : pap1);
 }

@@ -20,6 +20,9 @@ public:
 	bool isSound;
 	bool isMonitor;
 	bool isKeyboard;
+	bool isTurbo;
 
 	ssh_b modelZX;
+
+	StringZX mru[10];
 };

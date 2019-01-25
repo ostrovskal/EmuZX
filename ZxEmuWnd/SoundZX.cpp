@@ -4,31 +4,62 @@
 #include "CpuZX.h"
 
 extern HWND hWnd;
-DWORD tm1 = 0;
-int index = 0;
+int play_index = 0;
 int cur_index = 0;
-ssh_b buffer[65536];
 
-void SoundZX::execute(DWORD tm) {
-	if((CpuZX::STATE & CpuZX::SOUND) == 0) return;
+int cur_signal = -1;
+DWORD old_tm = 0;
+
+extern DWORD delayCPU;
+
+ssh_w buffer[16384];
+
+void SoundZX::execute(DWORD new_tm) {
+	ssh_d tm = (new_tm - old_tm);
+	if((CpuZX::STATE & CpuZX::SOUND) == 0) {
+		if(tm > 32768) {
+			cur_signal = -1;
+			old_tm = new_tm;
+		}
+		return;
+	}
 	CpuZX::STATE &= ~CpuZX::SOUND;
-	if((CpuZX::portFE & 16) == 16) {
-		ssh_w bt = (ssh_w)(tm - tm1) >> 4;
-		buffer[index] = bt;
-		index++;
-		index &= 32767;
-		tm1 = tm;
-		if(sndStk.lp) {
+	ssh_b signal = (CpuZX::portFE & 16) != 0;
+	if(cur_signal == -1) {
+		cur_signal = signal;
+		old_tm = new_tm;
+		return;
+	}
+	if(cur_signal != signal) {
+		cur_signal = signal;
+		buffer[cur_index++] = (ssh_w)tm;
+		cur_index &= 16383;
+		old_tm = new_tm;
+	}
+	if(sndStk.lp) {
+		int index = cur_index - play_index;
+		if(index > 0) {
 			ssh_d status;
 			sndStk.lp->GetStatus(&status);
 			if((status & DSBSTATUS_PLAYING) != DSBSTATUS_PLAYING) {
-				bt = buffer[cur_index];
-				cur_index++;
-				cur_index &= 32767;
+				ssh_w bt = buffer[play_index++];
+				play_index &= 16383;
+				if(bt > 255) bt = 256;
+				else if(bt == 0) bt = 3;
 				byte* adr = (byte*)sndStk.address;
 				byte* adrE = adr + sndStk.nNewSize;
-				for(int i = 0; i < bt; i++) *adr++ = 140;
-				for(int i = 0; i < bt; i++) *adr++ = 125;
+				int count = bt * 2 / sndStk.nNewSize;
+				for(int ii = 0; ii < count; ii++) {
+					if(adr >= adrE) break;
+					for(int i = 0; i < bt; i++) {
+						if(adr >= adrE) break;
+						*adr++ = 150;
+					}
+					for(int i = 0; i < bt; i++) {
+						if(adr >= adrE) break;
+						*adr++ = 125;
+					}
+				}
 				memset(adr, 128, adrE - adr);
 				if(SUCCEEDED(sndStk.lp->SetCurrentPosition(0)))
 					sndStk.lp->Play(0, 0, 0);

@@ -149,6 +149,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>comctl32.dll;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -195,6 +196,7 @@
   <ItemGroup>
     <Image Include="bitmap1.bmp" />
     <Image Include="small.ico" />
+    <Image Include="toolbar_common.bmp" />
     <Image Include="ZxEmuWnd.ico" />
   </ItemGroup>
   <ItemGroup>

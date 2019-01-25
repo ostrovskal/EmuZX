@@ -120,6 +120,9 @@
     <Image Include="bitmap1.bmp">
       <Filter>Файлы ресурсов</Filter>
     </Image>
+    <Image Include="toolbar_common.bmp">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <Text Include="plan.txt">
