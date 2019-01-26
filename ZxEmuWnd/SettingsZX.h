@@ -21,7 +21,8 @@ public:
 	bool isMonitor;
 	bool isKeyboard;
 	bool isTurbo;
-
+	
+	ssh_b postProcess;
 	ssh_b modelZX;
 
 	StringZX mru[10];

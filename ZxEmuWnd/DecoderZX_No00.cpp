@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "DecoderZX.h"
 
-funcOps table_opsN00_XXX[] = {
+funcDecoder table_opsN00_XXX[] = {
 	&DecoderZX::funcN00_000, &DecoderZX::ldRp, &DecoderZX::funcN00_010, &DecoderZX::incRp, &DecoderZX::incSSS, &DecoderZX::incSSS, &DecoderZX::ldSSS, &DecoderZX::funcN00_111
 };
 
@@ -11,13 +11,13 @@ void DecoderZX::funcN00_000() {
 		// NOP
 		case 0: break;
 			// EX AF, AF'
-		case 1: swapReg((ssh_w*)&CpuZX::cpu[RA], (ssh_w*)&CpuZX::cpu[RA + 14]); break;
+		case 1: swapReg((ssh_w*)&regsZX[RA], (ssh_w*)&regsZX[RA + 14]); break;
 			// DJNZ
-		case 2: (*CpuZX::B)--; if(*CpuZX::B) CpuZX::PC += d; break;
+		case 2: (*_B)--; if(*_B) _PC += d; break;
 			// JR
-		case 3: CpuZX::PC += d; break;
+		case 3: _PC += d; break;
 			// JR CCC
-		default: if(isFlag(ops & 3)) CpuZX::PC += d;
+		default: if(isFlag(ops & 3)) _PC += d;
 	}
 }
 
@@ -25,22 +25,22 @@ void DecoderZX::funcN00_010() {
 	if(ops < 4) {
 		// LD (BC/DE), A | LD A, (BC/DE)
 		ssh_w reg = *fromRP_AF(ops);
-		if(ops & 1) *CpuZX::A = read_mem8(reg); else write_mem8(reg, *CpuZX::A);
+		if(ops & 1) *_A = read_mem8(reg); else write_mem8(reg, *_A);
 	} else {
 		// LD [nn], HL/A | LD A/HL, [nn]
 		ssh_w nn = read_mem16PC();
 		ssh_w* reg = fromRP_AF(4);
 		bool d = ops & 2;
 		if(ops & 1) {
-			if(d) *CpuZX::A = read_mem8(nn); else *reg = read_mem16(nn);
+			if(d) *_A = read_mem8(nn); else *reg = read_mem16(nn);
 		} else {
-			if(d) write_mem8(nn, *CpuZX::A); else write_mem16(nn, *reg);
+			if(d) write_mem8(nn, *_A); else write_mem16(nn, *reg);
 		}
 	}
 }
 
 void DecoderZX::funcN00_111() {
-	ssh_b a = *CpuZX::A;
+	ssh_b a = *_A;
 	ssh_b oldFc = getFlag(FC);
 	switch(ops) {
 		// DAA SZ5*3P-*
@@ -69,9 +69,9 @@ void DecoderZX::funcN00_111() {
 		case 6:	update_flags(F5 | FH | F3 | FN | FC, (a & 0b00101000) | 1); break;
 		// CCF; CY <-NOT CY --***-0C H <-старый C
 		case 7: update_flags(F5 | FH | F3 | FN | FC, (a & 0b00101000) | (oldFc << 4) | (oldFc == 0)); break;
-		default: a = rotate(a, F5 | FH | F3 | FN | FC);
+		default: a = rotate(a, false);//F5 | FH | F3 | FN | FC);
 	}
-	*CpuZX::A = a;
+	*_A = a;
 }
 
 void DecoderZX::ldRp() {

@@ -9,7 +9,8 @@ extern ssh_d colours[];
 
 void BorderZX::draw() {
 	ssh_d* p = &gpu->memory[y * 320];
-	ssh_d c = colours[CpuZX::portFE & 7];
+	ssh_b col = _PORT_FE & 7;
+	ssh_d c = colours[col];
 
 	for(int x = 0; x < 320; x++) {
 		if(y < 32 || y > 223) *p = c;
@@ -20,7 +21,7 @@ void BorderZX::draw() {
 
 void BorderZX::execute() {
 	if(!gpu->memory) return;
-	if((CpuZX::STATE & CpuZX::BORDER) == 0 && y == 0) {
+	if((_STATE & ZX_BORDER) == 0 && y == 0) {
 		if(redraw) {
 			start++;
 			if(start > 10) {
@@ -32,7 +33,7 @@ void BorderZX::execute() {
 		}
 		return;
 	}
-	CpuZX::STATE &= ~CpuZX::BORDER;
+	_STATE &= ~ZX_BORDER;
 	redraw = false;
 	draw();
 	y++;

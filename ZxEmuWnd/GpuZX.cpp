@@ -2,14 +2,14 @@
 #include "stdafx.h"
 #include "GpuZX.h"
 #include "CpuZX.h"
-#include "BorderZX.h"
-#include "SoundZX.h"
+#include "SettingsZX.h"
 
-ssh_d colours[] = {	0xff000000, 0xff0000c0, 0xffc00000, 0xffc000c0, 0xff00c000, 0xff00c0c0, 0xffc0c000, 0xffc0c0c0,
-					0xff000000, 0xff0000e8, 0xffe80000, 0xffe800e8, 0xff00e800, 0xff00e8e8, 0xffe8e800, 0xffe8e8e8};
+ssh_d colours[] = {	0xff000000, 0xff2030c0, 0xffc04010, 0xffc040c0, 0xff40b010, 0xff50c0b0, 0xffe0c010, 0xffc0c0c0,
+					0xff000000, 0xff3040ff, 0xffff4030, 0xffff70f0, 0xff50e010, 0xff50e0ff, 0xffffe850, 0xffffffff};
 
-extern HWND hWnd;
-extern RECT rectWnd;
+ssh_ws str[256];
+
+extern SettingsZX settings;
 
 GpuZX::GpuZX() {
 	invert = 0;
@@ -38,8 +38,6 @@ void GpuZX::makeCanvas() {
 	hdcMem = ::CreateCompatibleDC(NULL);
 }
 
-wchar_t* str = new wchar_t[256];
-
 void GpuZX::showScreen() {
 	HDC hdc;
 	if((hdc = ::GetDC(hWnd))) {
@@ -47,7 +45,7 @@ void GpuZX::showScreen() {
 		StretchBlt(hdc, rectWnd.left, rectWnd.top, rectWnd.right - rectWnd.left, rectWnd.bottom - rectWnd.top, hdcMem, 0, 0, 320, 256, SRCCOPY);
 		SelectObject(hdcMem, h);
 		::DeleteObject(hdc);
-		wsprintf(str, L"PC: %d", CpuZX::PC);
+		wsprintf(str, L"PC: %d", _PC);
 		SetWindowText(hWnd, (LPCWSTR)str);
 	}
 }
@@ -67,8 +65,8 @@ void GpuZX::execute() {
 			for(int line = 0; line < 8; line++) {
 				ssh_d* graphics = dest;
 				for(int x = 0; x < 32; x++) {
-					decodeColor(CpuZX::memory[colors + x]);
-					drawLine(graphics, CpuZX::memory[graphZ + x]);
+					decodeColor(memZX[colors + x]);
+					drawLine(graphics, memZX[graphZ + x]);
 					graphics += 8;
 				}
 				dest -= 320;
@@ -79,12 +77,23 @@ void GpuZX::execute() {
 		}
 		graph += 2048;
 	}
-
+	int filter = settings.postProcess;
+	if(filter > 0) {
+		dest = &memory[32 * 320 + 32];
+		int x = 0, y = 1;
+		while(y++ < 191) {
+			while(x++ < 256) {
+				*dest++ = filter == 1 ? asm_ssh_mixed(dest, dest + 320) : asm_ssh_bilinear(x, y, 320, dest);
+			}
+			dest += 64;
+			x = 0;
+		} 
+	}
 	showScreen();
 
 	invert++;
 
-	CpuZX::trap = 1;
+	_TRAP = 1;
 }
 
 void GpuZX::decodeColor(ssh_b color) {
@@ -97,7 +106,7 @@ void GpuZX::decodeColor(ssh_b color) {
 
 void GpuZX::write(ssh_b* address, ssh_b val) {
 	return;
-	ssh_w offs = (ssh_w)(address - &CpuZX::memory[16384]);
+	ssh_w offs = (ssh_w)(address - &memZX[16384]);
 	int x, y;
 	ssh_d* addr = &memory[32 * 320 + 32];
 	if(offs >= 6144) {
@@ -106,7 +115,7 @@ void GpuZX::write(ssh_b* address, ssh_b val) {
 		x = offs & 31;
 		y = (offs / 32);
 		decodeColor(val);
-		ssh_b* screen = &CpuZX::memory[16384 + ((y / 8) * 2048 + ((y & 7) * 32)) + x];
+		ssh_b* screen = &memZX[16384 + ((y / 8) * 2048 + ((y & 7) * 32)) + x];
 		addr += ((24 - y) * 8 * 320 + x * 8 - 320);
 		for(int n = 0; n < 8; n++) {
 			drawLine(addr, *screen);
@@ -124,7 +133,7 @@ void GpuZX::write(ssh_b* address, ssh_b val) {
 		x = offs & 31;
 		y = 191 - (bank + (h + (l / 32) * 8));
 		addr += (y * 320 + x * 8);
-		decodeColor(CpuZX::memory[22528 + (y / 8) * 32 + x]);
+		decodeColor(memZX[22528 + (y / 8) * 32 + x]);
 		drawLine(addr, val);
 	}
 }
@@ -138,9 +147,9 @@ void GpuZX::drawLine(ssh_d* addr, ssh_b val) {
 bool GpuZX::saveScreen(ssh_cws path) {
 	int h = 0;
 	bool result = true;
-	bool exec = CpuZX::isExec;
+	auto state = _STATE;
 
-	CpuZX::isExec = false;
+	_STATE &= ~ZX_EXEC;
 
 	try {
 		_wsopen_s(&h, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
@@ -175,7 +184,7 @@ bool GpuZX::saveScreen(ssh_cws path) {
 	}
 	if(h) _close(h);
 
-	CpuZX::isExec = exec;
+	_STATE = state;
 
 	return result;
 }

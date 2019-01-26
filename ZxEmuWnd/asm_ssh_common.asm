@@ -57,6 +57,9 @@ is_valid	dw 0, 10, 11, 12, 13, 14, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4,
 base64_chars	dw 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90
 				dw 97, 98, 99, 100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122
 				dw 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 43, 47, 0
+ALIGN 16
+_fp255x4	dd 255.0, 255.0, 255.0, 255.0
+_blur		dd 0.25, 0.25, 0.25, 0.25
 
 .code
 
@@ -946,5 +949,81 @@ asm_ssh_bwt_untransform endp
 ssh_asm_encode_ari proc
 		ret
 ssh_asm_encode_ari endp
+
+; (void* pix, int ofs, int width);
+asm_ssh_mixed proc
+		pxor mm4, mm4
+		movd mm0, dword ptr [rcx]
+		movd mm1, dword ptr [rcx + 4]
+		movd mm2, dword ptr [rdx]
+		movd mm3, dword ptr [rdx + 4]
+		punpcklbw mm0, mm4
+		punpcklbw mm1, mm4
+		paddusw mm0, mm1
+		punpcklbw mm2, mm4
+		punpcklbw mm3, mm4
+		paddusw mm2, mm3
+		paddusw mm0, mm2
+		psraw mm0, 2
+		packuswb mm0, mm2
+		movd eax, mm0
+		emms
+		ret
+asm_ssh_mixed endp
+
+; rcx = x, rdx = y, r8 - pitch, r9 - pix
+asm_ssh_bilinear proc
+		lea r10, [r9 + r8 * 4]
+		xorps xmm15, xmm15
+		movaps xmm14, _fp255x4
+		movaps xmm13, _blur
+		movd xmm0, dword ptr [r9]
+		movd xmm1, dword ptr [r9 + 4]
+		movd xmm2, dword ptr [r10]
+		movd xmm3, dword ptr [r10 + 4]
+		punpcklbw xmm0, xmm15
+		punpcklbw xmm1, xmm15
+		punpcklbw xmm2, xmm15
+		punpcklbw xmm3, xmm15
+		punpcklwd xmm0, xmm15
+		punpcklwd xmm1, xmm15
+		punpcklwd xmm2, xmm15
+		punpcklwd xmm3, xmm15
+		cvtdq2ps xmm0, xmm0
+		cvtdq2ps xmm1, xmm1
+		cvtdq2ps xmm2, xmm2
+		cvtdq2ps xmm3, xmm3
+
+		divps xmm0, xmm14
+		divps xmm1, xmm14
+		divps xmm2, xmm14
+		divps xmm3, xmm14
+
+		movaps xmm10, xmm0
+		movaps xmm12, xmm2
+		
+		subps xmm1, xmm0
+		subps xmm3, xmm2
+
+		mulps xmm1, xmm13
+		mulps xmm3, xmm13
+
+		addps xmm1, xmm10
+		addps xmm3, xmm12
+
+		subps xmm3, xmm1
+		mulps xmm3, xmm13
+
+		addps xmm3, xmm1
+		mulps xmm3, xmm14
+
+		cvtps2dq xmm3, xmm3
+		packssdw xmm3, xmm3
+		packuswb xmm3, xmm3
+
+		movd rax, xmm3
+
+		ret
+asm_ssh_bilinear endp
 
 end

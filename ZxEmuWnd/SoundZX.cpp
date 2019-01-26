@@ -3,28 +3,26 @@
 #include "SoundZX.h"
 #include "CpuZX.h"
 
-extern HWND hWnd;
 int play_index = 0;
 int cur_index = 0;
 
 int cur_signal = -1;
 DWORD old_tm = 0;
 
-extern DWORD delayCPU;
-
 ssh_w buffer[16384];
 
 void SoundZX::execute(DWORD new_tm) {
 	ssh_d tm = (new_tm - old_tm);
-	if((CpuZX::STATE & CpuZX::SOUND) == 0) {
+	if((_STATE & ZX_SOUND) == 0) {
 		if(tm > 32768) {
 			cur_signal = -1;
 			old_tm = new_tm;
 		}
 		return;
 	}
-	CpuZX::STATE &= ~CpuZX::SOUND;
-	ssh_b signal = (CpuZX::portFE & 16) != 0;
+	_STATE &= ~ZX_SOUND;
+
+	ssh_b signal = (_PORT_FE & 16) != 0;
 	if(cur_signal == -1) {
 		cur_signal = signal;
 		old_tm = new_tm;

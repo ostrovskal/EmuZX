@@ -71,9 +71,9 @@ void KeyboardZX::writePort(ssh_b num, bool pressed) {
 	for(int i = 0; i < 9; i++) {
 		if(i == 8) nport = numPort[num / 5] << 8; else nport = i << 8;
 		if(pressed) {
-			CpuZX::port[nport | 254] &= ~msk;
+			portsZX[nport | 254] &= ~msk;
 		} else {
-			CpuZX::port[nport | 254] |= msk;
+			portsZX[nport | 254] |= msk;
 		}
 	}
 }
@@ -106,7 +106,7 @@ ssh_b joystick[] = {0, 0, 4, 0, 2, 16, 1, 0, 8, 0};
 void KeyboardZX::execute(ssh_b key, bool pressed) {
 	if(key >= VK_NUMPAD0 && key <= VK_NUMPAD9) {
 		ssh_b bit = joystick[key - VK_NUMPAD0];
-		if(pressed) CpuZX::port[31] |= bit; else CpuZX::port[31] &= ~bit;
+		if(pressed) portsZX[31] |= bit; else portsZX[31] &= ~bit;
 		return;
 	}
 	if(key == VK_SHIFT) {

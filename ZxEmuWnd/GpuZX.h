@@ -1,22 +1,5 @@
 #pragma once
 
-#pragma pack(push, 1)
-struct HEADER_TGA {
-	ssh_b	bIdLength;		// 
-	ssh_b	bColorMapType;	// тип цветовой карты ()
-	ssh_b	bType;			// тип файла ()
-	ssh_w	wCmIndex;		// тип индексов в палитре
-	ssh_w	wCmLength;		// длина палитры
-	ssh_b	bCmEntrySize;	// число бит на элемент палитры
-	ssh_w	wXorg;			// 
-	ssh_w	wYorg;			// 
-	ssh_w	wWidth;			// ширина
-	ssh_w	wHeight;		// высота
-	ssh_b	bBitesPerPixel;	// бит на пиксель
-	ssh_b	bFlags;			// 
-};
-#pragma pack(pop)
-
 class GpuZX {
 public:
 	GpuZX();

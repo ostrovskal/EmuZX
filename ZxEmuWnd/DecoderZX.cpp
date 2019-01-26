@@ -2,10 +2,10 @@
 #include "stdafx.h"
 #include "DecoderZX.h"
 
-extern funcOps table_opsN00_XXX[];
-extern funcOps table_opsN11_XXX[];
-extern funcOps table_opsED01_XXX[];
-extern funcOps table_opsED10_XXX[];
+extern funcDecoder table_opsN00_XXX[];
+extern funcDecoder table_opsN11_XXX[];
+extern funcDecoder table_opsED01_XXX[];
+extern funcDecoder table_opsED10_XXX[];
 
 ssh_b flags_cond[4] = {FZ, FC, FPV, FS};
 ssh_b cnvPrefixAF[] = {RC, RB, RE, RD, RL, RH, RA, RF, RC, RB, RE, RD, RIXL, RIXH, RA, RF, RC, RB, RE, RD, RIYL, RIYH, RA, RF};
@@ -13,9 +13,9 @@ ssh_b cnvPrefixSP[] = {RC, RB, RE, RD, RL, RH, RSPL, RSPH, RC, RB, RE, RD, RIXL,
 
 ssh_b DecoderZX::readPort(ssh_w address) {
 	if((address % 256) == 31) {
-		return CpuZX::port[31];
+		return portsZX[31];
 	}
-	return CpuZX::port[address];
+	return portsZX[address];
 }
 
 void DecoderZX::writePort(ssh_w address, ssh_b val) {
@@ -23,12 +23,12 @@ void DecoderZX::writePort(ssh_w address, ssh_b val) {
 		// 0, 1, 2 - бордер
 		// 3 MIC - при записи/загрузке
 		// 4 - SOUND
-		CpuZX::portFE &= 224;
-		CpuZX::portFE |= (val & 31);
-		CpuZX::STATE |= (CpuZX::SOUND | CpuZX::BORDER);
+		_PORT_FE &= 224;
+		_PORT_FE |= (val & 31);
+		_STATE |= (ZX_SOUND | ZX_BORDER);
 		return;
 	}
-	CpuZX::port[address] = val;
+	portsZX[address] = val;
 
 }
 
@@ -62,24 +62,25 @@ void DecoderZX::swapReg(ssh_w* r1, ssh_w* r2) {
 }
 
 void DecoderZX::execCALL(ssh_w address) {
-	(*CpuZX::SP) -= 2;
-	write_mem16(*CpuZX::SP, CpuZX::PC);
-	CpuZX::PC = address;
+	(*_SP) -= 2;
+	write_mem16(*_SP, _PC);
+	_PC = address;
 }
 
-ssh_b DecoderZX::rotate(ssh_b v, int msk) {
+ssh_b DecoderZX::rotate(ssh_b v, bool ed) {
 	// --503-0C | SZ503P0C
-	ssh_b fc = (v & ((ops & 1) ? 1 : 128));
+	ssh_b ofc = getFlag(FC);
+	ssh_b fc = ((v & ((ops & 1) ? 1 : 128)) != 0);
 	ssh_b v1 = ((ops & 1) ? v >> 1 : v << 1);
 	switch(ops) {
 		// RLC
-		case 0: v = (fc == 128); break;
+		case 0: v = fc; break;
 		// RRC
-		case 1: v = ((fc == 1) << 7); break;
+		case 1: v = fc << 7; break;
 		// RL
-		case 2: v = getFlag(FC); break;
+		case 2: v = ofc; break;
 		// RR
-		case 3: v = (getFlag(FC) << 7); break;
+		case 3: v = ofc << 7; break;
 		// SLA SRL
 		case 4: case 7: v = 0; break;
 		// SRA
@@ -88,33 +89,37 @@ ssh_b DecoderZX::rotate(ssh_b v, int msk) {
 		case 6: v = 1; break;
 	}
 	v |= v1;
-	update_flags(msk, msk & ((v & 128) | GET_FZ(v) | (v & 0b00101000) | GET_FP(v) | (fc != 0)));
+	if(ed) {
+		update_flags(FS | FZ | F5 | FH | F3 | FPV | FN | FC, (v & 128) | GET_FZ(v) | (v & 0b00101000) | GET_FP(v) | fc);
+	} else {
+		update_flags(F5 | FH | F3 | FN | FC, (v & 0b00101000) | fc);
+	}
 	return v;
 }
 
 void DecoderZX::opsAccum(ssh_b d) {
 	ssh_w nVal = 0;
-	ssh_b a = *CpuZX::A;
+	ssh_b a = *_A;
 	ssh_b fn = 0;
 	ssh_b fh = 255;
 	ssh_b fc = getFlag(FC);
 
 	switch(ops) {
-		// ADD A, d; A <- A + d; SZ5H3V0C
+		// ADD A, d; SZ5H3V0C
 		case 0: nVal = a + d; break;
-		// ADC A, d; A <- A + d + CY; SZ5H3V0C
+		// ADC A, d; SZ5H3V0C
 		case 1: nVal = a + (d + fc); break;
-		// SUB A, d; A <- A - d; SZ5H3V1C
+		// SUB A, d; SZ5H3V1C
 		case 2: nVal = a - d; fn = 2; break;
-		// SBC A, d; A <- A - d - CY; SZ5H3V1C
+		// SBC A, d; SZ5H3V1C
 		case 3: nVal = a - (d + fc); fn = 2; break;
-		// AND A, d; A <- A AND d; SZ513P00
+		// AND A, d; SZ513P00
 		case 4: nVal = a & d; fh = 16; break;
-		// XOR A, d; A <- A XOR d; SZ503P00
+		// XOR A, d; SZ503P00
 		case 5: nVal = a ^ d; fh = 0; break;
-		// OR A, d; A <- A OR d; SZ503P00
+		// OR A, d; SZ503P00
 		case 6: nVal = a | d; fh = 0; break;
-		// CP A, d; A - d; SZ*H*V1C; F5 и F3 - копия d
+		// CP A, d; SZ*H*V1C; F5 и F3 - копия d
 		case 7: nVal = a - d; fn = 2; break;
 	}
 	ssh_b val = (ssh_b)nVal;
@@ -128,7 +133,7 @@ void DecoderZX::opsAccum(ssh_b d) {
 		fc = 0;
 		fpv = GET_FP(val); 
 	}
-	if(ops != 7) *CpuZX::A = val;
+	if(ops != 7) *_A = val;
 
 	update_flags(FS | FZ | F5 | FH | F3 | FPV | FN | FC, ((ops == 7 ? d : val) & 0b00101000) | (val & 128) | GET_FZ(val) | fh | fpv | fn | fc);
 }
@@ -140,14 +145,14 @@ void DecoderZX::ops00_NO() {
 void DecoderZX::ops01_NO() {
 	if(typeOps == ops && ops == 6) {
 		// halt
-	if(!CpuZX::trap) CpuZX::PC--;
+	if(!_TRAP) _PC--;
 	} else {
 		if(typeOps == 6) {
 			// LD DDD, [HL/IX]
-			CpuZX::cpu[(RC + ((ops & 7) ^ 1))] = *fromRON(typeOps);
+			regsZX[(RC + ((ops & 7) ^ 1))] = *fromRON(typeOps);
 		} else if(ops == 6) {
 			// LD [HL/IX], SSS
-			write_mem8(fromRON(ops), CpuZX::cpu[(RC + ((typeOps & 7) ^ 1))], ops);
+			write_mem8(fromRON(ops), regsZX[(RC + ((typeOps & 7) ^ 1))], ops);
 		} else {
 			// LD DDD, SSS
 			write_mem8(fromRON(ops), *fromRON(typeOps), ops);
@@ -163,25 +168,19 @@ void DecoderZX::ops11_NO() {
 	(this->*table_opsN11_XXX[typeOps])();
 }
 	
-void DecoderZX::opsXX_ED() {
-	noni();
-}
-
 void DecoderZX::ops01_ED() {
 	(this->*table_opsED01_XXX[typeOps])();
 }
 
-funcOps table_ops[] = {
-	&DecoderZX::ops00_NO, &DecoderZX::ops00_CB, &DecoderZX::opsXX_ED,
+funcDecoder table_ops[] = {
+	&DecoderZX::ops00_NO, &DecoderZX::ops00_CB, &DecoderZX::noni,
 	&DecoderZX::ops01_NO, &DecoderZX::ops01_CB, &DecoderZX::ops01_ED,
 	&DecoderZX::ops10_NO, &DecoderZX::ops10_CB, &DecoderZX::ops10_ED,
-	&DecoderZX::ops11_NO, &DecoderZX::ops11_CB, &DecoderZX::opsXX_ED
+	&DecoderZX::ops11_NO, &DecoderZX::ops11_CB, &DecoderZX::noni
 };
 
 void DecoderZX::execOps(int prefix1, int prefix2) {
-	// инкремент R
-	ssh_b r1 = CpuZX::RR & 127;
-	CpuZX::RR = (CpuZX::RR & 128) | (++r1 & 127);
+	incrementR();
 	// читаем операцию
 	ssh_b group = readOps();
 	prefix = prefix1;
