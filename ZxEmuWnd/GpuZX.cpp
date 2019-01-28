@@ -42,7 +42,8 @@ void GpuZX::showScreen() {
 	HDC hdc;
 	if((hdc = ::GetDC(hWnd))) {
 		HGDIOBJ h = SelectObject(hdcMem, hbmpMem);
-		StretchBlt(hdc, rectWnd.left, rectWnd.top, rectWnd.right - rectWnd.left, rectWnd.bottom - rectWnd.top, hdcMem, 0, 0, 320, 256, SRCCOPY);
+		LPRECT r = &theApp.wndRect;
+		StretchBlt(hdc, r->left, r->top, r->right - r->left, r->bottom - r->top, hdcMem, 0, 0, 320, 256, SRCCOPY);
 		SelectObject(hdcMem, h);
 		::DeleteObject(hdc);
 		wsprintf(str, L"PC: %d", _PC);
@@ -77,7 +78,7 @@ void GpuZX::execute() {
 		}
 		graph += 2048;
 	}
-	int filter = settings.postProcess;
+	auto filter = theApp.getOpt(OPT_PP)->dval;
 	if(filter > 0) {
 		dest = &memory[32 * 320 + 32];
 		int x = 0, y = 1;
@@ -93,7 +94,7 @@ void GpuZX::execute() {
 
 	invert++;
 
-	_TRAP = 1;
+	*_TRAP = 1;
 }
 
 void GpuZX::decodeColor(ssh_b color) {
@@ -105,7 +106,6 @@ void GpuZX::decodeColor(ssh_b color) {
 }
 
 void GpuZX::write(ssh_b* address, ssh_b val) {
-	return;
 	ssh_w offs = (ssh_w)(address - &memZX[16384]);
 	int x, y;
 	ssh_d* addr = &memory[32 * 320 + 32];
@@ -145,15 +145,13 @@ void GpuZX::drawLine(ssh_d* addr, ssh_b val) {
 }
 
 bool GpuZX::saveScreen(ssh_cws path) {
-	int h = 0;
 	bool result = true;
-	auto state = _STATE;
 
-	_STATE &= ~ZX_EXEC;
+	pauseCPU(true, 0);
 
 	try {
-		_wsopen_s(&h, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
-		if(h) {
+		_wsopen_s(&_hf, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
+		if(_hf) {
 			HEADER_TGA head;
 
 			head.bIdLength = 0;
@@ -172,19 +170,18 @@ bool GpuZX::saveScreen(ssh_cws path) {
 			head.bBitesPerPixel = 32;
 			head.bFlags = 0x28;
 
-			if(_write(h, &head, sizeof(HEADER_TGA)) != sizeof(HEADER_TGA)) throw(0);
+			if(_write(_hf, &head, sizeof(HEADER_TGA)) != sizeof(HEADER_TGA)) throw(0);
 			ssh_d* ptr = (memory + 320 * 255);
 			for(int i = 0; i < 256; i++) {
-				if(_write(h, ptr, 1280) != 1280) throw(0);
+				if(_write(_hf, ptr, 1280) != 1280) throw(0);
 				ptr -= 320;
 			}
 		}
-	} catch(...) {
-		result = false;
-	}
-	if(h) _close(h);
+	} catch(...) { result = false; }
 
-	_STATE = state;
+	SAFE_CLOSE1(_hf);
+
+	pauseCPU(false, 0);
 
 	return result;
 }

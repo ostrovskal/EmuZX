@@ -17,15 +17,12 @@ void DecoderZX::funcN11_000() {
 		if(!isFlag(ops)) return;
 	}
 	switch(typeOps) {
-		// RET CCC; Если CCC то PC <- [SP]; SP += 2
-		case 0: 
-			_PC = read_mem16(*_SP);
-			(*_SP) += 2;
-			break;
-		// JP CCC, nn; Если CCC то PC <- nn
+		// RET CCC
+		case 0: _PC = read_mem16(*_SP); (*_SP) += 2; break;
+		// JP CCC, nn
 		case 2:  _PC = nn; break;
-		// CALL ССС, nn; Если ССС то SP -= 2; [SP] <-PC; PC <-nn
-		// RST NNN; SP -= 2; [SP] <- PC;  PC <- NNN * 8
+		// CALL ССС, nn
+		// RST NNN
 		case 4: case 7:
 			(*_SP) -= 2;
 			write_mem16(*_SP, _PC);
@@ -50,7 +47,7 @@ void DecoderZX::funcN11_001() {
 		// JP [HL/IX]
 		case 1:	case 5: _PC = reg; break;
 		// EXX
-		case 3: swapReg(_BC, (_BC + 7)); swapReg(_DE, (_DE + 7)); swapReg(_HL, (_HL + 7)); break;
+		case 3: swapReg(_BC, _BC + 4); swapReg(_DE, _DE + 4); swapReg(_HL, _HL + 4); break;
 		// LD SP, HL
 		case 7: *_SP = reg; break;
 		// POP RP
@@ -64,7 +61,7 @@ void DecoderZX::funcN11_101() {
 		case 1: execCALL(read_mem16PC()); break;
 		// prefix DD/FD
 		case 3: case 7: {
-			ssh_b n = memZX[_PC];
+			ssh_b n = read_mem8(_PC);
 			if(n == 0xDD || n == 0xFD || n == 0xED) noni();
 			else execOps(((ops & 4) >> 2) + 1, (n == 0xCB ? PREFIX_CB : 0));
 			break;
@@ -98,6 +95,6 @@ void DecoderZX::funcN11_011() {
 		// EX HL, DE
 		case 5: swapReg(_DE, _HL); break;
 		// EI/DI
-		default: _IFF1 = _IFF2 = (ops & 1); _STATE &= ~ZX_INT; _STATE |= (ZX_INT * !(ops & 1));
+		default: *_IFF1 = *_IFF2 = (ops & 1); modifyTSTATE(!(ops & 1), ZX_INT);
 	}
 }

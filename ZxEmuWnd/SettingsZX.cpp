@@ -1,53 +1,61 @@
 
 #include "stdafx.h"
 #include "SettingsZX.h"
+#include "zxDebugger.h"
+
+extern zxDebugger* debug;
 
 ssh_cws nameROMs[] = {L"48K", L"128K"};
 ssh_cws namePPs[] = {L"None", L"Mixed", L"Bilinear"};
 
-ssh_cws options[] = {
-	L"soundEnable",
-	L"monitorEnable",
-	L"keyboardEnable",
-	L"turboEnable",
-	L"postProcess",
-	L"soundFraquency",
-	L"delayCPU",
-	L"delayGPU",
-	L"path",
-	L"model",
-	L"mru0",
-	L"mru1",
-	L"mru2",
-	L"mru3",
-	L"mru4",
-	L"mru5",
-	L"mru6",
-	L"mru7",
-	L"mru8",
-	L"mru9",
-	nullptr
+ZX_OPTION opt[] = {
+	{OPTT_STRING, L"mru0"},
+	{OPTT_STRING, L"mru1"},
+	{OPTT_STRING, L"mru2"},
+	{OPTT_STRING, L"mru3"},
+	{OPTT_STRING, L"mru4"},
+	{OPTT_STRING, L"mru5"},
+	{OPTT_STRING, L"mru6"},
+	{OPTT_STRING, L"mru7"},
+	{OPTT_STRING, L"mru8"},
+	{OPTT_STRING, L"mru9"},
+	{OPTT_STRING, L"bps0"},
+	{OPTT_STRING, L"bps1"},
+	{OPTT_STRING, L"bps2"},
+	{OPTT_STRING, L"bps3"},
+	{OPTT_STRING, L"bps4"},
+	{OPTT_STRING, L"bps5"},
+	{OPTT_STRING, L"bps6"},
+	{OPTT_STRING, L"bps7"},
+	{OPTT_STRING, L"bps8"},
+	{OPTT_STRING, L"bps9"},
+	{OPTT_STRING, L"path"},
+
+	{OPTT_BOOL, L"soundEnable", 0},
+	{OPTT_BOOL, L"debuggerEnable", 0},
+	{OPTT_BOOL, L"keyboardEnable", 0},
+	{OPTT_BOOL, L"turboEnable", 0},
+	{OPTT_BOOL, L"decimalEnable", 1},
+	{OPTT_BOOL, L"executeEnable", 1},
+	{OPTT_BOOL, L"debuggerShowPADDR", 1},
+	{OPTT_BOOL, L"debuggerShowPPADDR", 0},
+	{OPTT_BOOL, L"debuggerShowData", 0},
+	{OPTT_DWORD, L"delayCPU", 8},
+	{OPTT_DWORD, L"delayGPU", 20},
+	{OPTT_DWORD, L"soundFrequency", 44100},
+	{OPTT_DWORD, L"memoryModel", MODEL_48K},
+	{OPTT_DWORD, L"postProcess", PP_BILINEAR}
 };
 
 SettingsZX::SettingsZX() {
-	ssh_ws buf[MAX_PATH];
-	::GetModuleFileName(::GetModuleHandle(NULL), buf, MAX_PATH);
-	mainDir = buf;
+	::GetModuleFileName(hInst,	mainDir.reserved(MAX_PATH), MAX_PATH);
+	mainDir.releaseReserved();
 	mainDir = mainDir.left(mainDir.find_rev(L'\\') + 1);
-	curPath = mainDir;
-
-	modelZX = 0;
-	delayCPU = DELAY_CPU;
-	delayGPU = DELAY_GPU;
-	isSound = true;
-	isMonitor = false;
-	isKeyboard = false;
-	isTurbo = false;
-	postProcess = 0;
-	sndFreq = 44100;
+	options = opt;
+	get(OPT_CUR_PATH)->sval = mainDir;
 }
 
-bool readLine(FILE* hh, StringZX& name, StringZX& value) {
+bool SettingsZX::readLine(FILE* hh, StringZX& name, StringZX& value) {
 	StringZX tmp(L'\0', 256);
 	if(!fgetws(tmp.buffer(), 255, hh)) return false;
 	auto l = wcslen(tmp.buffer()) - 1;
@@ -58,75 +66,53 @@ bool readLine(FILE* hh, StringZX& name, StringZX& value) {
 }
 
 void SettingsZX::load(const StringZX& path) {
-
 	StringZX name, value;
-	FILE* hh = nullptr;
 
-	_wfopen_s(&hh, path, L"rt,ccs=UTF-16LE");
-	if(hh) {
+	_wfopen_s(&hf, path, L"rt,ccs=UTF-16LE");
+	if(hf) {
 		while(true) {
-			if(!readLine(hh, name, value)) break;
-			auto dd = name.buffer();
-			auto dd1 = value.buffer();
-			int num = 0;
-			ssh_cws opt;
-			while((opt = options[num]) != nullptr) {
-				if(name == opt) break;
-				num++;
-			}
-			ssh_d val = *(ssh_d*)asm_ssh_wton(value.buffer(), (ssh_u)Radix::_dec);
-			bool bval = value == L"true";
-			switch(num) {
-				case 0: isSound = bval; break;
-				case 1: isMonitor = bval; break;
-				case 2: isKeyboard = bval; break;
-				case 3: isTurbo = bval; break;
-				case 4: postProcess = (ssh_b)val; break;
-				case 5: sndFreq = val; break;
-				case 6: delayCPU = val; break;
-				case 7: delayGPU = val; break;
-				case 8: curPath = value; break;
-				case 9: modelZX = (ssh_b)val; break;
-				default: mru[num - 10] = value; break;
+			if(!readLine(hf, name, value)) break;
+			for(auto& o : opt) {
+				if(name != o.name) continue;
+				switch(o.type) {
+					case OPTT_STRING:
+						o.sval = value;
+						break;
+					case OPTT_DWORD:
+						o.dval = *(ssh_d*)asm_ssh_wton(value.buffer(), (ssh_u)Radix::_dec);
+						break;
+					case OPTT_BOOL:
+						o.dval = value == L"true";
+						break;
+				}
+				break;
 			}
 		}
-		fclose(hh);
+		fclose(hf);
 	}
 }
 
 void SettingsZX::save(const StringZX& path) {
-	FILE* hh = nullptr;
-
-	_wfopen_s(&hh, path, L"wt,ccs=UTF-16LE");
-	if(hh) {
-		int num = 0;
-		ssh_cws opt;
-		while((opt = options[num]) != nullptr) {
-			StringZX line(opt);
-			line += L'=';
-			ssh_u val = -1;
-			ssh_b bval = 255;
-			ssh_cws sval = nullptr;
-			switch(num) {
-				case 0: bval = isSound; break;
-				case 1: bval = isMonitor; break;
-				case 2: bval = isKeyboard; break;
-				case 3: bval = isTurbo; break;
-				case 4: val = postProcess; break;
-				case 5: val = sndFreq; break;
-				case 6: val = delayCPU; break;
-				case 7: val = delayGPU; break;
-				case 8: sval = curPath; break;
-				case 9: val = modelZX; break;
-				default: sval = mru[num - 10]; break;
+	_wfopen_s(&hf, path, L"wt,ccs=UTF-16LE");
+	if(hf) {
+		for(auto& o : opt) {
+			ssh_cws value;
+			ssh_u u;
+			switch(o.type) {
+				case OPTT_DWORD:
+					u = o.dval;
+					value = asm_ssh_ntow(&u, (ssh_u)Radix::_dec);
+					break;
+				case OPTT_BOOL:
+					value = o.dval ? L"true" : L"false";
+					break;
+				case OPTT_STRING:
+					value = o.sval;
+					break;
 			}
-			if(val != -1) line += asm_ssh_ntow(&val, (ssh_u)Radix::_dec);
-			else if(sval) line += sval;
-			else if(bval != 255) line += (bval ? L"true" : L"false");
-			line += L'\n';
-			num++;
-			fputws(line, hh);
+			auto ret = swprintf_s(tmpBuf, MAX_PATH, L"%s=%s\n", o.name, value);
+			fputws(tmpBuf, hf);
 		}
-		fclose(hh);
+		fclose(hf);
 	}
 }

@@ -15,7 +15,7 @@ void DecoderZX::ops10_ED() {
 			// LDI [DE] <- [HL]; DE += d; HL += d; BC--; --*0**0-
 			// PV = 1 если после декремента BC<>0; F3 = бит 3 операции переданный байт + A; F5 = бит 1 операции переданный байт + A
 			case 0: {
-				ssh_b bt = memZX[hl];
+				ssh_b bt = read_mem8(hl);
 				write_mem8(*_DE, bt); (*_DE) += d; (*_HL) += d; (*_BC)--;
 				is = *_BC != 0;
 				if(!is || !rep) {
@@ -29,7 +29,7 @@ void DecoderZX::ops10_ED() {
 			// F3 = бит 3 операции A - [HL] - HC, где HC взят из F после предыдущей операции
 			// F5 = бит 1 операции A - [HL] - HC
 			case 1: {
-				ssh_b d = memZX[hl];
+				ssh_b d = read_mem8(hl);
 				ssh_b bt = a - d;
 				ssh_b fz = GET_FZ(bt);
 				(*_HL) += d; (*_BC)--;
@@ -53,7 +53,7 @@ void DecoderZX::ops10_ED() {
 			}
 			// OUTI OUT[BC] <- [HL]; HL += d; B--; SZ5*3***
 			case 3: {
-				portsZX[*_BC] = memZX[hl];
+				portsZX[*_BC] = read_mem8(hl);
 				(*_HL) += d; (*_B)--;
 				is = *_B == 0;
 				if(is || !rep) {

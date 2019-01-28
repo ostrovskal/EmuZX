@@ -4,12 +4,11 @@
 #include "CpuZX.h"
 #include "GpuZX.h"
 
-extern GpuZX* gpu;
 extern ssh_d colours[];
 
 void BorderZX::draw() {
 	ssh_d* p = &gpu->memory[y * 320];
-	ssh_b col = _PORT_FE & 7;
+	ssh_b col = (*_PORT_FE) & 7;
 	ssh_d c = colours[col];
 
 	for(int x = 0; x < 320; x++) {
@@ -21,24 +20,24 @@ void BorderZX::draw() {
 
 void BorderZX::execute() {
 	if(!gpu->memory) return;
-	if((_STATE & ZX_BORDER) == 0 && y == 0) {
+	if((_TSTATE & ZX_BORDER) == 0 && y == 0) {
 		if(redraw) {
 			start++;
 			if(start > 10) {
 				for(y = 0; y < 256; y++) draw();
 				y = 0;
 				redraw = false;
-				gpu->showScreen();
+				theApp.gpu->showScreen();
 			}
 		}
 		return;
 	}
-	_STATE &= ~ZX_BORDER;
+	_TSTATE &= ~ZX_BORDER;
 	redraw = false;
 	draw();
 	y++;
 	if(y >= 256) {
-		gpu->showScreen();
+		theApp.gpu->showScreen();
 		y = 0;
 		redraw = true;
 		start = 0;

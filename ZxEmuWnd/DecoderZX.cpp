@@ -1,6 +1,8 @@
 
 #include "stdafx.h"
 #include "DecoderZX.h"
+#include "GpuZX.h"
+#include "zxDebugger.h"
 
 extern funcDecoder table_opsN00_XXX[];
 extern funcDecoder table_opsN11_XXX[];
@@ -10,6 +12,25 @@ extern funcDecoder table_opsED10_XXX[];
 ssh_b flags_cond[4] = {FZ, FC, FPV, FS};
 ssh_b cnvPrefixAF[] = {RC, RB, RE, RD, RL, RH, RA, RF, RC, RB, RE, RD, RIXL, RIXH, RA, RF, RC, RB, RE, RD, RIYL, RIYH, RA, RF};
 ssh_b cnvPrefixSP[] = {RC, RB, RE, RD, RL, RH, RSPL, RSPH, RC, RB, RE, RD, RIXL, RIXH, RSPL, RSPH, RC, RB, RE, RD, RIYL, RIYH, RSPL, RSPH};
+
+// пишем в память 8 битное значение
+void DecoderZX::write_mem8(ssh_b* address, ssh_b val, ssh_w ron) {
+	if((_TSTATE & ZX_DEBUG) == ZX_DEBUG) debug->checkBPS((ssh_w)(address - memZX), true);
+	if(address < &memZX[16384] && (_TSTATE & ZX_WRITE_ROM) == ZX_WRITE_ROM) { *address = val; }
+	else if(address < &memZX[23296] && (_TSTATE & ZX_WRITE_GPU) == ZX_WRITE_GPU) gpu->write(address, val);
+	else *address = val;
+}
+
+// пишем в память 16 битное значение
+void DecoderZX::write_mem16(ssh_w address, ssh_w val) {
+	ssh_b* mem = &memZX[address];
+	if((_TSTATE & ZX_DEBUG) == ZX_DEBUG) debug->checkBPS(address, true);
+	if(address < 16384 && (_TSTATE & ZX_WRITE_ROM) == ZX_WRITE_ROM) { *(ssh_w*)mem = val; }
+	else if(address < 23296 && (_TSTATE & ZX_WRITE_GPU) == ZX_WRITE_GPU) {
+		gpu->write(mem, (ssh_b)val);
+		gpu->write(mem + 1, val >> 8);
+	} else *(ssh_w*)mem = val;
+}
 
 ssh_b DecoderZX::readPort(ssh_w address) {
 	if((address % 256) == 31) {
@@ -23,42 +44,13 @@ void DecoderZX::writePort(ssh_w address, ssh_b val) {
 		// 0, 1, 2 - бордер
 		// 3 MIC - при записи/загрузке
 		// 4 - SOUND
-		_PORT_FE &= 224;
-		_PORT_FE |= (val & 31);
-		_STATE |= (ZX_SOUND | ZX_BORDER);
+		*_PORT_FE &= 224;
+		*_PORT_FE |= (val & 31);
+		modifyTSTATE(ZX_SOUND | ZX_BORDER, 0);
 		return;
 	}
 	portsZX[address] = val;
 
-}
-
-// вычисление четности
-ssh_b calcFP(ssh_b val) {
-	val = ((val >> 1) & 0x55) + (val & 0x55);
-	val = ((val >> 2) & 0x33) + (val & 0x33);
-	val = ((val >> 4) & 0x0F) + (val & 0x0F);
-	return !(val & 1);
-}
-
-// вычисление переполнения
-ssh_b calcFV(ssh_b val1, ssh_b val2) {
-	if((val1 & 128) != (val2 & 128)) return 4;
-	return 0;
-}
-
-// вычисление полупереноса
-ssh_b calcFH(ssh_b val, ssh_b offs, ssh_b fn) {
-	ssh_b v = val & 15;
-	ssh_b o = offs & 15;
-	ssh_b ret = fn ? v - o : v + o;
-	return (ret > 15) << 4;
-}
-
-void DecoderZX::swapReg(ssh_w* r1, ssh_w* r2) {
-	ssh_w a = *r1;
-	ssh_w b = *r2;
-	*r2 = a;
-	*r1 = b;
 }
 
 void DecoderZX::execCALL(ssh_w address) {

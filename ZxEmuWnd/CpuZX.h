@@ -6,10 +6,6 @@ public:
 	CpuZX();
 	virtual ~CpuZX();
 
-	void signalRESET();
-	void signalINT();
-	void signalNMI();
-
 	// выполнение
 	void execute();
 
@@ -19,6 +15,10 @@ public:
 
 	// дешифратор
 	DecoderZX* decoder;
+protected:
+	void signalRESET();
+	void signalINT();
+	void signalNMI();
 
 	// ПЗУ
 	ssh_b* ROM;

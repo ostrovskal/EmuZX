@@ -24,9 +24,6 @@
     <ClInclude Include="Resource.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="ZxEmuWnd.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="CpuZX.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
@@ -60,12 +57,18 @@
     <ClInclude Include="Z80.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="zxDebugger.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="zxEmulation.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="zxKeyboard.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="ZxEmuWnd.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="CpuZX.cpp">
@@ -116,6 +119,15 @@
     <ClCompile Include="zxDisAsm.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="zxDebugger.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="zxEmulation.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="zxKeyboard.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ZxEmuWnd.rc">
@@ -133,6 +145,9 @@
       <Filter>Файлы ресурсов</Filter>
     </Image>
     <Image Include="toolbar_common.bmp">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="toolbar_debugger.bmp">
       <Filter>Файлы ресурсов</Filter>
     </Image>
   </ItemGroup>

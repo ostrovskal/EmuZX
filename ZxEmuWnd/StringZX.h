@@ -63,6 +63,8 @@ public:
 	friend StringZX operator + (const StringZX& str, ssh_cws wcs) { return StringZX::add(str, str.length(), wcs, wcslen(wcs)); }
 	// методы
 	ssh_ws* buffer() const { return (ssh_ws*)str(); }
+	ssh_ws* reserved(ssh_u count) { alloc(count, false); return buffer(); }
+	void releaseReserved() { _str.len = (int)wcslen(buffer()); }
 	ssh_u length() const { return _str.len; }
 	ssh_ws at(ssh_u idx) const { return (idx < length() ? str()[idx] : 0); }
 	void set(ssh_u idx, ssh_ws ws) { if(idx < length()) buffer()[idx] = ws; }
@@ -93,6 +95,7 @@ public:
 	StringZX substr(ssh_u idx, ssh_l len = -1) const;
 	StringZX left(ssh_u idx) const { return substr(0, idx); }
 	StringZX right(ssh_u idx) const { return substr(length() - idx); }
+	StringZX* split(ssh_cws delim, int& count) const;
 	ssh_cws str() const { return (_str.len_buf > SSH_BUFFER_LENGTH ? _str.ptr : _str.str); }
 #ifdef _DEBUG
 	// тест

@@ -173,8 +173,10 @@
     <ClInclude Include="StringZX.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Z80.h" />
+    <ClInclude Include="zxDebugger.h" />
     <ClInclude Include="zxDisAsm.h" />
-    <ClInclude Include="ZxEmuWnd.h" />
+    <ClInclude Include="zxEmulation.h" />
+    <ClInclude Include="zxKeyboard.h" />
     <ClInclude Include="ZxTimer.h" />
   </ItemGroup>
   <ItemGroup>
@@ -198,8 +200,10 @@
     </ClCompile>
     <ClCompile Include="StringZX.cpp" />
     <ClCompile Include="Z80.cpp" />
+    <ClCompile Include="zxDebugger.cpp" />
     <ClCompile Include="zxDisAsm.cpp" />
-    <ClCompile Include="ZxEmuWnd.cpp" />
+    <ClCompile Include="zxEmulation.cpp" />
+    <ClCompile Include="zxKeyboard.cpp" />
     <ClCompile Include="ZxTimer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -209,6 +213,7 @@
     <Image Include="bitmap1.bmp" />
     <Image Include="small.ico" />
     <Image Include="toolbar_common.bmp" />
+    <Image Include="toolbar_debugger.bmp" />
     <Image Include="ZxEmuWnd.ico" />
   </ItemGroup>
   <ItemGroup>

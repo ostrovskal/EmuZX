@@ -2,18 +2,19 @@
 #pragma once
 
 #include "CpuZX.h"
-#include "GpuZX.h"
 
 extern ssh_b flags_cond[4];
 extern ssh_b cnvPrefixSP[];
 extern ssh_b cnvPrefixAF[];
-extern GpuZX* gpu;
 
 class DecoderZX {
 	friend class CpuZX;
 public:
 	//  онструктор
-	DecoderZX() { }
+	DecoderZX() { 
+		debug = theApp.debug;
+		gpu = theApp.gpu;
+	}
 	
 	// ƒеструктор
 	virtual ~DecoderZX() { }
@@ -21,7 +22,6 @@ public:
 	// обработчики категорий операций с учетом префикса
 	void ops00_NO();
 	void ops00_CB();
-	void opsXX_ED();
 	void ops01_NO();
 	void ops01_CB();
 	void ops01_ED();
@@ -50,14 +50,16 @@ public:
 	void funcED01_000();
 	void funcED01_111();
 
-	void noni() { _STATE &= ~ZX_INT; }
+	void noni() { modifyTSTATE(0, ZX_INT); }
 
 	inline void incrementR() {
-		ssh_b r1 = _R & 127;
-		_R = (_R & 128) | (++r1 & 127);
+		ssh_b fs = *_R & 128;
+		*_R = (((*_R)++) & 127) | fs;
 	}
 
 protected:
+	GpuZX*		gpu;
+	zxDebugger* debug;
 	// читаем операцию
 	inline ssh_b readOps() { 
 		ssh_b v = read_mem8PC();
@@ -88,28 +90,13 @@ protected:
 	inline ssh_b read_mem8PC() { return memZX[_PC++]; }
 
 	// пишем в пам€ть 8 битное значение
-	void write_mem8(ssh_b* address, ssh_b val, ssh_w ron) {
-		if(address < &memZX[16384]) {
-			write_rom(address); 
-			return; 
-		} 
-		else if(address < &memZX[23296]) gpu->write(address, val);
-		*address = val;
-	}
-
-	// пишем в пам€ть 8 битное значение
 	inline void write_mem8(ssh_w address, ssh_b val) { write_mem8(&memZX[address], val, 6); }
 
+	// пишем в пам€ть 8 битное значение
+	void write_mem8(ssh_b* address, ssh_b val, ssh_w ron);
+
 	// пишем в пам€ть 16 битное значение
-	void write_mem16(ssh_w address, ssh_w val) {
-		ssh_b* mem = &memZX[address];
-		if(address < 16384) { write_rom(&memZX[address]); return; }
-		else if(address < 23296) {
-			gpu->write(mem, (ssh_b)val);
-			gpu->write(mem + 1, val >> 8);
-		}
-		*(ssh_w*)mem = val;
-	}
+	void write_mem16(ssh_w address, ssh_w val);
 
 	// преобразуем 2 битный номер регистровой пары в указатель на регистр(с учетом SP)
 	inline ssh_w* fromRP_SP(ssh_b rp) { return (ssh_w*)&regsZX[cnvPrefixSP[(prefix << 3) + (RC + (rp & 6))]]; }
@@ -150,16 +137,13 @@ private:
 	// вызов подпрограммы
 	void execCALL(ssh_w address);
 
-	// обмен значений регистров
-	void swapReg(ssh_w* r1, ssh_w* r2);
-
 	// выполнение операции
 	void execOps(int prefix1, int prefix2);
 
 	// запись в ROM(запрещено)
 	void write_rom(ssh_b* address) {}
 
-	inline void flagsIR(ssh_b bt) { update_flags(FS | FZ | F5 | FH | F3 | FPV | FN, (bt & 128) | GET_FZ(bt) | (bt & 0b00101000) | (_IFF2 << 2)); }
+	inline void flagsIR(ssh_b bt) { update_flags(FS | FZ | F5 | FH | F3 | FPV | FN, (bt & 128) | GET_FZ(bt) | (bt & 0b00101000) | (*_IFF2 << 2)); }
 
 	inline void nop() { }
 

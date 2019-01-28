@@ -195,3 +195,20 @@ const StringZX& StringZX::trim_right(ssh_cws wcs) {
 	_str.len = (int)len;
 	return *this;
 }
+
+StringZX* StringZX::split(ssh_cws delim, int& count) const {
+	ssh_u pos = 0;
+	count = 0;
+	auto tmp = new StringZX[32];
+	auto ldelim = wcslen(delim);
+	while(pos < length()) {
+		auto npos = find(delim, pos);
+		tmp[count++] = substr(pos, (npos == -1 ? length() : npos) - pos);
+		if(npos == -1) break;
+		pos = npos + ldelim;
+	}
+	auto result = new StringZX[count];
+	ssh_memcpy(result, tmp, count * sizeof(StringZX*));
+	SAFE_DELETE(tmp);
+	return result;
+}

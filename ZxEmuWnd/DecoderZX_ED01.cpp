@@ -53,25 +53,25 @@ void DecoderZX::funcED01_000() {
 			break;
 		// RETI; IFF1 <- IFF2; SP += 2; PC <- [SP - 2];	Возврат из INT
 		case 5:
-			_IFF1 = _IFF2;
+			*_IFF1 = *_IFF2;
 			_PC = read_mem16(*_SP);
 			(*_SP) += 2;
 			break;
 		// IM X
-		case 6: _IM = (ops & 3) - 1; break;
+		case 6: *_IM = (ops & 3) - 1; break;
 	}
 }
 
 void DecoderZX::funcED01_111() {
 		switch(ops) {
 		// LD I, A
-		case 0: _I = *_A; break;
+		case 0: *_I = *_A; break;
 		// LD R, A
-		case 1: _R = *_A; break;
+		case 1: *_R = 128; *_R |= ((*_A) & 127); break;
 		// LD A, I
-		case 2: flagsIR(*_A = _I); break;
+		case 2: flagsIR(*_A = *_I); break;
 		// LD A, R; PV <- IFF2 SZ503*0-
-		case 3: flagsIR(*_A = _R); break;
+		case 3: flagsIR(*_A = *_R); break;
 		// RRD/RLD; SZ503P0-
 		case 4: case 5: {
 			ssh_b* reg = fromRON1(6);

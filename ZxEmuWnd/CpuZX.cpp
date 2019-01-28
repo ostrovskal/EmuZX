@@ -2,9 +2,8 @@
 #include "stdafx.h"
 #include "CpuZX.h"
 #include "DecoderZX.h"
-#include "SettingsZX.h"
+#include "zxDebugger.h"
 
-extern SettingsZX settings;
 extern ssh_cws nameROMs[];
 
 // содержмое памяти
@@ -12,7 +11,7 @@ ssh_b* memZX;
 ssh_d szMemZX;
 
 // регистры
-ssh_b regsZX[22];
+ssh_b regsZX[COUNT_REGS];
 
 // порты
 ssh_b portsZX[65536];
@@ -21,26 +20,23 @@ ssh_b portsZX[65536];
 ssh_w _PC;
 
 // адрес прерывания
-ssh_b _I;
+ssh_b* _I;
 
 // ренегерация
-ssh_b _R;
+ssh_b* _R;
 
 // режим прерываний
-ssh_b _IM;
+ssh_b* _IM;
 
 // триггеры
-ssh_b _IFF1;
-ssh_b _IFF2;
-
-// статус
-ssh_b _STATE;
+ssh_b* _IFF1;
+ssh_b* _IFF2;
 
 // содержимое порта FE
-ssh_b _PORT_FE;
+ssh_b* _PORT_FE;
 
 // признак наличия прерывания INT
-ssh_b _TRAP;
+ssh_b* _TRAP;
 
 ssh_b* _A;
 ssh_b* _B;
@@ -50,6 +46,9 @@ ssh_w* _DE;
 ssh_w* _HL;
 ssh_w* _SP;
 
+// статус
+volatile ssh_w _TSTATE;
+
 CpuZX::CpuZX() {
 	decoder = new DecoderZX();
 	ROM = nullptr; szROM = 0;
@@ -58,47 +57,54 @@ CpuZX::CpuZX() {
 }
 
 CpuZX::~CpuZX() {
-	_STATE &= ~ZX_EXEC;
-	delete decoder; decoder = nullptr;
-	delete ROM; ROM = nullptr;
-	delete memZX; memZX = nullptr;
+	SAFE_DELETE(decoder);
+	SAFE_DELETE(ROM);
+	SAFE_DELETE(memZX);
 }
 
 void CpuZX::signalRESET() {
-	_STATE = 0;
-	_PC = 0;
-	_R = _I = _IM = _TRAP = 0;
-	_IFF1 = _IFF2 = 0;
-	_PORT_FE = 224;
-
-	delete ROM; ROM = nullptr;
-	delete memZX; memZX = nullptr;
-	szROM = 0;
+	modifyTSTATE(0, 0xffff);
 
 	_A = &regsZX[RA];
 	_B = &regsZX[RB];
+	_R = &regsZX[RR];
+	_I = &regsZX[RI];
+	_IM= &regsZX[RIM];
+
+	_IFF1 = &regsZX[RIFF1];
+	_IFF2 = &regsZX[RIFF2];
+	_PORT_FE = &regsZX[RFE];
+	_TRAP = &regsZX[RTRAP];
 
 	_BC = (ssh_w*)&regsZX[RC];
 	_DE = (ssh_w*)&regsZX[RE];
 	_HL = (ssh_w*)&regsZX[RL];
 	_SP = (ssh_w*)&regsZX[RSPL];
 
+	*_R = *_I = *_IM = *_TRAP = 0;
+	*_IFF1 = *_IFF2 = 0;
+	*_PORT_FE = 224;
+	_PC = 0;
+
+	SAFE_DELETE(ROM); szROM = 0;
+	SAFE_DELETE(memZX); szMemZX = 0;
+
+	auto model = theApp.getOpt(OPT_MEM_MODEL)->dval;
 	// грузим ПЗУ
-	int hh = 0;
 	try {
-		StringZX pathROM(settings.mainDir + L"Roms\\" + nameROMs[settings.modelZX] + L".rom");
-		_wsopen_s(&hh, pathROM, _O_RDONLY, _SH_DENYRD, _S_IREAD);
-		if(hh) {
-			szROM = _filelength(hh);
+		StringZX pathROM(theApp.opts.mainDir + L"Roms\\" + nameROMs[model] + L".rom");
+		_wsopen_s(&_hf, pathROM, _O_RDONLY, _SH_DENYRD, _S_IREAD);
+		if(_hf) {
+			szROM = _filelength(_hf);
 			ROM = new ssh_b[szROM];
-			if(_read(hh, ROM, szROM) != szROM) throw(0);
+			if(_read(_hf, ROM, szROM) != szROM) throw(0);
 		}
 	} catch(...) {
 
 	}
-	if(hh) _close(hh);
+	SAFE_CLOSE1(_hf);
 
-	switch(settings.modelZX) {
+	switch(model) {
 		// 48K
 		case 0:
 			szMemZX = 65536;
@@ -109,7 +115,7 @@ void CpuZX::signalRESET() {
 			break;
 		// 128K
 		case 1:
-			szMemZX = 65536 * 2;
+			szMemZX = 131072;
 			memZX = new ssh_b[szMemZX];
 			memset(memZX, 0, szMemZX);
 			memcpy(memZX, ROM, 16384);
@@ -121,14 +127,14 @@ void CpuZX::signalRESET() {
 
 	portsZX[31] = 0;
 
-	_STATE |= ZX_EXEC;
+	modifyTSTATE(ZX_EXEC, 0);
 }
 
 void CpuZX::signalINT() {
-	if(_IFF1 && _TRAP) {
-		_TRAP = _IFF1 = _IFF2 = 0;
+	if(*_IFF1 && *_TRAP) {
+		*_TRAP = *_IFF1 = *_IFF2 = 0;
 		decoder->incrementR();
-		switch(_IM) {
+		switch(*_IM) {
 			case 0: 
 				// вызываем системный монитор (debug window)
 				decoder->execCALL(0x66);
@@ -137,7 +143,7 @@ void CpuZX::signalINT() {
 				decoder->execCALL(0x38);
 				break;
 			case 2:
-				decoder->execCALL(decoder->read_mem16(_I * 256 + 254));
+				decoder->execCALL(decoder->read_mem16(*_I * 256 + 254));
 				break;
 		}
 	}
@@ -149,88 +155,78 @@ void CpuZX::signalNMI() {
 }
 
 void CpuZX::execute() {
-	if((_STATE & ZX_EXEC) == ZX_EXEC) {
-		_STATE |= ZX_INT;
+	if((_TSTATE & ZX_RESET) == ZX_RESET) signalRESET();
+	if((_TSTATE & ZX_EXEC) == ZX_EXEC) {
+		modifyTSTATE(ZX_INT, 0);
+		if((_TSTATE & ZX_DEBUG) == ZX_DEBUG) {
+			if(theApp.debug->checkBPS(_PC, false)) return;
+		}
 		// выполнение операции
 		decoder->execOps(0, 0);
 		// проверка на прерывания
-		if((_STATE & ZX_INT) == ZX_INT) signalINT();
+		if((_TSTATE & ZX_NMI) == ZX_NMI) signalNMI();
+		else if((_TSTATE & ZX_INT) == ZX_INT) signalINT();
 	}
 }
 
 bool CpuZX::saveStateZX(const StringZX& path) {
-	int h = 0;
-
 	bool result = true;
-	auto state = _STATE;
-	
-	_STATE &= ZX_EXEC;
+
+	pauseCPU(true, 0);
 
 	try {
-		_wsopen_s(&h, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
-		if(h) {
-			ssh_b temp[32];
+		_wsopen_s(&_hf, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
+		if(_hf) {
+			ssh_b temp[16];
 
-			temp[0] = _I; temp[1] = _R; temp[2] = _IM; temp[3] = _IFF1; temp[4] = _IFF2;
-			temp[5] = _STATE; temp[6] = _PORT_FE; temp[7] = _TRAP; temp[8] = settings.modelZX;
-			*(ssh_w*)(temp + 9) = _PC;
-			*(ssh_d*)(temp + 11) = szMemZX;
+			temp[0] = (ssh_b)theApp.getOpt(OPT_MEM_MODEL)->dval;
+			*(ssh_w*)(temp + 1) = _TSTATE;
+			*(ssh_w*)(temp + 3) = _PC;
+			*(ssh_d*)(temp + 5) = szMemZX;
 
-			int size =	sizeof(_I) + sizeof(_R) + sizeof(_IM) + sizeof(_IFF1) + sizeof(_IFF2) +
-						sizeof(_STATE) + sizeof(_PORT_FE) + sizeof(_TRAP) + sizeof(settings.modelZX) +
-						sizeof(_PC) + sizeof(szMemZX);
-			
-			if(_write(h, &temp, size) != size) throw(0);
-			if(_write(h, &regsZX, sizeof(regsZX)) != sizeof(regsZX)) throw(0);
-			if(_write(h, memZX, szMemZX) != szMemZX) throw(0);
+			if(_write(_hf, &temp, 9) != 9) throw(0);
+			if(_write(_hf, &regsZX, sizeof(regsZX)) != sizeof(regsZX)) throw(0);
+			if(_write(_hf, memZX, szMemZX) != szMemZX) throw(0);
 		}
-	} catch(...) {
-		result = false;
-	}
+	} catch(...) { result = false; }
 
-	if(h) _close(h);
+	SAFE_CLOSE1(_hf);
 
-	_STATE = state;
+	pauseCPU(false, 0);
 
 	return result;
 }
 
 bool CpuZX::loadStateZX(const StringZX& path) {
-	FILE* hh = nullptr;
 	bool result = true;
-	
-	auto state = _STATE;
-	_STATE &= ~ZX_EXEC;
+
+	pauseCPU(true, 0);
 
 	try {
-		_wfopen_s(&hh, path, L"rb");
-		if(hh) {
-			int size =	sizeof(_I) + sizeof(_R) + sizeof(_IM) + sizeof(_IFF1) + sizeof(_IFF2) + 
-						sizeof(_STATE) + sizeof(_PORT_FE) + sizeof(_TRAP) + sizeof(_PC) +
-						sizeof(szMemZX) + sizeof(settings.modelZX);
+		_wfopen_s(&hf, path, L"rb");
+		if(hf) {
+			ssh_b temp[16];
+
+			if(fread(&temp, 1, 9, hf) != 9) throw(0);
+
+			theApp.getOpt(OPT_MEM_MODEL)->dval = temp[0];
+			modifyTSTATE(*(ssh_w*)(temp + 1), 0xffff);
+			_PC		= *(ssh_w*)(temp + 3);
+			szMemZX = *(ssh_d*)(temp + 5);
 			
-			ssh_b temp[32];
+			SAFE_DELETE(memZX);
+			memZX = new ssh_b[szMemZX];
 
-			if(fread(&temp, 1, size, hh) != size) throw(0);
-
-			_I = temp[0]; _R = temp[1]; _IM = temp[2]; _IFF1 = temp[3]; _IFF2 = temp[4];
-			_STATE = temp[5]; _PORT_FE = temp[6]; _TRAP = temp[7]; settings.modelZX = temp[8];
-			_PC = *(ssh_w*)(temp + 9);
-			szMemZX = *(ssh_d*)(temp + 11);
-			
-			delete memZX; memZX = new ssh_b[szMemZX];
-
-			if(fread(&regsZX, 1, sizeof(regsZX), hh) != sizeof(regsZX)) throw(0);
-			if(fread(memZX, 1, szMemZX, hh) != szMemZX) throw(0);
+			if(fread(&regsZX, 1, sizeof(regsZX), hf) != sizeof(regsZX)) throw(0);
+			if(fread(memZX, 1, szMemZX, hf) != szMemZX) throw(0);
 		}
 	} catch(...) {
 		result = false;
 	}
 	
-	if(hh) fclose(hh);
+	SAFE_CLOSE2(hf);
 
-	_STATE = (state | (ZX_BORDER | ZX_SOUND));
+	pauseCPU(false, ZX_BORDER | ZX_SOUND);
 
 	return result;
 }
-
