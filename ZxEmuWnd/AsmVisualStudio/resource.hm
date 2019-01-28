@@ -1,5 +1,0 @@
-// Microsoft Visual C++ generated Help ID include file.
-// Used by AsmVisualStudio.rc
-//
-#define HIDC_EDIT_PATH                  0x81a1046d    // IDD_DIALOG_ARCHIVE_NEW
-#define HIDC_EDIT_PATH_LST              0x81a1046e    // IDD_DIALOG_ARCHIVE_NEW
