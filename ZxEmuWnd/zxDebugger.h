@@ -1,6 +1,7 @@
 #pragma once
 
 struct ZX_DEBUGGER {
+	ssh_cws text;
 	ssh_d idMain;
 	ssh_d idText;
 	ssh_b* regb;
@@ -14,39 +15,49 @@ struct ZX_DEBUGGER {
 };
 
 struct ZX_BREAK_POINT {
+	ZX_BREAK_POINT() : address1(0), address2(0), flags(0), value(0) {}
 	int address1;
 	int address2;
 	int value;
 	int flags;
 };
 
+#define FBP_MEM			1
+#define FBP_PC			2
+
 class zxDisAsm;
-class zxDebugger {
-	friend INT_PTR CALLBACK DlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-	friend LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+class zxDebugger : public zxDialog {
+	friend class zxDlgListBps;
 public:
-	zxDebugger();
+	zxDebugger() : zxDialog(), da(nullptr), hFont(nullptr), _pc(-1), _sp(-1), curIndexBP(0), curStoryPC(-1), limitStoryPC(0), owner(false) { }
 	virtual ~zxDebugger();
 	bool checkBPS(ssh_w address, bool mem);
 	void show(bool visible);
-	void updateRegisters(int newPC, bool always);
+	void updateRegisters(int newPC, bool always, bool story);
+	bool check(ssh_w address, ZX_BREAK_POINT& breakptr, int flags);
+	void saveBPS();
 protected:
-	INT_PTR procWnd(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-	INT_PTR procDlg(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-	void makeToolbar();
-	void init(HWND hWnd);
-	void drawItem(DRAWITEMSTRUCT* dis, int id);
+	virtual bool onCommand(int wmId, int param, LPARAM lParam) override;
+	virtual bool onClose() override;
+	virtual bool onNotify(LPNMHDR nm) override;
+	virtual bool onDrawItem(UINT idCtl, LPDRAWITEMSTRUCT lpdis) override;
+	virtual void onInitDialog(HWND hWnd, LPARAM lParam);
+	virtual INT_PTR onCtlColorStatic(HDC hDC, HWND hWnd) override;
+	virtual bool preCreate() override;
+	void updateUndoRedo(bool set);
+	void updatePrevNextBP();
+	void quickBP(int adr);
+	void init();
 	void updateStack(int sp);
 	void updateHexDec(bool change);
-	int topIndexDA, topIndexSP;
-	RECT rcWnd;
-	RECT rcSP;
-	ssh_w firstPC;
-	ssh_w lastPC;
+	void setProgrammPause(bool pause, bool activate);
+	int _pc, _sp;
 	zxDisAsm* da;
 	HFONT hFont;
-	HBITMAP hBmp;
-	HWND hWndToolbar;
 	HBRUSH hbrSel, hbrUnSel;
-	ZX_BREAK_POINT* bps[10];
+	ZX_BREAK_POINT bps[10];
+	ssh_w storyPC[32];
+	bool owner;
+	int curStoryPC, limitStoryPC;
+	int curIndexBP;
 };

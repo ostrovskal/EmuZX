@@ -9,7 +9,7 @@ static ZX_KEY keys[] = {
 	{IDC_BUTTON_K4, L"4", L"4", L"4", L"green", L"OPEN", L"$", L"inv video", 0xfe, 0x8},
 	{IDC_BUTTON_K5, L"5", L"5", L"5", L"cyan", L"CLOSE", L"%", L"left", 0xfe, 0x10},
 	{IDC_BUTTON_K6, L"6", L"6", L"6", L"yellow", L"MOVE", L"'", L"down", 0xef, 0x10},
-	{IDC_BUTTON_K7, L"7", L"7", L"7", L"white", L"ERASE", L"&", L"right", 0xef, 0x8},
+	{IDC_BUTTON_K7, L"7", L"7", L"7", L"white", L"ERASE", L"&&", L"right", 0xef, 0x8},
 	{IDC_BUTTON_K8, L"8", L"8", L"8", L"", L"POINT", L"*", L"up", 0xef, 0x4},
 	{IDC_BUTTON_K9, L"9", L"9", L"9", L"bright", L"CAT", L"(", L"graphics", 0xef, 0x2},
 	{IDC_BUTTON_K0, L"0", L"0", L"0", L"black", L"FORMAT", L")", L"delete", 0xef, 0x1},
@@ -45,3 +45,61 @@ static ZX_KEY keys[] = {
 	{IDC_BUTTON_SYMBOL_SHIFT, L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", 0x7f, 0x2},
 	{IDC_BUTTON_SPACE, L"", L"", L"", L"", L"", L"", L"", 0x7f, 0x1}
 };
+
+static ssh_d WINAPI KeyProc(void* params) {
+	return theApp.keyboard->procKEY();
+}
+
+DWORD zxKeyboard::procKEY() {
+	while(true) {
+		int nmode = KM_SH_E;
+		if(mode != nmode) {
+			mode = nmode;
+			for(auto& k : keys) {
+				ssh_cws name;
+				switch(mode) {
+					case KM_K: name = k.name_k; break;
+					case KM_L: name = k.name_l; break;
+					case KM_C: name = k.name_c; break;
+					case KM_E: name = k.name_e; break;
+					case KM_G: name = k.name_l; break;
+					case KM_SH_E: name = k.name_sh_e; break;
+					case KM_SH_KL: name = k.name_sh_k; break;
+					case KM_CH: name = k.name_l; break;
+				}
+				SetWindowText(k.hWndKey, name);
+			}
+		}
+	}
+	return 0;
+}
+
+void zxKeyboard::onInitDialog(HWND hWnd, LPARAM lParam) {
+	for(auto& k : keys) {
+		k.hWndKey = GetDlgItem(hWnd, k.butID);
+		SendMessage(k.hWndKey, WM_SETFONT, (WPARAM)hFont, true);
+	}
+}
+
+bool zxKeyboard::preCreate() {
+	DWORD keyID;
+	hKeyThread = CreateThread(nullptr, 0, KeyProc, nullptr, CREATE_SUSPENDED, &keyID);
+	hFont = CreateFont(-10, 0, 0, 0, FW_THIN, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_TT_PRECIS,
+					   CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN, L"Courier New");
+
+	return true;
+}
+
+void zxKeyboard::show(bool visible) {
+	if(visible) {
+		showWindow(true);
+		updateWindow();
+		ResumeThread(hKeyThread);
+	} else {
+		if(isWindowVisible()) {
+			showWindow(false);
+			Wow64SuspendThread(hKeyThread);
+		}
+	}
+
+}

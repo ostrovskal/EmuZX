@@ -14,9 +14,29 @@ struct ZX_KEY {
 	HWND hWndKey;
 };
 
-class zxKeyboard {
+#define KM_K		0
+#define KM_L		1
+#define KM_C		2
+#define KM_E		3
+#define KM_G		4
+#define KM_SH_E		5
+#define KM_SH_KL	6
+#define KM_CH		7
+
+#include "zxWnd.h"
+
+class zxKeyboard : public zxDialog {
+	friend ssh_d WINAPI KeyProc(void* params);
 public:
-	zxKeyboard() {}
-	virtual ~zxKeyboard() {}
+	zxKeyboard() : mode(-1), hKeyThread(nullptr), hFont(nullptr) { }
+	virtual ~zxKeyboard() { CloseHandle(hKeyThread); }
+	void show(bool visible);
 protected:
+	virtual bool onClose() override { theApp.changeWndKeyboard(true); return false; }
+	virtual void onInitDialog(HWND hWnd, LPARAM lParam) override;
+	virtual bool preCreate() override;
+	DWORD procKEY();
+	HANDLE hKeyThread;
+	HFONT hFont;
+	int mode;
 };

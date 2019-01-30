@@ -40,14 +40,14 @@ void GpuZX::makeCanvas() {
 
 void GpuZX::showScreen() {
 	HDC hdc;
-	if((hdc = ::GetDC(hWnd))) {
+	if((hdc = ::GetDC(theApp.getHWND()))) {
 		HGDIOBJ h = SelectObject(hdcMem, hbmpMem);
 		LPRECT r = &theApp.wndRect;
 		StretchBlt(hdc, r->left, r->top, r->right - r->left, r->bottom - r->top, hdcMem, 0, 0, 320, 256, SRCCOPY);
 		SelectObject(hdcMem, h);
 		::DeleteObject(hdc);
 		wsprintf(str, L"PC: %d", _PC);
-		SetWindowText(hWnd, (LPCWSTR)str);
+		SetWindowText(theApp.getHWND(), (LPCWSTR)str);
 	}
 }
 

@@ -49,6 +49,10 @@
 #define OPT_MEM_MODEL	33
 #define OPT_PP			34
 
+#define OPT_WND_KEY_POS		35
+#define OPT_WND_DEBUG_POS	36
+#define OPT_WND_MAIN_POS	37
+
 #define OPTT_STRING		0
 #define OPTT_DWORD		1
 #define OPTT_BOOL		2

@@ -164,6 +164,9 @@
     <ClInclude Include="BorderZX.h" />
     <ClInclude Include="CpuZX.h" />
     <ClInclude Include="DecoderZX.h" />
+    <ClInclude Include="zxDlgAddBp.h" />
+    <ClInclude Include="zxListBox.h" />
+    <ClInclude Include="zxWnd.h" />
     <ClInclude Include="GpuZX.h" />
     <ClInclude Include="KeyboardZX.h" />
     <ClInclude Include="Resource.h" />
@@ -175,6 +178,7 @@
     <ClInclude Include="Z80.h" />
     <ClInclude Include="zxDebugger.h" />
     <ClInclude Include="zxDisAsm.h" />
+    <ClInclude Include="zxDlgListBps.h" />
     <ClInclude Include="zxEmulation.h" />
     <ClInclude Include="zxKeyboard.h" />
     <ClInclude Include="ZxTimer.h" />
@@ -188,6 +192,9 @@
     <ClCompile Include="DecoderZX_ED10.cpp" />
     <ClCompile Include="DecoderZX_No00.cpp" />
     <ClCompile Include="DecoderZX_No11.cpp" />
+    <ClCompile Include="zxDlgAddBp.cpp" />
+    <ClCompile Include="zxListBox.cpp" />
+    <ClCompile Include="zxWnd.cpp" />
     <ClCompile Include="GpuZX.cpp" />
     <ClCompile Include="KeyboardZX.cpp" />
     <ClCompile Include="SettingsZX.cpp" />
@@ -202,6 +209,7 @@
     <ClCompile Include="Z80.cpp" />
     <ClCompile Include="zxDebugger.cpp" />
     <ClCompile Include="zxDisAsm.cpp" />
+    <ClCompile Include="zxDlgListBps.cpp" />
     <ClCompile Include="zxEmulation.cpp" />
     <ClCompile Include="zxKeyboard.cpp" />
     <ClCompile Include="ZxTimer.cpp" />

@@ -7,7 +7,7 @@ public:
 	virtual ~CpuZX();
 
 	// выполнение
-	void execute();
+	void execute(bool run_debugger);
 
 	// загрузка/сохранение состояния
 	bool loadStateZX(const StringZX& path);

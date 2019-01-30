@@ -197,9 +197,9 @@ const StringZX& StringZX::trim_right(ssh_cws wcs) {
 }
 
 StringZX* StringZX::split(ssh_cws delim, int& count) const {
+	static StringZX tmp[32];
 	ssh_u pos = 0;
 	count = 0;
-	auto tmp = new StringZX[32];
 	auto ldelim = wcslen(delim);
 	while(pos < length()) {
 		auto npos = find(delim, pos);
@@ -207,8 +207,14 @@ StringZX* StringZX::split(ssh_cws delim, int& count) const {
 		if(npos == -1) break;
 		pos = npos + ldelim;
 	}
-	auto result = new StringZX[count];
-	ssh_memcpy(result, tmp, count * sizeof(StringZX*));
-	SAFE_DELETE(tmp);
-	return result;
+	return tmp;
+}
+
+StringZX StringZX::fmt(ssh_cws fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	_vstprintf_s(tmpBuf, 260, fmt, args);
+	va_end(args);
+	return StringZX(tmpBuf);
+
 }

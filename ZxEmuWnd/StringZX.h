@@ -88,6 +88,8 @@ public:
 	const StringZX& trim(ssh_cws wcs) { trim_left(wcs); return trim_right(wcs); }
 	const StringZX& trim_left(ssh_cws wcs);
 	const StringZX& trim_right(ssh_cws wcs);
+	static StringZX fmt(ssh_cws fmt, ...);
+	StringZX* split(ssh_cws delim, int& count) const;
 	// поиск
 	ssh_l find(ssh_cws wcs, ssh_u idx = 0) const { auto buf(buffer()); return (idx < length() ? (wcsstr(buf + idx, wcs) - buf) : -1); }
 	ssh_l find(ssh_ws ws, ssh_u idx = 0) const { auto buf(str()); return (idx < length() ? (wcschr(buf + idx, ws) - buf) : -1); }
@@ -95,7 +97,6 @@ public:
 	StringZX substr(ssh_u idx, ssh_l len = -1) const;
 	StringZX left(ssh_u idx) const { return substr(0, idx); }
 	StringZX right(ssh_u idx) const { return substr(length() - idx); }
-	StringZX* split(ssh_cws delim, int& count) const;
 	ssh_cws str() const { return (_str.len_buf > SSH_BUFFER_LENGTH ? _str.ptr : _str.str); }
 #ifdef _DEBUG
 	// тест

@@ -19,17 +19,17 @@ ZX_OPTION opt[] = {
 	{OPTT_STRING, L"mru7"},
 	{OPTT_STRING, L"mru8"},
 	{OPTT_STRING, L"mru9"},
-	{OPTT_STRING, L"bps0"},
-	{OPTT_STRING, L"bps1"},
-	{OPTT_STRING, L"bps2"},
-	{OPTT_STRING, L"bps3"},
-	{OPTT_STRING, L"bps4"},
-	{OPTT_STRING, L"bps5"},
-	{OPTT_STRING, L"bps6"},
-	{OPTT_STRING, L"bps7"},
-	{OPTT_STRING, L"bps8"},
-	{OPTT_STRING, L"bps9"},
-	{OPTT_STRING, L"path"},
+	{OPTT_STRING, L"bps0", 0, L"-1,-1,-1,0"},
+	{OPTT_STRING, L"bps1", 0, L"-1,-1,-1,0"},
+	{OPTT_STRING, L"bps2", 0, L"-1,-1,-1,0"},
+	{OPTT_STRING, L"bps3", 0, L"-1,-1,-1,0"},
+	{OPTT_STRING, L"bps4", 0, L"-1,-1,-1,0"},
+	{OPTT_STRING, L"bps5", 0, L"-1,-1,-1,0"},
+	{OPTT_STRING, L"bps6", 0, L"-1,-1,-1,0"},
+	{OPTT_STRING, L"bps7", 0, L"-1,-1,-1,0"},
+	{OPTT_STRING, L"bps8", 0, L"-1,-1,-1,0"},
+	{OPTT_STRING, L"bps9", 0, L"-1,-1,-1,0"},
+	{OPTT_STRING, L"path", 0, L"-1,-1,-1,0"},
 
 	{OPTT_BOOL, L"soundEnable", 0},
 	{OPTT_BOOL, L"debuggerEnable", 0},
@@ -40,11 +40,15 @@ ZX_OPTION opt[] = {
 	{OPTT_BOOL, L"debuggerShowPADDR", 1},
 	{OPTT_BOOL, L"debuggerShowPPADDR", 0},
 	{OPTT_BOOL, L"debuggerShowData", 0},
-	{OPTT_DWORD, L"delayCPU", 8},
+	{OPTT_DWORD, L"delayCPU", 10},
 	{OPTT_DWORD, L"delayGPU", 20},
 	{OPTT_DWORD, L"soundFrequency", 44100},
 	{OPTT_DWORD, L"memoryModel", MODEL_48K},
-	{OPTT_DWORD, L"postProcess", PP_BILINEAR}
+	{OPTT_DWORD, L"postProcess", PP_BILINEAR},
+	
+	{OPTT_STRING, L"keyboardWndPos", 0},
+	{OPTT_STRING, L"debuggerdWndPos", 0},
+	{OPTT_STRING, L"mainWndPos", 0}
 };
 
 SettingsZX::SettingsZX() {

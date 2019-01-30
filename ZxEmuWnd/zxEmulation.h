@@ -87,8 +87,9 @@ class BorderZX;
 class KeyboardZX;
 class SoundZX;
 class zxDebugger;
-class zxEmulation {
-	friend LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+class zxKeyboard;
+
+class zxEmulation : public zxWnd {
 	friend ssh_d WINAPI ProcCPU(void* params);
 public:
 	zxEmulation();
@@ -100,9 +101,6 @@ public:
 	//
 	auto getOpt(int idx) { return opts.get(idx); }
 
-	//
-	ssh_cws registerClass(ssh_cws name, int idMenu, WNDPROC proc);
-	
 	//
 	void changeWndDebugger(bool change);
 
@@ -123,12 +121,20 @@ public:
 
 	//
 	GpuZX*		gpu;
+
+	//
+	zxKeyboard*	keyboard;
 protected:
 	ssh_d procCPU();
-	LRESULT procWnd(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	void makeToolbar();
+	virtual bool onCommand(int wmId, int param, LPARAM lParam) override;
+	virtual bool onClose() override;
+	virtual bool onSize(WPARAM type, int nWidth, int nHeight) override;
+	virtual bool onKey(int nVirtKey, LPARAM keyData, bool pressed) override;
+	virtual bool onNotify(LPNMHDR nm) override;
+	virtual void postCreate() override;
+
 	void modifyMRU(StringZX path);
-	bool checkedModelOrPP(HMENU hMenu, ZX_OPTION* opt, int val, int* ids);
+	bool checkedModelOrPP(HMENU hMenu, int id_opt, int val, int* ids);
 	void changeTurbo(bool change);
 	void changeSound(bool change);
 	bool changeState(int id_opt, int id, bool change);
@@ -141,7 +147,6 @@ protected:
 	ssh_d delayCPU;
 	ssh_d delayGPU;
 
-	HWND hWndToolbar;
 	HMENU hMenuMRU;
 	HMENU hMenuPP;
 	HMENU hMenuModel;

@@ -66,6 +66,18 @@
     <ClInclude Include="zxKeyboard.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="zxWnd.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="zxDlgAddBp.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="zxDlgListBps.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="zxListBox.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -126,6 +138,18 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="zxKeyboard.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="zxWnd.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="zxDlgAddBp.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="zxDlgListBps.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="zxListBox.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

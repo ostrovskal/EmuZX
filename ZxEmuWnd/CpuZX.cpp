@@ -133,7 +133,6 @@ void CpuZX::signalRESET() {
 void CpuZX::signalINT() {
 	if(*_IFF1 && *_TRAP) {
 		*_TRAP = *_IFF1 = *_IFF2 = 0;
-		decoder->incrementR();
 		switch(*_IM) {
 			case 0: 
 				// вызываем системный монитор (debug window)
@@ -146,6 +145,7 @@ void CpuZX::signalINT() {
 				decoder->execCALL(decoder->read_mem16(*_I * 256 + 254));
 				break;
 		}
+		decoder->incrementR();
 	}
 }
 
@@ -154,11 +154,11 @@ void CpuZX::signalNMI() {
 	decoder->execCALL(0x66);
 }
 
-void CpuZX::execute() {
+void CpuZX::execute(bool run_debugger) {
 	if((_TSTATE & ZX_RESET) == ZX_RESET) signalRESET();
-	if((_TSTATE & ZX_EXEC) == ZX_EXEC) {
+	if((_TSTATE & ZX_EXEC) || run_debugger) {
 		modifyTSTATE(ZX_INT, 0);
-		if((_TSTATE & ZX_DEBUG) == ZX_DEBUG) {
+		if((_TSTATE & ZX_DEBUG) && !run_debugger) {
 			if(theApp.debug->checkBPS(_PC, false)) return;
 		}
 		// выполнение операции

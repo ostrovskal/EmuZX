@@ -67,7 +67,7 @@ void DecoderZX::funcED01_111() {
 		// LD I, A
 		case 0: *_I = *_A; break;
 		// LD R, A
-		case 1: *_R = 128; *_R |= ((*_A) & 127); break;
+		case 1: *_R = *_A; break;
 		// LD A, I
 		case 2: flagsIR(*_A = *_I); break;
 		// LD A, R; PV <- IFF2 SZ503*0-

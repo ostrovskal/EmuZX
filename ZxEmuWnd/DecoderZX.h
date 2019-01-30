@@ -30,6 +30,7 @@ public:
 	void ops10_ED();
 	void ops11_NO();
 	void ops11_CB();
+	void opsXX_ED();
 	
 	// opsN11_XXX
 	void funcN11_000();
@@ -53,8 +54,9 @@ public:
 	void noni() { modifyTSTATE(0, ZX_INT); }
 
 	inline void incrementR() {
-		ssh_b fs = *_R & 128;
-		*_R = (((*_R)++) & 127) | fs;
+		ssh_b fs = (*_R) & 128;
+		(*_R)++;
+		*_R = ((*_R) & 127) | fs;
 	}
 
 protected:
@@ -143,7 +145,7 @@ private:
 	// запись в ROM(запрещено)
 	void write_rom(ssh_b* address) {}
 
-	inline void flagsIR(ssh_b bt) { update_flags(FS | FZ | F5 | FH | F3 | FPV | FN, (bt & 128) | GET_FZ(bt) | (bt & 0b00101000) | (*_IFF2 << 2)); }
+	inline void flagsIR(ssh_b bt) { update_flags(FS | FZ | F5 | FH | F3 | FPV | FN, (bt & 128) | GET_FZ(bt) | (bt & 0b00101000) | ((*_IFF2) << 2)); }
 
 	inline void nop() { }
 

@@ -21,6 +21,7 @@ void SoundZX::execute(DWORD new_tm) {
 		return;
 	}
 	modifyTSTATE(0, ZX_SOUND);
+	return;
 
 	ssh_b signal = ((*_PORT_FE) & 16) != 0;
 	if(cur_signal == -1) {
@@ -67,13 +68,13 @@ void SoundZX::execute(DWORD new_tm) {
 }
 
 bool SoundZX::init(int freq) {
-
+	return false;
 	DSBUFFERDESC dsbd;
 	memset(buffer, 0, sizeof(buffer));
 
 	try {
 		if(FAILED(DirectSoundCreate(NULL, &dSnd, NULL))) throw(0);
-		if(FAILED(dSnd->SetCooperativeLevel(hWnd, DSSCL_NORMAL))) throw(0);
+		if(FAILED(dSnd->SetCooperativeLevel(theApp, DSSCL_NORMAL))) throw(0);
 
 		fmtWave.cbSize = sizeof(WAVEFORMATEX);
 		fmtWave.wFormatTag = 1;

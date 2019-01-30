@@ -3,7 +3,7 @@
 #include "DecoderZX.h"
 
 void DecoderZX::ops10_ED() {
-	if(ops < 4) noni();
+	if(ops < 4) opsXX_ED();
 	else {
 		ssh_w d = ((ops & 1) ? -1 : 1);
 		ssh_w hl = *_HL;
@@ -12,7 +12,7 @@ void DecoderZX::ops10_ED() {
 		ssh_b rep = (ops & 2);
 		bool is;
 		switch(typeOps) {
-			// LDI [DE] <- [HL]; DE += d; HL += d; BC--; --*0**0-
+			// LDI; --*0**0-
 			// PV = 1 если после декремента BC<>0; F3 = бит 3 операции переданный байт + A; F5 = бит 1 операции переданный байт + A
 			case 0: {
 				ssh_b bt = read_mem8(hl);
@@ -24,7 +24,7 @@ void DecoderZX::ops10_ED() {
 				if(rep && is) _PC -= 2;
 				break;
 			}
-			// CPI A - [HL]; HL += d; BC--; SZ*H**1-
+			// CPI; SZ*H**1-
 			// S, Z, HC из A - [HL]
 			// F3 = бит 3 операции A - [HL] - HC, где HC взят из F после предыдущей операции
 			// F5 = бит 1 операции A - [HL] - HC
@@ -62,7 +62,7 @@ void DecoderZX::ops10_ED() {
 				if(rep && !is) _PC -= 2;
 				break;
 			}
-			default: noni();
+			default: opsXX_ED();
 		}
 	}
 }

@@ -164,11 +164,16 @@ void DecoderZX::ops01_ED() {
 	(this->*table_opsED01_XXX[typeOps])();
 }
 
+void DecoderZX::opsXX_ED() {
+	_PC--;
+	noni();
+}
+
 funcDecoder table_ops[] = {
-	&DecoderZX::ops00_NO, &DecoderZX::ops00_CB, &DecoderZX::noni,
+	&DecoderZX::ops00_NO, &DecoderZX::ops00_CB, &DecoderZX::opsXX_ED,
 	&DecoderZX::ops01_NO, &DecoderZX::ops01_CB, &DecoderZX::ops01_ED,
 	&DecoderZX::ops10_NO, &DecoderZX::ops10_CB, &DecoderZX::ops10_ED,
-	&DecoderZX::ops11_NO, &DecoderZX::ops11_CB, &DecoderZX::noni
+	&DecoderZX::ops11_NO, &DecoderZX::ops11_CB, &DecoderZX::opsXX_ED
 };
 
 void DecoderZX::execOps(int prefix1, int prefix2) {
