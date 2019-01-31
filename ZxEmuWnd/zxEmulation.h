@@ -30,6 +30,8 @@ enum CPU_REG {
 	RIM,
 	RTRAP,
 	RFE,
+	RPC_EXIT_CALL1,
+	RPC_EXIT_CALL2,
 	COUNT_REGS
 };
 
@@ -72,6 +74,8 @@ extern ssh_w* _BC;
 extern ssh_w* _DE;
 extern ssh_w* _HL;
 extern ssh_w* _SP;
+extern ssh_w* _PC_EXIT_CALL;
+
 extern ssh_b* _PORT_FE;
 extern ssh_b* _TRAP;
 
@@ -95,35 +99,41 @@ public:
 	zxEmulation();
 	virtual ~zxEmulation();
 	
-	//
+	// основной цикл сообщений приложния
 	int run();
 	
-	//
+	// получение значения опции по ее ИД
 	auto getOpt(int idx) { return opts.get(idx); }
 
-	//
+	// изменить статус отладчика
 	void changeWndDebugger(bool change);
 
-	//
+	// изменить статус клавиатуры
 	void changeWndKeyboard(bool change);
 
-	//
+	// изменить режим
 	void changeExecute(bool change);
 
-	//
+	// Пауза/возонобление треда
+	void pauseCPU(bool isPause, int adding);
+
+	// область главного окна
 	RECT wndRect;
 
-	//
+	// установки
 	SettingsZX	opts;
 
-	//
+	// отладчик
 	zxDebugger* debug;
 
-	//
+	// графическая подсистема
 	GpuZX*		gpu;
 
-	//
+	// клавиатура
 	zxKeyboard*	keyboard;
+
+	// процессор
+	CpuZX*		zilog;
 protected:
 	ssh_d procCPU();
 	virtual bool onCommand(int wmId, int param, LPARAM lParam) override;
@@ -139,7 +149,6 @@ protected:
 	void changeSound(bool change);
 	bool changeState(int id_opt, int id, bool change);
 
-	CpuZX*		zilog;
 	BorderZX*	brd;
 	KeyboardZX* keyb;
 	SoundZX*	snd;

@@ -59,6 +59,8 @@ public:
 		*_R = ((*_R) & 127) | fs;
 	}
 
+	// выполнение операции
+	void execOps(int prefix1, int prefix2);
 protected:
 	GpuZX*		gpu;
 	zxDebugger* debug;
@@ -138,9 +140,6 @@ private:
 
 	// вызов подпрограммы
 	void execCALL(ssh_w address);
-
-	// выполнение операции
-	void execOps(int prefix1, int prefix2);
 
 	// запись в ROM(запрещено)
 	void write_rom(ssh_b* address) {}

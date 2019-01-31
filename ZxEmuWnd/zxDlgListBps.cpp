@@ -43,11 +43,43 @@ bool zxDlgListBps::onCommand(int wmId, int param, LPARAM lParam) {
 		case IDM_CHANGE:
 		case IDM_NEW: {
 			zxDlgAddBp add;
+			ZX_BREAK_POINT* bpItem = nullptr;
 			if(wmId == IDM_CHANGE) {
 				// fill data
-				add.edit(&theApp.debug->bps[itemSelected]);
+				bpItem = &theApp.debug->bps[itemSelected];
+				add.edit(bpItem);
 			}
-			add.create(IDD_DIALOG_ADD_BP, this, true);
+			if(add.create(IDD_DIALOG_ADD_BP, this, true) == IDOK) {
+				// проверка на пересечение
+				auto _bp = &add.result;
+				auto bps = theApp.debug->bps;
+				if(wmId == IDM_CHANGE) {
+					memcpy(bpItem, _bp, sizeof(ZX_BREAK_POINT));
+				} else {
+					for(int i = 0; i < COUNT_BP; i++) {
+						auto bp = &bps[i];
+						if(bp->address1 == -1) {
+							// установка
+							memcpy(bp, _bp, sizeof(ZX_BREAK_POINT));
+							break;
+						}
+						if((_bp->flags & FBP_ACCESS) != (bp->flags & FBP_ACCESS)) continue;
+						bool is1 = (_bp->address1 <= bp->address1) && (_bp->address2 >= bp->address1);
+						bool is2 = (_bp->address1 <= bp->address2) && (_bp->address2 >= bp->address2);
+						if(is1 || is2) {
+							bool dec = theApp.getOpt(OPT_DECIMAL)->dval;
+							StringZX s1(fromNum(_bp->address1, radix[dec + 10]));
+							StringZX s2(fromNum(_bp->address2, radix[dec + 10]));
+							StringZX d1(fromNum(bp->address1, radix[dec + 10]));
+							StringZX d2(fromNum(bp->address2, radix[dec + 10]));
+							MsgBox(StringZX::fmt(L"Перекрытие точки останова с <%i : %s - %s, %s - %s>!", i + 1, s1, s2, d1, d2), L"Ошибка", MB_ICONERROR);
+							break;
+						}
+					}
+				}
+				// обновление
+				setItems();
+			}
 			break;
 		}
 		case IDM_REMOVE: {
@@ -114,7 +146,7 @@ void zxDlgListBps::setItems() {
 	lvi.mask = LVIF_TEXT;
 	lvi.cchTextMax = 256;
 
-	for(int i = 0; i < 10; i++) {
+	for(int i = 0; i < COUNT_BP; i++) {
 		auto bp = &theApp.debug->bps[i];
 		if(bp->address1 == -1) continue;
 		lvi.iItem = i;
@@ -130,11 +162,11 @@ void zxDlgListBps::setItems() {
 		SendMessage(hWndList, LVM_SETITEM, 1, (LPARAM)&lvi);
 
 		lvi.iSubItem = 2;
-		lvi.pszText = (bp->value == -1) ? L"" : ((bp->flags & FBP_EQ) ? L"==" : L"!=");
+		lvi.pszText = (bp->value == -1) ? L"" : cond_bp[(bp->flags & FBP_COND) >> 3];
 		SendMessage(hWndList, LVM_SETITEM, 3, (LPARAM)&lvi);
 
 		lvi.iSubItem = 3;
-		lvi.pszText = (bp->value == -1) ? L"" : fromNum(bp->value, radix[dec]);
+		lvi.pszText = (bp->value == -1) ? L"" : fromNum(bp->value, radix[dec + 16]);
 		SendMessage(hWndList, LVM_SETITEM, 2, (LPARAM)&lvi);
 
 		lvi.iSubItem = 4;

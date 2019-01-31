@@ -15,18 +15,24 @@ ssh_b cnvPrefixSP[] = {RC, RB, RE, RD, RL, RH, RSPL, RSPH, RC, RB, RE, RD, RIXL,
 
 // пишем в память 8 битное значение
 void DecoderZX::write_mem8(ssh_b* address, ssh_b val, ssh_w ron) {
-	if((_TSTATE & ZX_DEBUG) == ZX_DEBUG) debug->checkBPS((ssh_w)(address - memZX), true);
-	if(address < &memZX[16384] && (_TSTATE & ZX_WRITE_ROM) == ZX_WRITE_ROM) { *address = val; }
-	else if(address < &memZX[23296] && (_TSTATE & ZX_WRITE_GPU) == ZX_WRITE_GPU) gpu->write(address, val);
-	else *address = val;
+	if(_TSTATE & ZX_DEBUG) debug->checkBPS((ssh_w)(address - memZX), true);
+	if(address < &memZX[16384] && (_TSTATE & ZX_WRITE_ROM)) { *address = val; }
+	else if(address < &memZX[23296] && (_TSTATE & ZX_WRITE_GPU)) gpu->write(address, val);
+	else {
+		ssh_u offs = address - &memZX[65536];
+		if(offs < 1000) {
+			ssh_b* error = address;
+		}
+		*address = val;
+	}
 }
 
 // пишем в память 16 битное значение
 void DecoderZX::write_mem16(ssh_w address, ssh_w val) {
 	ssh_b* mem = &memZX[address];
-	if((_TSTATE & ZX_DEBUG) == ZX_DEBUG) debug->checkBPS(address, true);
-	if(address < 16384 && (_TSTATE & ZX_WRITE_ROM) == ZX_WRITE_ROM) { *(ssh_w*)mem = val; }
-	else if(address < 23296 && (_TSTATE & ZX_WRITE_GPU) == ZX_WRITE_GPU) {
+	if(_TSTATE & ZX_DEBUG) debug->checkBPS(address, true);
+	if(address < 16384 && (_TSTATE & ZX_WRITE_ROM)) { *(ssh_w*)mem = val; }
+	else if(address < 23296 && (_TSTATE & ZX_WRITE_GPU)) {
 		gpu->write(mem, (ssh_b)val);
 		gpu->write(mem + 1, val >> 8);
 	} else *(ssh_w*)mem = val;
@@ -54,6 +60,7 @@ void DecoderZX::writePort(ssh_w address, ssh_b val) {
 }
 
 void DecoderZX::execCALL(ssh_w address) {
+	*_PC_EXIT_CALL = _PC;
 	(*_SP) -= 2;
 	write_mem16(*_SP, _PC);
 	_PC = address;

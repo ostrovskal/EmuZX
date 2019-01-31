@@ -316,8 +316,11 @@ StringZX zxDisAsm::makeCommand(ssh_d num, int flags) {
 		if((flags & DA_FADDR)) {
 			command = StringZX::fmt(radix[dec + 10], address);
 			static ZX_BREAK_POINT bp;
-			if(theApp.debug->check(address, bp, FBP_PC | FBP_MEM)) {
-				command += (bp.flags & FBP_MEM) ? L'+' : L'*';
+			static ssh_cws type_bp[] = {L" ", L"*", L"+", L"*+"};
+			int isPC = theApp.debug->check(address, bp, FBP_PC);
+			int isMEM = theApp.debug->check(address, bp, FBP_MEM);
+			if(isPC || isMEM) {
+				command += type_bp[isPC | (isMEM << 1)];
 			} else command += L' ';
 		}
 		if((flags & DA_FCODE) == DA_FCODE) {
@@ -350,7 +353,7 @@ StringZX zxDisAsm::makeCommand(ssh_d num, int flags) {
 	return command;
 }
 
-StringZX zxDisAsm::makeCode(ssh_w address, int length, ssh_b dec) {
+StringZX zxDisAsm::makeCode(ssh_w address, int length, ssh_b dec) const {
 	StringZX code;
 	for(int i = 0; i < length; i++) {
 		code += fromNum(memZX[address++], radix[dec + ((i != (length - 1)) * 2)]);
@@ -360,7 +363,10 @@ StringZX zxDisAsm::makeCode(ssh_w address, int length, ssh_b dec) {
 ssh_w zxDisAsm::move(ssh_w pc, int count) {
 	_pc = pc;
 	if(count > 0) {
-		while(count--) execute(0, 0);
+		while(count--) {
+			pos = 0;
+			execute(0, 0);
+		}
 	} else if(count < 0){
 		_pc += count;
 		// TODO: сдвиг дизасма назад
@@ -370,18 +376,15 @@ ssh_w zxDisAsm::move(ssh_w pc, int count) {
 
 int zxDisAsm::getCmdOperand(ssh_d num, bool isPC) {
 	if(adrs && num < cmdCount) {
-		auto pc = adrs[num];
-		ssh_b ops = memZX[pc++];
-		typeOps = (ops & 0b00000111);
-		codeOps = (ops & 0b00111000) >> 3;
-		groupOps = ((ops & 0b11000000) >> 6);
-		// JP XXX, JP, CALL, CALL XXX, JR CC, JR. DJNZ
+		_pc = adrs[num];
+		readOps();
 		if(isPC) {
+			// JP XXX, JP, CALL, CALL XXX, JR CC, JR. DJNZ
 			if(groupOps == 3) {
 				bool is = (typeOps == 2 || typeOps == 4) || (typeOps == 3 && codeOps == 0) || (typeOps == 5 && codeOps == 1);
-				if(is) return *(ssh_w*)(memZX + pc);
+				if(is) return *(ssh_w*)(memZX + _pc);
 			} else if(groupOps == 0 && typeOps == 0 && codeOps > 1) {
-				return ((pc + 1) + (char)memZX[pc]);
+				return ((_pc + 1) + (char)memZX[_pc]);
 			}
 		} else {
 			// LD RP, NN/LD NN, RP/LD A/RP,[NN]/LD [NN], A/RP
@@ -390,9 +393,27 @@ int zxDisAsm::getCmdOperand(ssh_d num, bool isPC) {
 	return -1;
 }
 
-int zxDisAsm::getCmdAddress(ssh_d num) {
+int zxDisAsm::getCmdAddress(ssh_d num) const {
 	if(adrs && num < cmdCount) {
 		return adrs[num];
 	}
 	return -1;
+}
+
+bool zxDisAsm::isCALL(ssh_d num) {
+	if(adrs && num < cmdCount) {
+		_pc = adrs[num];
+		if(readOps() == 3) return (typeOps == 4 || (typeOps == 5 && codeOps == 1));
+	}
+	return false;
+
+}
+
+int zxDisAsm::indexFromAddress(ssh_d pc) const {
+	if(adrs) {
+		for(ssh_d i = 0; i < cmdCount; i++) {
+			if(adrs[i] == pc) return i;
+		}
+	}
+	return 0;
 }

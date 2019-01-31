@@ -13,6 +13,7 @@ protected:
 	virtual void onInitDialog(HWND hWnd, LPARAM lParam) override;
 	virtual bool onCommand(int wmId, int param, LPARAM lParam) override;
 	int getValue(HWND hWnd, int def);
+	void updateAccess();
 	ZX_BREAK_POINT* _bp;
 	HWND hWndAddr1, hWndAddr2;
 	HWND hWndValue, hWndOK;

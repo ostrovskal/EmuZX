@@ -14,6 +14,8 @@ public:
 	virtual HWND create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, int x, int y, int cx, int cy, zxWnd* wndParent, UINT nID, UINT nMenu);
 	void showWindow(bool show) const { ShowWindow(hWnd, show); }
 	void updateWindow() const { UpdateWindow(hWnd); }
+	void enableWindow(bool enable) { EnableWindow(hWnd, enable); }
+	int MsgBox(ssh_cws text, ssh_cws caption, int flags) { return MessageBox(hWnd, text, caption, flags); }
 	bool isWindowVisible() const { return IsWindowVisible(hWnd); }
 	LRESULT SendMsg(UINT msg, WPARAM wParam, LPARAM lParam) const { return SendMessage(hWnd, msg, wParam, lParam); }
 	LONG getStyles() const { return GetWindowLong(hWnd, GWL_STYLE); }

@@ -66,10 +66,12 @@ ssh_w modifyTSTATE(int adding, int remove) {
 	return _TSTATE;
 }
 
-void pauseCPU(bool isPause, int adding) {
+void zxEmulation::pauseCPU(bool isPause, int adding) {
 	if(isPause) {
 		old_tstate = _TSTATE;
 		modifyTSTATE(0, ZX_EXEC);
+		
+		Wow64SuspendThread(hCpuThread);
 		Sleep(100);
 	} else {
 		modifyTSTATE(old_tstate | adding, 0xffff);
@@ -174,6 +176,11 @@ bool zxEmulation::onCommand(int wmId, int param, LPARAM lParam) {
 	StringZX folder(getOpt(OPT_CUR_PATH)->sval);
 	// Разобрать выбор в меню:
 	switch(wmId) {
+		case IDM_1X: break;
+		case IDM_2X: break;
+		case IDM_3X: break;
+		case IDM_4X: break;
+		case IDM_AS_IS: break;
 		case 1000: case 1001: case 1002: case 1003: case 1004:
 		case 1005: case 1006: case 1007: case 1008: case 1009:
 			mii.fMask = MIIM_TYPE;
@@ -197,7 +204,9 @@ bool zxEmulation::onCommand(int wmId, int param, LPARAM lParam) {
 				}
 				if(!result) MessageBox(hWnd, L"Не удалось выполнить операцию!", L"Ошибка", MB_OK);
 				else {
-					getOpt(OPT_CUR_PATH)->sval = folder.left(folder.find_rev(L'\\') + 1);
+					auto pos = folder.find_rev(L'\\') + 1;
+					getOpt(OPT_CUR_PATH)->sval = folder.left(pos);
+					opts.nameLoadProg = folder.substr(pos);
 					modifyMRU(folder);
 				}
 				break;
@@ -311,8 +320,8 @@ int zxEmulation::run() {
 
 	hMenu = GetMenu(hWnd);
 	hMenuMRU = GetSubMenu(GetSubMenu(hMenu, 0), 7);
-	hMenuModel = GetSubMenu(GetSubMenu(hMenu, 1), 9);
-	hMenuPP = GetSubMenu(GetSubMenu(hMenu, 1), 7);
+	hMenuModel = GetSubMenu(GetSubMenu(hMenu, 2), 4);
+	hMenuPP = GetSubMenu(GetSubMenu(hMenu, 1), 3);
 
 	debug = new zxDebugger;
 	debug->create(IDD_DIALOG_DEBUGGER, this, false);
@@ -347,7 +356,7 @@ int zxEmulation::run() {
 	snd = new SoundZX;
 	keyb = new KeyboardZX;
 
-	debug->updateRegisters(_PC, true, true);
+	debug->updateRegisters(_PC, zxDebugger::U_PC | zxDebugger::U_REGS | zxDebugger::U_SEL | zxDebugger::U_SP | zxDebugger::U_TOP);
 
 	DWORD cpuID;
 	hCpuThread = CreateThread(nullptr, 0, ProcCPU, nullptr, 0, &cpuID);
@@ -457,6 +466,6 @@ void zxEmulation::changeWndKeyboard(bool change) {
 void zxEmulation::changeExecute(bool change) {
 	if(change) modifyTSTATE(_TSTATE ^ ZX_EXEC, ZX_EXEC);
 	CheckMenuItem(hMenu, IDM_PAUSE, _TSTATE & ZX_EXEC);
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_PAUSE, TBSTATE_ENABLED | (_TSTATE >> 3));
+	SendMessage(hWndToolbar, TB_SETSTATE, IDM_PAUSE, TBSTATE_ENABLED | ((_TSTATE & ZX_EXEC) >> 3));
 	if(change) debug->setProgrammPause((_TSTATE & ZX_EXEC) != ZX_EXEC, false);
 }

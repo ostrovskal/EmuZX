@@ -26,7 +26,7 @@ INT_PTR zxListBox::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 			countItems = (int)wParam; 
 			changeScroll(topIndex, countItems, countVisibleItems); 
 			break;
-		case LB_GETCOUNT: return countItems;
+		case LB_GETCOUNT: return (wParam == 1 ? countVisibleItems : countItems);
 		case LB_SETTOPINDEX: {
 			int oldTop = topIndex;
 			topIndex = (int)wParam;
@@ -59,12 +59,11 @@ INT_PTR zxListBox::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 
 bool zxListBox::onSize(WPARAM type, int nWidth, int nHeight) {
 	SetRect(&rectWnd, 0, 0, nWidth, nHeight);
-	countVisibleItems = ((rectWnd.bottom - rectWnd.top) / heightItem) + 1;
+	countVisibleItems = ((rectWnd.bottom - rectWnd.top) / heightItem);
 	return true;
 }
 
 bool zxListBox::onPaint() {
-	
 	if(isWindowVisible()) {
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(hWnd, &ps);
@@ -86,7 +85,7 @@ bool zxListBox::onPaint() {
 
 		dis.hDC = hdc;
 		auto old = SelectObject(hdc, hFont);
-		for(int top = 0; top < countVisibleItems; top++) {
+		for(int top = 0; top <= countVisibleItems; top++) {
 			int idx = top + topIndex;
 			if(idx < countItems) {
 				bool isSel = (idx == curSel);
@@ -94,7 +93,7 @@ bool zxListBox::onPaint() {
 				FillRect(hdc, rc, (isSel ? hbrSel : hbrUnsel));
 				// заполнить стк
 				dis.itemState = (isSel ? ODS_SELECTED : 0);
-				dis.itemID = top;
+				dis.itemID = idx;
 				SendMessage(h, WM_DRAWITEM, wndID, (LPARAM)&dis);
 				rc->top += heightItem;
 				rc->bottom += heightItem;
@@ -117,7 +116,7 @@ void zxListBox::onFont(HFONT hF, bool redraw) {
 	if(redraw) InvalidateRect(hWnd, nullptr, true);
 }
 
-bool zxListBox::onScroll(UINT code, UINT p, HWND hWnd, int type) {
+bool zxListBox::onScroll(UINT code, UINT p, HWND hWndScroll, int type) {
 	memset(&si, 0, sizeof(SCROLLINFO));
 	si.cbSize = sizeof(SCROLLINFO);
 	si.fMask = SIF_ALL;
@@ -132,7 +131,8 @@ bool zxListBox::onScroll(UINT code, UINT p, HWND hWnd, int type) {
 			case SB_THUMBTRACK: pos = p; if(pos < si.nMin) pos = si.nMin; if(pos > si.nMax) pos = si.nMax; break;
 		}
 		topIndex = pos;
-		SetScrollPos(hWnd, SB_VERT, pos, true);
+		si.nPos = pos;
+		auto ret = SetScrollPos(hWnd, SB_VERT, pos, true);
 		sendNotify(LBN_VSCROLL);
 		return true;
 	}
@@ -141,7 +141,7 @@ bool zxListBox::onScroll(UINT code, UINT p, HWND hWnd, int type) {
 
 void zxListBox::sendNotify(int code) {
 	SendMessage(parent->getHWND(), WM_COMMAND, MAKELONG(wndID, code), (LPARAM)hWnd);
-	InvalidateRect(hWnd, nullptr, true);
+	InvalidateRect(hWnd, nullptr, false);
 }
 
 bool zxListBox::onMouseWheel(int vkKey, int x, int y, int delta) {
@@ -162,6 +162,22 @@ bool zxListBox::onMouseButtonDblClk(int vkKey, int x, int y, bool left) {
 	return true;
 }
 
+bool zxListBox::onKey(int nVirtKey, LPARAM keyData, bool pressed) {
+	int delta = 0;
+	switch(nVirtKey) {
+		case VK_UP: delta = -1; break;
+		case VK_DOWN: delta = 1; break;
+		case VK_NEXT: delta = countVisibleItems - 1; break;
+		case VK_PRIOR: delta = -(countVisibleItems - 1); break;
+	}
+	if(delta != 0) {
+		topIndex += delta;
+		sendNotify(LBN_VSCROLL);
+		return true;
+	}
+	return false;
+}
+
 void zxListBox::changeScroll(int& offs, int count, int page) {
 	memset(&si, 0, sizeof(SCROLLINFO));
 	si.cbSize = sizeof(SCROLLINFO);
@@ -169,6 +185,7 @@ void zxListBox::changeScroll(int& offs, int count, int page) {
 	si.nMin = 0;
 
 	if(GetScrollInfo(hWnd, SB_VERT, &si)) {
+		page--;
 		int delta = count - page;
 		bool visible = delta > 0;
 		offs = (visible ? (offs > delta ? delta : offs) : 0);

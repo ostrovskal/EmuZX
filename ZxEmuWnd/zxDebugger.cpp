@@ -2,6 +2,8 @@
 #include "resource.h"
 #include "zxDebugger.h"
 #include "zxDisAsm.h"
+#include "CpuZX.h"
+#include "DecoderZX.h"
 #include "SettingsZX.h"
 #include "zxDlgListBps.h"
 #include "zxDlgAddBp.h"
@@ -35,10 +37,10 @@ ZX_DEBUGGER dlgElems[] = {
 	{L"DE", IDC_EDIT_DE, IDC_STATIC_DE, nullptr, (ssh_w*)&regsZX[RE], 0xffff},
 	{L"HL", IDC_EDIT_HL, IDC_STATIC_HL, nullptr, (ssh_w*)&regsZX[RL], 0xffff},
 	{L"AF", IDC_EDIT_AF, IDC_STATIC_AF, nullptr, (ssh_w*)&regsZX[RA], 0xffff},
-	{L"BC'", IDC_EDIT_BC_, IDC_STATIC_BC_, nullptr, (ssh_w*)&regsZX[RC + 14], 0xffff},
-	{L"DE'", IDC_EDIT_DE_, IDC_STATIC_DE_, nullptr, (ssh_w*)&regsZX[RE + 14], 0xffff},
-	{L"HL'", IDC_EDIT_HL_, IDC_STATIC_HL_, nullptr, (ssh_w*)&regsZX[RL + 14], 0xffff},
-	{L"AF'", IDC_EDIT_AF_, IDC_STATIC_AF_, nullptr, (ssh_w*)&regsZX[RA + 14], 0xffff},
+	{L"BC'", IDC_EDIT_BC_, IDC_STATIC_BC_, nullptr, (ssh_w*)&regsZX[RC_], 0xffff},
+	{L"DE'", IDC_EDIT_DE_, IDC_STATIC_DE_, nullptr, (ssh_w*)&regsZX[RE_], 0xffff},
+	{L"HL'", IDC_EDIT_HL_, IDC_STATIC_HL_, nullptr, (ssh_w*)&regsZX[RL_], 0xffff},
+	{L"AF'", IDC_EDIT_AF_, IDC_STATIC_AF_, nullptr, (ssh_w*)&regsZX[RA_], 0xffff},
 	{L"SP", IDC_EDIT_SP, IDC_STATIC_SP, nullptr, (ssh_w*)&regsZX[RSPL], 0xffff},
 	{L"IX", IDC_EDIT_IX, IDC_STATIC_IX, nullptr, (ssh_w*)&regsZX[RIXL], 0xffff},
 	{L"IY", IDC_EDIT_IY, IDC_STATIC_IY, nullptr, (ssh_w*)&regsZX[RIYL], 0xffff},
@@ -110,38 +112,37 @@ void zxDebugger::show(bool visible) {
 	}
 }
 
-void zxDebugger::updateRegisters(int newPC, bool always, bool story) {
+void zxDebugger::updateRegisters(int newPC, int flags) {
 	bool decimal = theApp.getOpt(OPT_DECIMAL)->dval;
 	HWND h;
-	
-	for(auto& zx : dlgElems) {
-		ssh_w val = (((zx.regb == nullptr) ? *zx.regw : (ssh_w)(*zx.regb)) & zx.msk) >> zx.shift;
-		zx.change = zx.val != val;
-		h = zx.hWndText;
-		auto hdc = GetDC(h);
-		SetTextColor(hdc, zx.change ? RGB(0, 255, 0) : RGB(0, 0, 0));
-		SetWindowText(h, zx.text);
-		ReleaseDC(h, hdc);
-		if(zx.change || always) {
+	if(flags & U_REGS) {
+		for(auto& zx : dlgElems) {
+			ssh_w val = (((zx.regb == nullptr) ? *zx.regw : (ssh_w)(*zx.regb)) & zx.msk) >> zx.shift;
+			zx.change = zx.val != val;
+			h = zx.hWndText;
+			auto hdc = GetDC(h);
+			SetTextColor(hdc, zx.change ? RGB(0, 255, 0) : RGB(0, 0, 0));
+			SetWindowText(h, zx.text);
+			ReleaseDC(h, hdc);
 			zx.val = val;
 			auto fmt = (zx.msk < 255 ? L"%d" : (zx.regb ? radix[decimal] : radix[decimal + 10]));
 			SetWindowText(zx.hWndMain, fromNum(val, fmt));
 		}
+		InvalidateRect(hWnd, nullptr, false);
 	}
+	if((flags & U_SP) && _SP && _sp != *_SP) updateStack(*_SP);
 	
-	if(always && _SP && _sp != *_SP)
-		updateStack(*_SP);
-	
-	if(_pc != newPC) {
-		da->decode(newPC, 34);
-		_pc = newPC;
-		updateUndoRedo(story);
-		owner = true;
-		SendMessage(hWndDA, LB_SETTOPINDEX, _pc, 0);
-		SendMessage(hWndDA, LB_SETCURSEL, _pc, 0);
-		InvalidateRect(hWndDA, nullptr, false);
+	if(flags & U_PC) {
+		if(_pc != newPC) {
+			if(newPC < _pc || newPC >= _lastPC) {
+				_lastPC = da->decode(newPC, countVisibleItems + 1);
+				_pc = newPC;
+			}
+			updateUndoRedo(flags & U_STORY);
+			SendMessage(hWndDA, LB_SETTOPINDEX, _pc, 0);
+		}
+		if(flags & U_SEL) SendMessage(hWndDA, LB_SETCURSEL, _pc + da->indexFromAddress(newPC), 0);
 	}
-	InvalidateRect(hWnd, nullptr, false);
 }
 
 void zxDebugger::updateStack(int sp) {
@@ -157,15 +158,15 @@ void zxDebugger::updateStack(int sp) {
 void zxDebugger::updatePrevNextBP() {
 	bool is = curIndexBP > 0 && (bps[curIndexBP - 1].address1 != -1);
 	SendMessage(hWndToolbar, TB_SETSTATE, IDM_PREV_BREAKPOINT, (is << 2));
-	is = curIndexBP < 9 && (bps[curIndexBP + 1].address1 != -1);
+	is = curIndexBP < (COUNT_BP - 1) && (bps[curIndexBP + 1].address1 != -1);
 	SendMessage(hWndToolbar, TB_SETSTATE, IDM_NEXT_BREAKPOINT, is << 2);
 }
 
 void zxDebugger::updateUndoRedo(bool set) {
 	if(set) {
-		if(curStoryPC > 31) {
-			memcpy(&storyPC[0], &storyPC[1], 31 * 2);
-			curStoryPC = 31;
+		if(curStoryPC > (COUNT_STORY_PC - 1)) {
+			memcpy(&storyPC[0], &storyPC[1], (COUNT_STORY_PC - 1) * 2);
+			curStoryPC = COUNT_STORY_PC - 1;
 		}
 		storyPC[++curStoryPC] = _pc;
 		limitStoryPC = curStoryPC;
@@ -178,11 +179,15 @@ void zxDebugger::updateHexDec(bool change) {
 	auto opt = theApp.getOpt(OPT_DECIMAL);
 	if(change) {
 		opt->dval = !opt->dval;
-		updateRegisters(_pc, true, false);
+		updateRegisters(_pc, U_PC | U_SP | U_REGS);
 		InvalidateRect(hWndSP, nullptr, false);
 		InvalidateRect(hWndDA, nullptr, false);
 	}
 	SendMessage(hWndToolbar, TB_SETSTATE, IDM_HEX_DEC, TBSTATE_ENABLED | opt->dval);
+}
+
+bool zxDebugger::onSize(WPARAM type, int nWidth, int nHeight) {
+	return false;
 }
 
 bool zxDebugger::onClose() {
@@ -206,6 +211,8 @@ void zxDebugger::onInitDialog(HWND hWnd, LPARAM lParam) {
 	SendMessage(hWndDA, LB_SETCOUNT, 65536, 0);
 	SendMessage(hWndDA, LB_SETTOPINDEX, _PC, 0);
 	
+	countVisibleItems = (int)SendMessage(hWndDA, LB_GETCOUNT, 1, 0);
+
 	SendMessage(hWndSP, WM_SETFONT, WPARAM(hFont), TRUE);
 	SendMessage(hWndSP, LB_SETITEMHEIGHT, 0, 16);
 	SendMessage(hWndSP, LB_SETCOUNT, 32768, 0);
@@ -218,11 +225,11 @@ bool zxDebugger::onDrawItem(UINT id, LPDRAWITEMSTRUCT dis) {
 	auto dec = theApp.getOpt(OPT_DECIMAL)->dval;
 	auto item = dis->itemID;
 	if(id == IDC_LIST_DA) {
-		txt = da->makeCommand((int)item, DA_FCODE | DA_FADDR | DA_FPADDR | (int)dec);
+		auto top = SendMessage(hWndDA, LB_GETTOPINDEX, 0, 0);
+		txt = da->makeCommand((int)(item - top), DA_FCODE | DA_FADDR | DA_FPADDR | (int)dec);
 	} else {
 		// stack
-		auto top = SendMessage(hWndSP, LB_GETTOPINDEX, 0, 0);
-		auto idx = (top + item) * 2;
+		auto idx = item * 2;
 		auto val = *(ssh_w*)(memZX + idx);
 		StringZX chars((ssh_b*)&memZX[val], 4);
 		auto sp = (idx == *_SP ? L"SP " : L"   ");
@@ -232,9 +239,7 @@ bool zxDebugger::onDrawItem(UINT id, LPDRAWITEMSTRUCT dis) {
 	HDC hdc = dis->hDC;
 	SetBkColor(hdc, GetSysColor(isStat ? COLOR_HIGHLIGHT : COLOR_WINDOW));
 	SetTextColor(hdc, GetSysColor(isStat ? COLOR_BTNHIGHLIGHT : COLOR_WINDOWTEXT));
-	//FillRect(hdc, &dis->rcItem, isStat ? hbrSel : hbrUnSel);
 	DrawText(hdc, txt, (int)txt.length(), &dis->rcItem, DT_SINGLELINE | DT_LEFT | DT_EXPANDTABS);
-	owner = false;
 	return true;
 }
 
@@ -245,29 +250,29 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 		case IDM_UNDO:
 			if(curStoryPC > 0) {
 				curStoryPC--;
-				updateRegisters(storyPC[curStoryPC], true, false);
+				updateRegisters(storyPC[curStoryPC], U_PC | U_SEL | U_TOP);
 			}
 			break;
 		case IDM_REDO:
 			if(curStoryPC < limitStoryPC) {
 				curStoryPC++;
-				updateRegisters(storyPC[curStoryPC], true, false);
+				updateRegisters(storyPC[curStoryPC], U_PC | U_SEL | U_TOP);
 			}
 			break;
 		case IDM_PREV_BREAKPOINT:
 			if(curIndexBP > 0) {
 				if(bps[curIndexBP - 1].address1 != -1) {
 					curIndexBP--;
-					updateRegisters(bps[curIndexBP].address1, true, false);
+					updateRegisters(bps[curIndexBP].address1, U_PC | U_SEL | U_TOP);
 				}
 			}
 			updatePrevNextBP();
 			break;
 		case IDM_NEXT_BREAKPOINT:
-			if(curIndexBP < 9) {
+			if(curIndexBP < (COUNT_BP - 1)) {
 				if(bps[curIndexBP + 1].address1 != -1) {
 					curIndexBP++;
-					updateRegisters(bps[curIndexBP].address1, true, false);
+					updateRegisters(bps[curIndexBP].address1, U_PC | U_SEL | U_TOP);
 				}
 			}
 			updatePrevNextBP();
@@ -286,10 +291,30 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 			InvalidateRect(hWndDA, nullptr, false);
 			break;
 		}
-		case IDM_STEP_INTO:
+		case IDM_STEP_INTO: {
+			*_TRAP = 0;
+			theApp.zilog->execute(true);
+			updateRegisters(_PC, U_REGS | U_PC | U_SP | U_SEL);
 			break;
-		case IDM_STEP_OVER:
+		}
+		case IDM_STEP_OVER: {
+			*_TRAP = 0;
+			// если CALL nn/CALL ccc,nn -> выполняем до тех пор пока PC не станет следующей командой
+			bool isCall = da->isCALL(sel);
+			auto nextPC = da->move(_PC, 1);
+			do {
+				theApp.zilog->execute(true);
+			} while(_PC != nextPC && isCall);
+			updateRegisters(_PC, U_REGS | U_PC | U_SP | U_SEL);
 			break;
+		}
+		case IDM_OVER_PROC: {
+			*_TRAP = 0;
+			auto exit_pc = *_PC_EXIT_CALL;
+			while(_PC != exit_pc) theApp.zilog->execute(true);
+			updateRegisters(_PC, U_REGS | U_PC | U_SP | U_SEL);
+			break;
+		}
 		case IDM_PAUSE:
 			setProgrammPause(true, false);
 			break;
@@ -299,10 +324,8 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 		case IDM_HEX_DEC:
 			updateHexDec(true);
 			break;
-		case IDM_OVER_PROC:
-			break;
 		case IDC_BUTTON_TO_PC:
-			updateRegisters(_PC, false, true);
+			updateRegisters(_PC, U_PC | U_SEL | U_TOP);
 			break;
 		case IDC_BUTTON_TO_SP:
 			updateStack(*_SP);
@@ -340,7 +363,18 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 				case EN_CHANGE: {
 					for(auto& zx : dlgElems) {
 						if(zx.idMain == wmId) {
-
+							GetWindowText(zx.hWndMain, tmpBuf, 256);
+							bool dec = theApp.getOpt(OPT_DECIMAL)->dval;
+							ssh_w v = (ssh_w)*(ssh_u*)(asm_ssh_wton(tmpBuf, (dec ? (ssh_u)Radix::_dec : (ssh_u)Radix::_hex)));
+							if(zx.regb) {
+								if(flag) {
+									*zx.regb &= ~(1 << zx.shift);
+									*zx.regb |= (v ? 1 : 0) << zx.shift;
+								} else *zx.regb = (ssh_b)(v & zx.msk);
+							} else if(zx.regw) {
+								v &= zx.msk;
+								*zx.regw = v;
+							}
 							break;
 						}
 					}
@@ -352,13 +386,13 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 			switch(param) {
 				case LBN_VSCROLL: {
 					int delta = (int)SendMessage(hWndDA, LB_GETTOPINDEX, 0, 0) - _pc;
-					updateRegisters(da->move(_pc, delta), true, false);
+					updateRegisters(da->move(_pc, delta), U_PC | U_TOP);
 					break;
 				}
 				case LBN_DBLCLK: {
 					// определить тип комманды с адресом перехода
 					auto addr = da->getCmdOperand(sel, true);
-					updateRegisters(addr, false, true);
+					if(addr != -1) updateRegisters(addr, U_PC | U_STORY | U_SEL | U_TOP);
 					break;
 				}
 				case LBN_SELCHANGE:
@@ -371,7 +405,7 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 			switch(param) {
 				case LBN_DBLCLK: {
 					ssh_w newPC = *(ssh_w*)(memZX + SendMessage((HWND)lParam, LB_GETCURSEL, 0, 0) * 2);
-					updateRegisters(newPC, false, true);
+					updateRegisters(newPC, U_PC | U_STORY | U_SEL | U_TOP);
 					break;
 				}
 			}
@@ -420,7 +454,7 @@ void zxDebugger::setProgrammPause(bool pause, bool activate) {
 		updatePrevNextBP();
 
 		modifyTSTATE(pause ? ZX_DEBUG : ZX_EXEC, pause ? ZX_EXEC : 0);
-		if(pause) updateRegisters(_PC, true, true);
+		if(pause) updateRegisters(_PC, U_PC | U_REGS | U_STORY | U_SEL | U_SP | U_TOP);
 		theApp.changeExecute(false);
 
 		if(activate) SetForegroundWindow(hWnd);
@@ -429,24 +463,36 @@ void zxDebugger::setProgrammPause(bool pause, bool activate) {
 
  bool zxDebugger::checkBPS(ssh_w address, bool mem) {
 	static ZX_BREAK_POINT bp;
-	bool target = false;
+	bool res = false;
 	int flags = mem ? FBP_MEM : FBP_PC;
 	if(check(address, bp, flags)) {
 		if(flags == FBP_MEM) {
-			if(bp.value != -1) target = (memZX[address] == bp.value);
-		} else target = true;
-		if(target) setProgrammPause(true, true);
+			if(bp.value != -1) {
+				ssh_b v1 = (memZX[address] & bp.mask);
+				ssh_b v2 = (ssh_b)bp.value;
+				switch((bp.flags & FBP_COND)) {
+					case FBP_EQ: res = v1 == v2; break;
+					case FBP_NEQ: res = v1 != v2; break;
+					case FBP_GT: res = v1 > v2; break;
+					case FBP_LS: res = v1 < v2; break;
+					case FBP_QGT: res = v1 >= v2; break;
+					case FBP_QLS: res = v1 <= v2; break;
+				}
+			}
+		} else res = true;
+		if(res) setProgrammPause(true, true);
 	}
-	return target;
+	return res;
 }
 
 void zxDebugger::quickBP(int adr) {
-	for(int i = 0; i < 10; i++) {
+	for(int i = 0; i < COUNT_BP; i++) {
 		auto bp = &bps[i];
 		if(bp->address1 == -1) {
 			bp->address1 = adr;
 			bp->address2 = adr;
 			bp->value = -1;
+			bp->mask = 0xff;
 			bp->flags = FBP_PC;
 			break;
 		} else if(adr >= bp->address1 && adr <= bp->address2 && (bp->flags & FBP_PC)) {
@@ -454,6 +500,7 @@ void zxDebugger::quickBP(int adr) {
 			break;
 		}
 	}
+	updatePrevNextBP();
 }
 
 void zxDebugger::saveBPS() {
@@ -465,6 +512,7 @@ void zxDebugger::saveBPS() {
 }
 
 void zxDebugger::removeBP(int index) {
-	memcpy(&bps[index], &bps[index + 1], (&bps[9] - &bps[index]) * sizeof(ZX_BREAK_POINT));
-	memset(&bps[9], -1, sizeof(ZX_BREAK_POINT));
+	if(curIndexBP == index) curIndexBP--;
+	memcpy(&bps[index], &bps[index + 1], (&bps[(COUNT_BP - 1)] - &bps[index]) * sizeof(ZX_BREAK_POINT));
+	memset(&bps[(COUNT_BP - 1)], -1, sizeof(ZX_BREAK_POINT));
 }

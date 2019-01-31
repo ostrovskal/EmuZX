@@ -28,13 +28,12 @@ void decodePage(ssh_b* ptr, ssh_b* dst, ssh_b* dstE, int sz, bool packed) {
 }
 
 bool loadZ80(const StringZX& path) {
-
 	ssh_b* pptr = nullptr;
 	bool result = true;
 	ssh_b* ptr;
 	long sz;
 
-	pauseCPU(true, 0);
+	theApp.pauseCPU(true, 0);
 
 	try {
 		_wsopen_s(&_hf, path, _O_RDONLY | _O_BINARY, _SH_DENYRD, _S_IREAD);
@@ -97,7 +96,7 @@ bool loadZ80(const StringZX& path) {
 	SAFE_CLOSE1(_hf);
 	SAFE_DELETE(pptr);
 
-	pauseCPU(false, ZX_BORDER);
+	theApp.pauseCPU(false, ZX_BORDER);
 
 	return result;
 }
@@ -106,7 +105,7 @@ bool saveZ80(const StringZX& path) {
 	ssh_b* pptr = nullptr;
 	bool result = true;
 
-	pauseCPU(true, 0);
+	theApp.pauseCPU(true, 0);
 
 	try {
 		_wsopen_s(&_hf, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
@@ -171,7 +170,7 @@ bool saveZ80(const StringZX& path) {
 	SAFE_CLOSE1(_hf);
 	SAFE_DELETE(pptr);
 
-	pauseCPU(false, 0);
+	theApp.pauseCPU(false, 0);
 
 	return result;
 }

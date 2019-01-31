@@ -7,10 +7,6 @@
 ssh_d colours[] = {	0xff000000, 0xff2030c0, 0xffc04010, 0xffc040c0, 0xff40b010, 0xff50c0b0, 0xffe0c010, 0xffc0c0c0,
 					0xff000000, 0xff3040ff, 0xffff4030, 0xffff70f0, 0xff50e010, 0xff50e0ff, 0xffffe850, 0xffffffff};
 
-ssh_ws str[256];
-
-extern SettingsZX settings;
-
 GpuZX::GpuZX() {
 	invert = 0;
 	hbmpMem = nullptr;
@@ -46,8 +42,9 @@ void GpuZX::showScreen() {
 		StretchBlt(hdc, r->left, r->top, r->right - r->left, r->bottom - r->top, hdcMem, 0, 0, 320, 256, SRCCOPY);
 		SelectObject(hdcMem, h);
 		::DeleteObject(hdc);
-		wsprintf(str, L"PC: %d", _PC);
-		SetWindowText(theApp.getHWND(), (LPCWSTR)str);
+		StringZX::fmt(L"SshZX (%s : %d) %s [%s]", ((_TSTATE & ZX_EXEC) ? L"execute" : L"pause"), _PC,
+					  nameROMs[theApp.getOpt(OPT_MEM_MODEL)->dval], theApp.opts.nameLoadProg);
+		SetWindowText(theApp.getHWND(), (LPCWSTR)tmpBuf);
 	}
 }
 
@@ -147,11 +144,11 @@ void GpuZX::drawLine(ssh_d* addr, ssh_b val) {
 bool GpuZX::saveScreen(ssh_cws path) {
 	bool result = true;
 
-	pauseCPU(true, 0);
+	theApp.pauseCPU(true, 0);
 
 	try {
 		_wsopen_s(&_hf, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
-		if(_hf) {
+		if(_hf != -1) {
 			HEADER_TGA head;
 
 			head.bIdLength = 0;
@@ -181,7 +178,7 @@ bool GpuZX::saveScreen(ssh_cws path) {
 
 	SAFE_CLOSE1(_hf);
 
-	pauseCPU(false, 0);
+	theApp.pauseCPU(false, 0);
 
 	return result;
 }

@@ -174,7 +174,7 @@ public:
 	ssh_w move(ssh_w pc, int count);
 
 	// формирование строки кода комманды
-	StringZX makeCode(ssh_w address, int length, ssh_b dec);
+	StringZX makeCode(ssh_w address, int length, ssh_b dec) const;
 	
 	// формирование комманды
 	StringZX makeCommand(ssh_d num, int flags);
@@ -183,8 +183,14 @@ public:
 	int getCmdOperand(ssh_d num, bool pc);
 
 	// вернуть адрес комманды
-	int getCmdAddress(ssh_d num);
+	int getCmdAddress(ssh_d num) const;
 
+	// вернуть признак того, что текущая команда это CALL
+	bool isCALL(ssh_d num);
+
+	// вернуть индекс комманды по ее адресу
+	int indexFromAddress(ssh_d pc) const;
+		
 	ssh_b* cmds;
 	ssh_w* adrs;
 

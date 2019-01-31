@@ -69,20 +69,24 @@ public:
 	SettingsZX();
 	virtual ~SettingsZX() { options = nullptr; }
 	
-	//
+	// загрузить установки
 	void load(const StringZX& path);
 
-	//
+	// сохранить установки
 	void save(const StringZX& path);
 
-	//
+	// получить опцию по ИД
 	ZX_OPTION* get(int idx) { return &options[idx]; }
 
+	// папка приложения
 	StringZX mainDir;
+
+	// имя последней загруженной программы(игры)
+	StringZX nameLoadProg;
 protected:
-	//
+	// прочитать строку из настроек
 	bool readLine(FILE* hh, StringZX& name, StringZX& value);
 		
-	//
+	// массив опций
 	ZX_OPTION* options;
 };

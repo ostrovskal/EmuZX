@@ -23,7 +23,10 @@ void DecoderZX::funcN11_000() {
 		case 2:  _PC = nn; break;
 		// CALL ССС, nn
 		// RST NNN
-		case 4: case 7:
+		case 4: 
+			// запомнить ПС для операции отладчика шаг с выходом
+			*_PC_EXIT_CALL = _PC;
+		case 7:
 			(*_SP) -= 2;
 			write_mem16(*_SP, _PC);
 			_PC = (typeOps == 4 ? nn : ops * 8);

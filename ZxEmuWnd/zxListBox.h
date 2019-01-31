@@ -17,6 +17,7 @@ protected:
 	virtual bool onSize(WPARAM type, int nWidth, int nHeight) override;
 	virtual bool onPaint() override;
 	virtual void onFont(HFONT hF, bool redraw) override;
+	virtual bool onKey(int nVirtKey, LPARAM keyData, bool pressed) override;
 	virtual void postCreate() override;
 	void changeScroll(int& offs, int count, int page);
 	void sendNotify(int code);

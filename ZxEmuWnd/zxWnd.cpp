@@ -96,8 +96,8 @@ INT_PTR zxWnd::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 		case WM_KEYUP: if(onKey((int)wParam, lParam, false)) return 0; break;
 		case WM_NOTIFY: if(onNotify((LPNMHDR)lParam)) return 0; break;
 		case WM_DRAWITEM: if(onDrawItem((UINT)wParam, (LPDRAWITEMSTRUCT)lParam)) return 1; break;
-		case WM_VSCROLL: if(onScroll(HIWORD(wParam), LOWORD(wParam), (HWND)lParam, SB_VERT)) return 0; break;
-		case WM_HSCROLL: if(onScroll(HIWORD(wParam), LOWORD(wParam), (HWND)lParam, SB_HORZ)) return 0; break;
+		case WM_VSCROLL:
+		case WM_HSCROLL: if(onScroll(LOWORD(wParam), HIWORD(wParam), (HWND)lParam, (message == WM_HSCROLL ? SB_HORZ : SB_VERT))) return 0; break;
 		case WM_MOUSEWHEEL: if(onMouseWheel(GET_KEYSTATE_WPARAM(wParam), ((short)LOWORD(lParam)),
 											((short)HIWORD(lParam)), GET_WHEEL_DELTA_WPARAM(wParam))) return 0;  break;
 		case WM_MOUSEMOVE: if(onMouseMove(GET_KEYSTATE_WPARAM(wParam),
@@ -216,7 +216,7 @@ int zxDialog::create(WORD IDD, zxWnd* wndParent, bool modal) {
 					// функция для работы пока нет сообщений
 					//SendMsg(WM_IDLE, 0, 0);
 				}
-				if(!::GetMessage(&msg, hWnd, NULL, NULL)) break;
+				if(!::GetMessage(&msg, NULL, NULL, NULL)) break;
 				if(!TranslateAccelerator(hWnd, hAccelTable, &msg)) {
 					if(!IsDialogMessage(hWnd, &msg)) {
 						TranslateMessage(&msg);
