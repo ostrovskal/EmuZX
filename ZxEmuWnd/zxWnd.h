@@ -1,6 +1,7 @@
 
 #pragma once
 
+struct SSH_MSGMAP;
 class zxWnd {
 	friend LRESULT CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 public:
@@ -10,7 +11,7 @@ public:
 	void detach();
 	static zxWnd* fromHWND(HWND hWnd);
 	HWND getHWND() const { return hWnd; }
-	virtual bool create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, const RECT& rect, zxWnd* pParentWnd, UINT nID, UINT nMenu);
+	virtual HWND create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, int x, int y, int cx, int cy, zxWnd* wndParent, UINT nID, UINT nMenu);
 	void showWindow(bool show) const { ShowWindow(hWnd, show); }
 	void updateWindow() const { UpdateWindow(hWnd); }
 	bool isWindowVisible() const { return IsWindowVisible(hWnd); }
@@ -28,15 +29,28 @@ protected:
 	virtual void onIdle() {}
 	virtual void onDestroy() {}
 	virtual bool onDrawItem(UINT idCtl, LPDRAWITEMSTRUCT lpdis) { return false; }
-	virtual bool onScroll(UINT code, UINT pos, HWND hWnd, bool vertical) { return false; }
+	virtual bool onScroll(UINT code, UINT pos, HWND hWnd, int type) { return false; }
+	virtual bool onMouseWheel(int vkKey, int x, int y, int delta) { return false; }
+	virtual bool onMouseButtonDown(int vkKey, int x, int y, bool left) { return false; }
+	virtual bool onMouseButtonUp(int vkKey, int x, int y, bool left) { return false; }
+	virtual bool onMouseMove(int vkKey, int x, int y) { return false; }
+	virtual bool onMouseButtonDblClk(int vkKey, int x, int y, bool left) { return false; }
+	virtual bool onPaint() { return false; }
+	virtual void onFont(HFONT hFont, bool redraw) { }
 	virtual bool preCreate() { return true; }
 	virtual void postCreate() {  }
+
 	bool makeToolbar(WORD IDB, TBBUTTON* tbb, int cBitmaps, int cButtons, int cxButton, int cyButton);
 	ssh_cws registerClass(ssh_cws name, int idMenu, WNDPROC proc);
 	zxWnd* parent;
 	HWND hWnd;
 	HWND hWndToolbar;
+	UINT wndID;
 	HBITMAP hBmp;
+
+	static const SSH_MSGMAP* PASCAL GetThisMessageMap() { return nullptr; }
+	virtual const SSH_MSGMAP* GetMessageMap() const { return nullptr; }
+
 };
 
 class zxDialog : public zxWnd {

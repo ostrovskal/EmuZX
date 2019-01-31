@@ -29,14 +29,21 @@ class zxKeyboard : public zxDialog {
 	friend ssh_d WINAPI KeyProc(void* params);
 public:
 	zxKeyboard() : mode(-1), hKeyThread(nullptr), hFont(nullptr) { }
-	virtual ~zxKeyboard() { CloseHandle(hKeyThread); }
+	virtual ~zxKeyboard() { 
+		CloseHandle(hKeyThread); 
+		DeleteObject(hbrSel);
+		DeleteObject(hbrUnsel);
+		DeleteObject(hFont);
+	}
 	void show(bool visible);
 protected:
 	virtual bool onClose() override { theApp.changeWndKeyboard(true); return false; }
 	virtual void onInitDialog(HWND hWnd, LPARAM lParam) override;
 	virtual bool preCreate() override;
+	virtual bool onDrawItem(UINT idCtl, LPDRAWITEMSTRUCT lpdis);
 	DWORD procKEY();
 	HANDLE hKeyThread;
 	HFONT hFont;
+	HBRUSH hbrSel, hbrUnsel;
 	int mode;
 };

@@ -171,7 +171,7 @@ public:
 	bool save(ssh_cws path, ssh_b dec);
 
 	// перемещение позиции вперед/назад
-	ssh_w move(ssh_w pc, bool direct, int count);
+	ssh_w move(ssh_w pc, int count);
 
 	// формирование строки кода комманды
 	StringZX makeCode(ssh_w address, int length, ssh_b dec);

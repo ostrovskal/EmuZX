@@ -51,25 +51,56 @@ static ssh_d WINAPI KeyProc(void* params) {
 }
 
 DWORD zxKeyboard::procKEY() {
-	while(true) {
-		int nmode = KM_SH_E;
-		if(mode != nmode) {
-			mode = nmode;
-			for(auto& k : keys) {
-				ssh_cws name;
-				switch(mode) {
-					case KM_K: name = k.name_k; break;
-					case KM_L: name = k.name_l; break;
-					case KM_C: name = k.name_c; break;
-					case KM_E: name = k.name_e; break;
-					case KM_G: name = k.name_l; break;
-					case KM_SH_E: name = k.name_sh_e; break;
-					case KM_SH_KL: name = k.name_sh_k; break;
-					case KM_CH: name = k.name_l; break;
-				}
-				SetWindowText(k.hWndKey, name);
-			}
+	int val, val1, val2;
+	LARGE_INTEGER sample;
+
+	QueryPerformanceFrequency(&sample);
+	DWORD ms = sample.LowPart / 1000;
+
+	QueryPerformanceCounter(&sample);
+	DWORD start = sample.LowPart / ms;
+
+	while(!(_TSTATE & ZX_TERMINATE)) {
+		QueryPerformanceCounter(&sample);
+		DWORD millis = sample.LowPart / ms;
+		if((millis - start) < 10) continue;
+		start = millis;
+		// проверить режим клавиатуры
+		int nmode = -1;
+		if(!memZX) continue;
+		val = memZX[23617];
+		int sh = (GetKeyState(VK_SHIFT) & 128);
+		switch(val) {
+			case 0:
+				val1 = memZX[23658];
+				val2 = memZX[23611];
+				if(val1 & 8) nmode = KM_C; else { if(val2 & 8) nmode = KM_L; else if(val1 & 16) nmode = KM_K; }
+				if(sh) nmode = KM_SH_KL;
+				if(nmode == KM_L && (GetKeyState(VK_CONTROL) & 128)) nmode = KM_CH;
+				break;
+			case 1: nmode = (sh ? KM_SH_E : KM_E); break;
+			default: nmode = KM_G; break;
 		}
+		// проверить на нажатые кнопки
+		if(mode == nmode) continue;
+		for(auto& k : keys) {
+			int p = ((k.port << 8) | 0xfe);
+			auto v = portsZX[p];
+			//if(!(v & k.bit)) SendMessage(k.hWndKey, BM_CLICK, 0, 0);
+			ssh_cws name = nullptr;
+			switch(nmode) {
+				case KM_K: name = k.name_k; break;
+				case KM_L: name = k.name_l; break;
+				case KM_C: name = k.name_c; break;
+				case KM_E: name = k.name_e; break;
+				case KM_G: name = k.name_l; break;
+				case KM_SH_E: name = k.name_sh_e; break;
+				case KM_SH_KL: name = k.name_sh_k; break;
+				case KM_CH: name = k.name_c; break;
+			}
+			if(nmode != mode && name != nullptr) SetWindowText(k.hWndKey, name);
+		}
+		mode = nmode;
 	}
 	return 0;
 }
@@ -87,6 +118,8 @@ bool zxKeyboard::preCreate() {
 	hFont = CreateFont(-10, 0, 0, 0, FW_THIN, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_TT_PRECIS,
 					   CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN, L"Courier New");
 
+	hbrSel = CreateSolidBrush(RGB(255, 0, 0));
+	hbrUnsel = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
 	return true;
 }
 
@@ -102,4 +135,27 @@ void zxKeyboard::show(bool visible) {
 		}
 	}
 
+}
+
+bool zxKeyboard::onDrawItem(UINT idCtl, LPDRAWITEMSTRUCT dis) {
+	auto isStat = (dis->itemState & ODS_SELECTED) != 0;
+	if(isStat) {
+		isStat = isStat;
+	}
+	GetWindowText(dis->hwndItem, tmpBuf, 260);
+	StringZX txt(tmpBuf);
+	RECT* r = &dis->rcItem;
+	HDC hdc = dis->hDC;
+	POINT pt;
+
+	SetTextColor(hdc, GetSysColor(isStat ? COLOR_HIGHLIGHTTEXT : COLOR_BTNTEXT));
+	SetBkMode(hdc, TRANSPARENT);
+	FillRect(hdc, r, isStat ? hbrSel : hbrUnsel);
+	DrawText(hdc, txt, (int)txt.length(), r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+	MoveToEx(hdc, r->left, r->top, &pt);
+	LineTo(hdc, r->right - 1, r->top);
+	LineTo(hdc, r->right - 1, r->bottom - 1);
+	LineTo(hdc, r->left, r->bottom - 1);
+	LineTo(hdc, r->left, r->top);
+	return true;
 }

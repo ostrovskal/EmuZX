@@ -33,9 +33,6 @@
     <ClInclude Include="GpuZX.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="ZxTimer.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="BorderZX.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
@@ -105,9 +102,6 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="GpuZX.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="ZxTimer.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="BorderZX.cpp">

@@ -7,7 +7,8 @@
 #include "zxDlgAddBp.h"
 #include <math.h>
 
-static ssh_w _FAKE = 0;
+BEGIN_MSG_MAP(zxDebugger, zxDialog)
+END_MSG_MAP()
 
 TBBUTTON tbb[] = {
 	{0, IDM_PREV_BREAKPOINT, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Previous Breakpoint\tCtr+F9"},
@@ -30,8 +31,6 @@ TBBUTTON tbb[] = {
 };
 
 ZX_DEBUGGER dlgElems[] = {
-	{L"", IDC_LIST_DA, IDC_LIST_DA, nullptr, &_FAKE, 0xffff},
-	{L"", IDC_LIST_STACK, IDC_LIST_STACK, nullptr, &_FAKE, 0xffff},
 	{L"BC", IDC_EDIT_BC, IDC_STATIC_BC, nullptr, (ssh_w*)&regsZX[RC], 0xffff},
 	{L"DE", IDC_EDIT_DE, IDC_STATIC_DE, nullptr, (ssh_w*)&regsZX[RE], 0xffff},
 	{L"HL", IDC_EDIT_HL, IDC_STATIC_HL, nullptr, (ssh_w*)&regsZX[RL], 0xffff},
@@ -130,25 +129,19 @@ void zxDebugger::updateRegisters(int newPC, bool always, bool story) {
 		}
 	}
 	
-	if(_sp == -1)
+	if(always && _SP && _sp != *_SP)
 		updateStack(*_SP);
 	
 	if(_pc != newPC) {
 		da->decode(newPC, 34);
 		_pc = newPC;
 		updateUndoRedo(story);
-		h = dlgElems[0].hWndMain;
 		owner = true;
-		SendMessage(h, LB_SETTOPINDEX, _pc, 0);
-		InvalidateRect(h, nullptr, true);
-		UpdateWindow(h);
+		SendMessage(hWndDA, LB_SETTOPINDEX, _pc, 0);
+		SendMessage(hWndDA, LB_SETCURSEL, _pc, 0);
+		InvalidateRect(hWndDA, nullptr, false);
 	}
-	/*
-	InvalidateRect(dlgElems[1].hWndMain, nullptr, true);
-	UpdateWindow(dlgElems[1].hWndMain);
-	*/
-	InvalidateRect(hWnd, nullptr, true);
-	UpdateWindow(hWnd);
+	InvalidateRect(hWnd, nullptr, false);
 }
 
 void zxDebugger::updateStack(int sp) {
@@ -156,7 +149,9 @@ void zxDebugger::updateStack(int sp) {
 	if(sp < 0) sp = 0;
 	else if((sp + 20) > 65535) sp = 655508;
 	_sp = sp / 2;
-	SendMessage(dlgElems[1].hWndMain, LB_SETTOPINDEX, _sp, 0);
+	SendMessage(hWndSP, LB_SETTOPINDEX, _sp, 0);
+	SendMessage(hWndSP, LB_SETCURSEL, (*_SP) / 2, 0);
+	InvalidateRect(hWndSP, nullptr, true);
 }
 
 void zxDebugger::updatePrevNextBP() {
@@ -184,6 +179,8 @@ void zxDebugger::updateHexDec(bool change) {
 	if(change) {
 		opt->dval = !opt->dval;
 		updateRegisters(_pc, true, false);
+		InvalidateRect(hWndSP, nullptr, false);
+		InvalidateRect(hWndDA, nullptr, false);
 	}
 	SendMessage(hWndToolbar, TB_SETSTATE, IDM_HEX_DEC, TBSTATE_ENABLED | opt->dval);
 }
@@ -196,43 +193,36 @@ bool zxDebugger::onClose() {
 }
 
 void zxDebugger::onInitDialog(HWND hWnd, LPARAM lParam) {
-	HWND h;
-
-	theApp.changeExecute(false);
+	hWndDA = zxDA.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 0, 29, 384, 515, this, IDC_LIST_DA, 0);
+	hWndSP = zxSP.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 390, 327, 173, 218, this, IDC_LIST_STACK, 0);
 
 	for(auto& zx : dlgElems) {
 		zx.hWndMain = GetDlgItem(hWnd, zx.idMain);
 		zx.hWndText = GetDlgItem(hWnd, zx.idText);
 		zx.val = (((zx.regb == nullptr) ? *zx.regw : (ssh_w)*zx.regb) & zx.msk) >> zx.shift;
 	}
-	h = dlgElems[0].hWndMain;
-	SendMessage(h, WM_SETFONT, WPARAM(hFont), TRUE);
-	SendMessage(h, LB_SETITEMHEIGHT, 0, 16);
-	SendMessage(h, LB_SETCOUNT, 65536, 0);
-	SendMessage(h, LB_SETTOPINDEX, _PC, 0);
-	h = dlgElems[1].hWndMain;
-	SendMessage(h, WM_SETFONT, WPARAM(hFont), TRUE);
-	SendMessage(h, LB_SETITEMHEIGHT, 0, 16);
-	SendMessage(h, LB_SETCOUNT, 32768, 0);
+	SendMessage(hWndDA, WM_SETFONT, WPARAM(hFont), TRUE);
+	SendMessage(hWndDA, LB_SETITEMHEIGHT, 0, 16);
+	SendMessage(hWndDA, LB_SETCOUNT, 65536, 0);
+	SendMessage(hWndDA, LB_SETTOPINDEX, _PC, 0);
+	
+	SendMessage(hWndSP, WM_SETFONT, WPARAM(hFont), TRUE);
+	SendMessage(hWndSP, LB_SETITEMHEIGHT, 0, 16);
+	SendMessage(hWndSP, LB_SETCOUNT, 32768, 0);
 	_sp = -1;
 }
-
 
 bool zxDebugger::onDrawItem(UINT id, LPDRAWITEMSTRUCT dis) {
 	StringZX txt;
 
 	auto dec = theApp.getOpt(OPT_DECIMAL)->dval;
 	auto item = dis->itemID;
-	if(id == dlgElems[0].idMain) {
-		auto top = SendMessage(dis->hwndItem, LB_GETTOPINDEX, 0, 0);
-		if(top != _pc && !owner) {
-			auto pc = da->move(_pc, top > _pc, abs((int)(top - _pc)));
-			updateRegisters((int)pc, false, false);
-		}
-		txt = da->makeCommand((int)(item - top), DA_FCODE | DA_FADDR | DA_FPADDR | (int)dec);
+	if(id == IDC_LIST_DA) {
+		txt = da->makeCommand((int)item, DA_FCODE | DA_FADDR | DA_FPADDR | (int)dec);
 	} else {
 		// stack
-		auto idx = item * 2;
+		auto top = SendMessage(hWndSP, LB_GETTOPINDEX, 0, 0);
+		auto idx = (top + item) * 2;
 		auto val = *(ssh_w*)(memZX + idx);
 		StringZX chars((ssh_b*)&memZX[val], 4);
 		auto sp = (idx == *_SP ? L"SP " : L"   ");
@@ -242,14 +232,15 @@ bool zxDebugger::onDrawItem(UINT id, LPDRAWITEMSTRUCT dis) {
 	HDC hdc = dis->hDC;
 	SetBkColor(hdc, GetSysColor(isStat ? COLOR_HIGHLIGHT : COLOR_WINDOW));
 	SetTextColor(hdc, GetSysColor(isStat ? COLOR_BTNHIGHLIGHT : COLOR_WINDOWTEXT));
-	FillRect(hdc, &dis->rcItem, isStat ? hbrSel : hbrUnSel);
+	//FillRect(hdc, &dis->rcItem, isStat ? hbrSel : hbrUnSel);
 	DrawText(hdc, txt, (int)txt.length(), &dis->rcItem, DT_SINGLELINE | DT_LEFT | DT_EXPANDTABS);
 	owner = false;
 	return true;
 }
 
 bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
-	int sel = (int)SendMessage(dlgElems[0].hWndMain, LB_GETCURSEL, 0, 0) - _pc;
+	int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
+	bool flag = false;
 	switch(wmId) {
 		case IDM_UNDO:
 			if(curStoryPC > 0) {
@@ -283,12 +274,16 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 			break;
 		case IDM_BREAKPOINT: {
 			auto addr = da->getCmdAddress(sel);
-			if(addr != -1) quickBP(addr);
+			if(addr != -1) {
+				quickBP(addr);
+				InvalidateRect(hWndDA, nullptr, false);
+			}
 			break;
 		}
 		case IDM_LIST_BREAKPOINTS: {
 			zxDlgListBps dlg;
 			dlg.create(IDD_DIALOG_LIST_BPS, this, true);
+			InvalidateRect(hWndDA, nullptr, false);
 			break;
 		}
 		case IDM_STEP_INTO:
@@ -314,8 +309,52 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 			break;
 		case IDC_BUTTON_SET_COMMAND:
 			break;
+		case IDC_EDIT_S:
+		case IDC_EDIT_Z:
+		case IDC_EDIT_5:
+		case IDC_EDIT_H:
+		case IDC_EDIT_3:
+		case IDC_EDIT_P:
+		case IDC_EDIT_N:
+		case IDC_EDIT_C:
+			flag = true;
+		case IDC_EDIT_BC:
+		case IDC_EDIT_DE:
+		case IDC_EDIT_HL:
+		case IDC_EDIT_AF:
+		case IDC_EDIT_BC_:
+		case IDC_EDIT_DE_:
+		case IDC_EDIT_HL_:
+		case IDC_EDIT_AF_:
+		case IDC_EDIT_IX:
+		case IDC_EDIT_IY:
+		case IDC_EDIT_SP:
+		case IDC_EDIT_PC:
+		case IDC_EDIT_R:
+		case IDC_EDIT_I:
+		case IDC_EDIT_IM:
+		case IDC_EDIT_IFF1:
+		case IDC_EDIT_IFF2:
+//		case IDC_EDIT_STATE:
+			switch(param) {
+				case EN_CHANGE: {
+					for(auto& zx : dlgElems) {
+						if(zx.idMain == wmId) {
+
+							break;
+						}
+					}
+					break;
+				}
+			}
+			break;
 		case IDC_LIST_DA: {
 			switch(param) {
+				case LBN_VSCROLL: {
+					int delta = (int)SendMessage(hWndDA, LB_GETTOPINDEX, 0, 0) - _pc;
+					updateRegisters(da->move(_pc, delta), true, false);
+					break;
+				}
 				case LBN_DBLCLK: {
 					// определить тип комманды с адресом перехода
 					auto addr = da->getCmdOperand(sel, true);
@@ -337,6 +376,7 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 				}
 			}
 			break;
+		case IDOK: break;
 		default: return false;
 	}
 	return true;
@@ -354,16 +394,6 @@ INT_PTR zxDebugger::onCtlColorStatic(HDC hDC, HWND hWnd) {
 	return (INT_PTR)0;
 }
 
-bool zxDebugger::onNotify(LPNMHDR nm) {
-	LPNMITEMACTIVATE lna = (LPNMITEMACTIVATE)nm;
-	if(lna->hdr.idFrom == IDC_LIST_BP) {
-		if(lna->hdr.code == NM_CLICK) {
-			return true;
-		}
-	}
-	return false;
-}
-
 bool zxDebugger::check(ssh_w address, ZX_BREAK_POINT& breakpt, int flags) {
 	for(auto& bp : bps) {
 		if(bp.address1 == -1) continue;
@@ -376,18 +406,25 @@ bool zxDebugger::check(ssh_w address, ZX_BREAK_POINT& breakpt, int flags) {
 }
 
 void zxDebugger::setProgrammPause(bool pause, bool activate) {
-	int state1 = pause ? TBSTATE_ENABLED : 0;
-	int state2 = pause ? 0 : TBSTATE_ENABLED;
+	if(hWndToolbar) {
+		int state1 = pause << 2;
+		int state2 = (!pause) << 2;
 
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_PAUSE, state2);
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_STEP_OVER, state1);
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_STEP_INTO, state1);
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_RUN, state1);
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_OVER_PROC, state1);
+		SendMessage(hWndToolbar, TB_SETSTATE, IDM_PAUSE, state2);
+		SendMessage(hWndToolbar, TB_SETSTATE, IDM_STEP_OVER, state1);
+		SendMessage(hWndToolbar, TB_SETSTATE, IDM_STEP_INTO, state1);
+		SendMessage(hWndToolbar, TB_SETSTATE, IDM_RUN, state1);
+		SendMessage(hWndToolbar, TB_SETSTATE, IDM_OVER_PROC, state1);
 
-	modifyTSTATE(pause ? ZX_DEBUG : ZX_EXEC, pause ? ZX_EXEC : 0);
-	if(pause) updateRegisters(_PC, true, true);
-	theApp.changeExecute(false);
+		updateUndoRedo(false);
+		updatePrevNextBP();
+
+		modifyTSTATE(pause ? ZX_DEBUG : ZX_EXEC, pause ? ZX_EXEC : 0);
+		if(pause) updateRegisters(_PC, true, true);
+		theApp.changeExecute(false);
+
+		if(activate) SetForegroundWindow(hWnd);
+	}
 }
 
  bool zxDebugger::checkBPS(ssh_w address, bool mem) {
@@ -412,9 +449,8 @@ void zxDebugger::quickBP(int adr) {
 			bp->value = -1;
 			bp->flags = FBP_PC;
 			break;
-		} else if(adr >= bp->address1 && adr <= bp->address2 && bp->flags == FBP_PC) {
-			memcpy(bp, bp + 1, &bps[9] - bp);
-			memset(&bps[9], -1, sizeof(ZX_BREAK_POINT));
+		} else if(adr >= bp->address1 && adr <= bp->address2 && (bp->flags & FBP_PC)) {
+			removeBP(i);
 			break;
 		}
 	}
@@ -426,4 +462,9 @@ void zxDebugger::saveBPS() {
 		auto bp = &bps[i - OPT_BPS0];
 		theApp.getOpt(i)->sval = StringZX::fmt(L"%d,%d,%d,%d", bp->address1, bp->address2, bp->value, bp->flags);
 	}
+}
+
+void zxDebugger::removeBP(int index) {
+	memcpy(&bps[index], &bps[index + 1], (&bps[9] - &bps[index]) * sizeof(ZX_BREAK_POINT));
+	memset(&bps[9], -1, sizeof(ZX_BREAK_POINT));
 }

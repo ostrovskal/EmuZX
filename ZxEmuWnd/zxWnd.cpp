@@ -11,6 +11,9 @@ static bool wndInit = false;
 static zxWnd* wnds[256];
 static THREAD_STATE thState;
 
+//BEGIN_MSG_MAP(zxWnd, zxWnd)
+//END_MSG_MAP()
+
 zxWnd* zxWnd::fromHWND(HWND hWnd) {
 	for(auto& w : wnds) {
 		if(w == (zxWnd*)-1) continue;
@@ -81,9 +84,11 @@ void HookWindowCreate(zxWnd* wnd) {
 INT_PTR zxWnd::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	switch(message) {
 		case WM_NCCALCSIZE: break;
+		case WM_PAINT: if(onPaint()) return 0; break;
 		case WM_CREATE: return (onCreate((LPCREATESTRUCT)lParam) ? 0 : -1);
 		case WM_SIZE: if(onSize(wParam, LOWORD(lParam), HIWORD(lParam))) return 0; break;
 		case WM_CLOSE: if(!onClose()) return 0; break;
+		case WM_SETFONT: onFont((HFONT)wParam, (bool)lParam); break;
 		case WM_DESTROY: onDestroy(); if(this == &theApp) { PostQuitMessage(0); return 1; } break;
 		case WM_COMMAND: if(onCommand(LOWORD(wParam), HIWORD(wParam), lParam)) return 0; break;
 		case WM_ERASEBKGND: if(hWndToolbar) SendMessage(hWndToolbar, message, wParam, lParam); return 1;
@@ -91,8 +96,21 @@ INT_PTR zxWnd::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 		case WM_KEYUP: if(onKey((int)wParam, lParam, false)) return 0; break;
 		case WM_NOTIFY: if(onNotify((LPNMHDR)lParam)) return 0; break;
 		case WM_DRAWITEM: if(onDrawItem((UINT)wParam, (LPDRAWITEMSTRUCT)lParam)) return 1; break;
-		case WM_VSCROLL: if(onScroll(HIWORD(wParam), LOWORD(wParam), (HWND)lParam, true)) return 0; break;
-		case WM_HSCROLL: if(onScroll(HIWORD(wParam), LOWORD(wParam), (HWND)lParam, false)) return 0; break;
+		case WM_VSCROLL: if(onScroll(HIWORD(wParam), LOWORD(wParam), (HWND)lParam, SB_VERT)) return 0; break;
+		case WM_HSCROLL: if(onScroll(HIWORD(wParam), LOWORD(wParam), (HWND)lParam, SB_HORZ)) return 0; break;
+		case WM_MOUSEWHEEL: if(onMouseWheel(GET_KEYSTATE_WPARAM(wParam), ((short)LOWORD(lParam)),
+											((short)HIWORD(lParam)), GET_WHEEL_DELTA_WPARAM(wParam))) return 0;  break;
+		case WM_MOUSEMOVE: if(onMouseMove(GET_KEYSTATE_WPARAM(wParam),
+											((short)LOWORD(lParam)), ((short)HIWORD(lParam)))) return 0; break;
+		case WM_LBUTTONDOWN:
+		case WM_RBUTTONDOWN: if(onMouseButtonDown(GET_KEYSTATE_WPARAM(wParam), ((short)LOWORD(lParam)),
+													((short)HIWORD(lParam)), message == WM_LBUTTONDOWN)) return 0; break;
+		case WM_LBUTTONUP: 
+		case WM_RBUTTONUP: if(onMouseButtonUp(GET_KEYSTATE_WPARAM(wParam), ((short)LOWORD(lParam)), 
+												((short)HIWORD(lParam)), message == WM_LBUTTONUP)) return 0; break;
+		case WM_LBUTTONDBLCLK:
+		case WM_RBUTTONDBLCLK: if(onMouseButtonDblClk(GET_KEYSTATE_WPARAM(wParam), ((short)LOWORD(lParam)),
+													((short)HIWORD(lParam)), message == WM_LBUTTONDBLCLK)) return 0; break;
 	}
 	return DefWindowProc(hWnd, message, wParam, lParam);
 }
@@ -104,20 +122,19 @@ INT_PTR zxDialog::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_COMMAND: {
 			int wmId = LOWORD(wParam);
 			auto res = onCommand(wmId, HIWORD(wParam), lParam);
-			if(wmId == IDOK || wmId == IDCANCEL) {
+			if((res && wmId == IDOK) || wmId == IDCANCEL) {
 				SendMsg(WM_CLOSE, 0, 0);
 				nResult = wmId;
 				res = true;
 			}
-			if(res) return 0;
-			break;
+			return !res;
 		}
 		case WM_CTLCOLORSTATIC: return onCtlColorStatic((HDC)wParam, (HWND)lParam);
 	}
 	return zxWnd::wndProc(hWnd, message, wParam, lParam);
 }
 
-zxWnd::zxWnd() : hWnd(nullptr), hWndToolbar(nullptr), parent(nullptr), hBmp(nullptr) {
+zxWnd::zxWnd() : wndID(0), hWnd(nullptr), hWndToolbar(nullptr), parent(nullptr), hBmp(nullptr) {
 	if(!wndInit) {
 		memset(wnds, -1, sizeof(wnds));
 		wndInit = true;
@@ -133,7 +150,7 @@ ssh_cws zxWnd::registerClass(ssh_cws name, int idMenu, WNDPROC proc) {
 	WNDCLASSEXW wcex;
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
-	wcex.style = CS_HREDRAW | CS_VREDRAW;
+	wcex.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
 	wcex.lpfnWndProc = proc;
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = 0;
@@ -150,17 +167,16 @@ ssh_cws zxWnd::registerClass(ssh_cws name, int idMenu, WNDPROC proc) {
 	return name;
 }
 
-bool zxWnd::create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, const RECT& rect, zxWnd* wndParent, UINT nID, UINT nMenu) {
+HWND zxWnd::create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, int x, int y, int cx, int cy, zxWnd* wndParent, UINT nID, UINT nMenu) {
 	if(!preCreate()) return false;
 	HookWindowCreate(this);
 	if(!(hWnd = CreateWindowW(registerClass(className, nMenu, MainWndProc), windowName, dwStyle, 
-							  rect.left, rect.top, rect.right, rect.bottom,
-							  (wndParent ? wndParent->hWnd : nullptr), nullptr, hInst, nullptr)))
-		return false;
-
+							  x, y, cx, cy, (wndParent ? wndParent->hWnd : nullptr), nullptr, hInst, nullptr)))
+		return (HWND)0;
+	wndID = nID;
 	postCreate();
 	parent = wndParent;
-	return true;
+	return hWnd;
 }
 
 zxDialog::~zxDialog() {
@@ -195,7 +211,7 @@ int zxDialog::create(WORD IDD, zxWnd* wndParent, bool modal) {
 			nResult = 0;
 			HACCEL hAccelTable = LoadAccelerators(hInst, MAKEINTRESOURCE(IDC_ZXEMUWND));
 			MSG msg;
-			while(true) {
+			while(!nResult) {
 				while(!::PeekMessage(&msg, NULL, NULL, NULL, PM_NOREMOVE)) {
 					// функция для работы пока нет сообщений
 					//SendMsg(WM_IDLE, 0, 0);
@@ -207,7 +223,6 @@ int zxDialog::create(WORD IDD, zxWnd* wndParent, bool modal) {
 						DispatchMessage(&msg);
 					}
 				}
-				if(nResult) break;
 			}
 		}
 		return nResult;

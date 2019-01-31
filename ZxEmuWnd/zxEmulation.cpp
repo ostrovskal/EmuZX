@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include "ZxTimer.h"
 #include "CpuZX.h"
 #include "GpuZX.h"
 #include "BorderZX.h"
@@ -140,18 +139,22 @@ zxEmulation::~zxEmulation() {
 }
 
 ssh_d zxEmulation::procCPU() {
-	ZxTimer tm;
+	LARGE_INTEGER sample;
+	QueryPerformanceFrequency(&sample);
 
-	tm.start();
+	DWORD ms = sample.LowPart / 1000;
+
+	QueryPerformanceCounter(&sample);
 
 	DWORD sndTm = 0;
-	DWORD startCpu = tm.samplePerformanceCounter();
+	DWORD startCpu = sample.LowPart;
 	DWORD startBrd = startCpu;
-	DWORD startGpu = startCpu / tm.millisecondsFrequency;
+	DWORD startGpu = startCpu / ms;
 
 	while(!(_TSTATE & ZX_TERMINATE)) {
-		DWORD current = tm.samplePerformanceCounter();
-		DWORD millis = current / tm.millisecondsFrequency;
+		QueryPerformanceCounter(&sample);
+		DWORD current = sample.LowPart;
+		DWORD millis = current / ms;
 		if((_TSTATE & ZX_EXEC)) {
 			if((current - startCpu) > delayCPU) {
 				zilog->execute(false); startCpu = current;
@@ -161,7 +164,7 @@ ssh_d zxEmulation::procCPU() {
 		if((current - startBrd) > (delayCPU * 16)) { brd->execute(); startBrd = current; }
 		if((millis - startGpu) > delayGPU) { gpu->execute(); startGpu = millis; }
 	}
-	tm.stop();
+
 	modifyTSTATE(0, ZX_TERMINATE);
 
 	return 0;
@@ -296,9 +299,7 @@ void zxEmulation::postCreate() {
 }
 
 int zxEmulation::run() {
-	RECT rc;
-	::SetRect(&rc, CW_USEDEFAULT, CW_USEDEFAULT, 640, 554);
-	if(!create(L"EmuWnd", L"EmuWnd", WS_CLIPCHILDREN | WS_OVERLAPPEDWINDOW, rc, nullptr, 0, IDC_ZXEMUWND))
+	if(!create(L"EmuWnd", L"EmuWnd", WS_CLIPCHILDREN | WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 640, 554, nullptr, 0, IDC_ZXEMUWND))
 		return -1;
 
 	makeToolbar(IDB_TOOLBAR_COMMON, tbb, 12, 19, 32, 32);
@@ -351,6 +352,8 @@ int zxEmulation::run() {
 	DWORD cpuID;
 	hCpuThread = CreateThread(nullptr, 0, ProcCPU, nullptr, 0, &cpuID);
 
+	SetForegroundWindow(hWnd);
+		
 	HACCEL hAccelTable = LoadAccelerators(hInst, MAKEINTRESOURCE(IDC_ZXEMUWND));
 
 	MSG msg;
@@ -455,4 +458,5 @@ void zxEmulation::changeExecute(bool change) {
 	if(change) modifyTSTATE(_TSTATE ^ ZX_EXEC, ZX_EXEC);
 	CheckMenuItem(hMenu, IDM_PAUSE, _TSTATE & ZX_EXEC);
 	SendMessage(hWndToolbar, TB_SETSTATE, IDM_PAUSE, TBSTATE_ENABLED | (_TSTATE >> 3));
+	if(change) debug->setProgrammPause((_TSTATE & ZX_EXEC) != ZX_EXEC, false);
 }

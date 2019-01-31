@@ -181,7 +181,6 @@
     <ClInclude Include="zxDlgListBps.h" />
     <ClInclude Include="zxEmulation.h" />
     <ClInclude Include="zxKeyboard.h" />
-    <ClInclude Include="ZxTimer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BorderZX.cpp" />
@@ -212,7 +211,6 @@
     <ClCompile Include="zxDlgListBps.cpp" />
     <ClCompile Include="zxEmulation.cpp" />
     <ClCompile Include="zxKeyboard.cpp" />
-    <ClCompile Include="ZxTimer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ZxEmuWnd.rc" />

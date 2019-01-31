@@ -357,13 +357,12 @@ StringZX zxDisAsm::makeCode(ssh_w address, int length, ssh_b dec) {
 	}
 	return code;
 }
-ssh_w zxDisAsm::move(ssh_w pc, bool direct, int count) {
+ssh_w zxDisAsm::move(ssh_w pc, int count) {
 	_pc = pc;
-	pos = 0;
-	if(direct) {
+	if(count > 0) {
 		while(count--) execute(0, 0);
-	} else {
-		_pc -= count;
+	} else if(count < 0){
+		_pc += count;
 		// TODO: сдвиг дизасма назад
 	}
 	return _pc;
