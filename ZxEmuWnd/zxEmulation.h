@@ -79,7 +79,8 @@ extern ssh_w* _PC_EXIT_CALL;
 extern ssh_b* _PORT_FE;
 extern ssh_b* _TRAP;
 
-extern ssh_b* memZX;
+extern ssh_b memZX[65536];
+extern ssh_b memBanks[16384 * 8];
 extern ssh_b regsZX[COUNT_REGS];
 extern ssh_b portsZX[65536];
 

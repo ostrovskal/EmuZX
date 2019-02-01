@@ -45,7 +45,8 @@ ZX_OPTION opt[] = {
 	{OPTT_DWORD, L"soundFrequency", 44100},
 	{OPTT_DWORD, L"memoryModel", MODEL_48K},
 	{OPTT_DWORD, L"postProcess", PP_BILINEAR},
-	
+	{OPTT_DWORD, L"aspectRatio", AR_AS_IS},
+
 	{OPTT_STRING, L"keyboardWndPos", 0},
 	{OPTT_STRING, L"debuggerdWndPos", 0},
 	{OPTT_STRING, L"mainWndPos", 0}

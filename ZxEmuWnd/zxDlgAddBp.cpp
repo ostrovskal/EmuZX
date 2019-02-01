@@ -56,8 +56,8 @@ bool zxDlgAddBp::onCommand(int wmId, int param, LPARAM lParam) {
 			}
 			result.flags = ((f == -1) ? 0 : 1 << f);
 			if(f == 1) {
-				f = (int)SendMessage(hWndCond, CB_GETCURSEL, 0, 0) + 1;
-				result.flags |= ((f == 0) ? 0 : (f << 2));
+				f = (int)SendMessage(hWndCond, CB_GETCURSEL, 0, 0);
+				result.flags |= (f == -1 ? 0 : (f == 0 ? 4 : (f << 3)));
 			} else {
 				result.value = -1;
 			}
@@ -66,12 +66,16 @@ bool zxDlgAddBp::onCommand(int wmId, int param, LPARAM lParam) {
 		case IDC_EDIT_ADDRESS1:
 			if(param == EN_CHANGE) {
 				auto l = GetWindowText(hWndAddr1, tmpBuf, 260);
-				if(isAddr2) SetWindowText(hWndAddr2, tmpBuf);
+				if(isAddr2) {
+					owner = true;
+					SetWindowText(hWndAddr2, tmpBuf);
+					owner = true;
+				}
 				EnableWindow(hWndOK, l > 0);
 			}
 			break;
 		case IDC_EDIT_ADDRESS2:
-			if(param == EN_CHANGE) isAddr2 = false;
+			if(param == EN_CHANGE) isAddr2 = owner;
 			break;
 		case IDC_COMBO_ACCESS:
 			if(param == CBN_SELCHANGE) updateAccess();

@@ -5,7 +5,7 @@
 
 class zxDlgAddBp : public zxDialog {
 public:
-	zxDlgAddBp() : zxDialog(), _bp(nullptr), isAddr2(false) {}
+	zxDlgAddBp() : zxDialog(), _bp(nullptr), isAddr2(false), owner(false) {}
 	virtual ~zxDlgAddBp() {}
 	void edit(ZX_BREAK_POINT* bp) { _bp = bp; }
 	ZX_BREAK_POINT result;
@@ -18,5 +18,5 @@ protected:
 	HWND hWndAddr1, hWndAddr2;
 	HWND hWndValue, hWndOK;
 	HWND hWndCond, hWndAccess;
-	bool isAddr2;
+	bool isAddr2, owner;
 };

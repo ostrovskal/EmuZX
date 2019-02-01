@@ -110,7 +110,7 @@ protected:
 
 	// преобразуем 3 битный номер половинки регистра в указатель на регистр
 	inline ssh_b* fromRON(ssh_b ron) {
-		if(ron == 6) return (preg = &memZX[*fromRP_SP(4) + (char)(prefix ? read_mem8PC() : 0)]);
+		if(ron == 6) return (preg = &memZX[(*fromRP_SP(4) + (char)(prefix ? read_mem8PC() : 0) & 0xffff)]);
 		return &regsZX[cnvPrefixAF[(prefix << 3) + (RC + ((ron & 7) ^ 1))]];
 	}
 
@@ -136,7 +136,7 @@ private:
 	void opsAccum(ssh_b d);
 
 	// сдвиги
-	ssh_b rotate(ssh_b val, bool ed);
+	ssh_b rotate(ssh_b val, ssh_b mask);
 
 	// вызов подпрограммы
 	void execCALL(ssh_w address);
@@ -154,5 +154,4 @@ private:
 };
 
 typedef void(DecoderZX::*funcDecoder)();
-
 

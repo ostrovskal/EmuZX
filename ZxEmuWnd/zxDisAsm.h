@@ -242,7 +242,7 @@ protected:
 		if(ron == 6) {
 			auto r = fromHL();
 			DA_PUT(r);
-			if(prefix) { n = read8(); DA_PUT(C_D); DA_PUT(n); DA_PUT(C_ADDR); put16(addrReg(r) + (char)n); }
+			if(prefix) { n = read8(); DA_PUT(C_D); DA_PUT(n); DA_PUT(C_ADDR); put16((addrReg(r) + (char)n) & 0xffff); }
 		} else DA_PUT(prefRON[(prefix << 3) + ron]);
 	}
 

@@ -11,7 +11,7 @@ void DecoderZX::funcN00_000() {
 		// NOP
 		case 0: break;
 		// EX AF, AF'
-		case 1: swapReg((ssh_w*)&regsZX[RA], (ssh_w*)&regsZX[RA + 8]); break;
+		case 1: swapReg((ssh_w*)&regsZX[RA], (ssh_w*)&regsZX[RA_]); break;
 		// DJNZ
 		case 2: (*_B)--; if(*_B) _PC += d; break;
 		// JR
@@ -59,8 +59,7 @@ void DecoderZX::funcN00_111() {
 				a += (fn ? -96 : 96);
 				fc = 1;
 			} else fc = 0;
-			update_flags(FS | FZ | F5 | FH | F3 | FPV | FC,
-						 (a & 128) | GET_FZ(a) | (a & 0b00101000) | fh | GET_FP(a) | fc);
+			update_flags(FS | FZ | F5 | FH | F3 | FPV | FC, (a & 128) | GET_FZ(a) | (a & 0b00101000) | fh | GET_FP(a) | fc);
 			break;
 		}
 		// CPL; --*1*-1-
@@ -69,7 +68,7 @@ void DecoderZX::funcN00_111() {
 		case 6:	update_flags(F5 | FH | F3 | FN | FC, (a & 0b00101000) | 1); break;
 		// CCF; --***-0C H <-старый C
 		case 7: update_flags(F5 | FH | F3 | FN | FC, (a & 0b00101000) | (oldFc << 4) | (oldFc == 0)); break;
-		default: a = rotate(a, false);//F5 | FH | F3 | FN | FC);
+		default: a = rotate(a, F5 | FH | F3 | FN | FC);
 	}
 	*_A = a;
 }

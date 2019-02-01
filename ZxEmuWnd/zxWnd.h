@@ -2,11 +2,12 @@
 #pragma once
 
 struct SSH_MSGMAP;
+class zxToolbar;
 class zxWnd {
 	friend LRESULT CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 public:
 	zxWnd();
-	virtual ~zxWnd();
+	virtual ~zxWnd() { detach(); }
 	void attach(HWND hWnd);
 	void detach();
 	static zxWnd* fromHWND(HWND hWnd);
@@ -30,6 +31,7 @@ protected:
 	virtual bool onNotify(LPNMHDR nm) { return false; }
 	virtual void onIdle() {}
 	virtual void onDestroy() {}
+	virtual bool onBackgrnd() { return true; }
 	virtual bool onDrawItem(UINT idCtl, LPDRAWITEMSTRUCT lpdis) { return false; }
 	virtual bool onScroll(UINT code, UINT pos, HWND hWnd, int type) { return false; }
 	virtual bool onMouseWheel(int vkKey, int x, int y, int delta) { return false; }
@@ -42,17 +44,25 @@ protected:
 	virtual bool preCreate() { return true; }
 	virtual void postCreate() {  }
 
-	bool makeToolbar(WORD IDB, TBBUTTON* tbb, int cBitmaps, int cButtons, int cxButton, int cyButton);
 	ssh_cws registerClass(ssh_cws name, int idMenu, WNDPROC proc);
 	zxWnd* parent;
 	HWND hWnd;
-	HWND hWndToolbar;
 	UINT wndID;
-	HBITMAP hBmp;
+
+	zxToolbar* toolbar;
 
 	static const SSH_MSGMAP* PASCAL GetThisMessageMap() { return nullptr; }
 	virtual const SSH_MSGMAP* GetMessageMap() const { return nullptr; }
 
+};
+
+class zxToolbar : public zxWnd {
+public:
+	zxToolbar(zxWnd* parent, WORD IDB, TBBUTTON* tbb, int cBitmaps, int cButtons, int cxButton, int cyButton, UINT nID);
+	virtual ~zxToolbar() { DeleteObject(hBmp); }
+protected:
+	virtual bool onBackgrnd() { return false; }
+	HBITMAP hBmp;
 };
 
 class zxDialog : public zxWnd {
@@ -65,5 +75,6 @@ protected:
 	virtual void onInitDialog(HWND hWnd, LPARAM lParam) {}
 	virtual INT_PTR onCtlColorStatic(HDC hDC, HWND hWnd) { return 0; }
 	virtual bool onClose() { if(!zxWnd::onClose()) return 0; nResult = IDCANCEL; return false; }
+	virtual bool onBackgrnd() { return false; }
 	int nResult;
 };

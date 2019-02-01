@@ -61,13 +61,11 @@ LRESULT CALLBACK cbtFilterHook(int code, WPARAM wParam, LPARAM lParam) {
 	if(code == HCBT_CREATEWND) {
 		LPCREATESTRUCT lpcs = ((LPCBT_CREATEWND)lParam)->lpcs;
 		zxWnd* wndInit = thState.wndInit;
-		if(wndInit || (!(lpcs->style & WS_CHILD))) {
+		if(wndInit) {
 			HWND hWnd = (HWND)wParam;
-			if(wndInit) {
-				wndInit->attach(hWnd);
-				SetWindowLongPtr(hWnd, GWLP_WNDPROC, (DWORD_PTR)MainWndProc);
-				thState.wndInit = NULL;
-			}
+			wndInit->attach(hWnd);
+			SetWindowLongPtr(hWnd, GWLP_WNDPROC, (DWORD_PTR)MainWndProc);
+			thState.wndInit = NULL;
 		}
 	}
 	return CallNextHookEx(thState.hHookOldCbtFilter, code, wParam, lParam);
@@ -89,9 +87,15 @@ INT_PTR zxWnd::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 		case WM_SIZE: if(onSize(wParam, LOWORD(lParam), HIWORD(lParam))) return 0; break;
 		case WM_CLOSE: if(!onClose()) return 0; break;
 		case WM_SETFONT: onFont((HFONT)wParam, (bool)lParam); break;
-		case WM_DESTROY: onDestroy(); if(this == &theApp) { PostQuitMessage(0); return 1; } break;
+		case WM_DESTROY: 
+			onDestroy(); 
+			if(this == &theApp) { 
+				PostQuitMessage(0); 
+				return 0; 
+			}
+			break;
 		case WM_COMMAND: if(onCommand(LOWORD(wParam), HIWORD(wParam), lParam)) return 0; break;
-		case WM_ERASEBKGND: if(hWndToolbar) SendMessage(hWndToolbar, message, wParam, lParam); return 1;
+		case WM_ERASEBKGND: return onBackgrnd();
 		case WM_KEYDOWN: if(onKey((int)wParam, lParam, true)) return 0; break;
 		case WM_KEYUP: if(onKey((int)wParam, lParam, false)) return 0; break;
 		case WM_NOTIFY: if(onNotify((LPNMHDR)lParam)) return 0; break;
@@ -118,7 +122,6 @@ INT_PTR zxWnd::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 INT_PTR zxDialog::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	switch(message) {
 		case WM_INITDIALOG: onInitDialog(hWnd, lParam); return 1;
-		case WM_ERASEBKGND: if(hWndToolbar) SendMessage(hWndToolbar, message, wParam, lParam); return 0;
 		case WM_COMMAND: {
 			int wmId = LOWORD(wParam);
 			auto res = onCommand(wmId, HIWORD(wParam), lParam);
@@ -134,16 +137,11 @@ INT_PTR zxDialog::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	return zxWnd::wndProc(hWnd, message, wParam, lParam);
 }
 
-zxWnd::zxWnd() : wndID(0), hWnd(nullptr), hWndToolbar(nullptr), parent(nullptr), hBmp(nullptr) {
+zxWnd::zxWnd() : wndID(0), hWnd(nullptr), toolbar(nullptr), parent(nullptr) {
 	if(!wndInit) {
 		memset(wnds, -1, sizeof(wnds));
 		wndInit = true;
 	}
-}
-
-zxWnd::~zxWnd() {
-	detach();
-	DeleteObject(hBmp); hBmp = nullptr;
 }
 
 ssh_cws zxWnd::registerClass(ssh_cws name, int idMenu, WNDPROC proc) {
@@ -181,22 +179,18 @@ HWND zxWnd::create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, int x, 
 
 zxDialog::~zxDialog() {
 	DestroyWindow(hWnd);
-//	EndDialog(hWnd, 0);
 }
 
-bool zxWnd::makeToolbar(WORD IDB, TBBUTTON* tbb, int cBitmaps, int cButtons, int cxButton, int cyButton) {
-	if(hWndToolbar) return true;
+zxToolbar::zxToolbar(zxWnd* p, WORD IDB, TBBUTTON* tbb, int cBitmaps, int cButtons, int cxButton, int cyButton, UINT nID) {
 	hBmp = LoadBitmap(hInst, (LPCWSTR)IDB);
-	if((hWndToolbar = CreateToolbarEx(hWnd, TBSTYLE_FLAT | TBSTYLE_TOOLTIPS | WS_CLIPSIBLINGS | WS_CHILD | WS_VISIBLE | CCS_TOP, -1,
-									  cBitmaps, nullptr, (UINT_PTR)hBmp, tbb, cButtons, cxButton, cyButton, cxButton * cBitmaps, cyButton,
-									  sizeof(TBBUTTON)))) {
-		SendMessage(hWndToolbar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DRAWDDARROWS);
-		SendMessage(hWndToolbar, TB_SETMAXTEXTROWS, 0, 0);
-		UpdateWindow(hWndToolbar);
-		return true;
+	if((hWnd = CreateToolbarEx(p->getHWND(), TBSTYLE_FLAT | TBSTYLE_TOOLTIPS | WS_CLIPSIBLINGS | WS_CHILD | WS_VISIBLE | CCS_TOP | WS_BORDER, nID,
+							  cBitmaps, nullptr, (UINT_PTR)hBmp, tbb, cButtons, cxButton, cyButton, cxButton * cBitmaps, cyButton,
+							  sizeof(TBBUTTON)))) {
+		SendMessage(hWnd, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DRAWDDARROWS);
+		SendMessage(hWnd, TB_SETMAXTEXTROWS, 0, 0);
+		UpdateWindow(hWnd);
+		parent = p;
 	}
-	return false;
-
 }
 
 int zxDialog::create(WORD IDD, zxWnd* wndParent, bool modal) {
@@ -212,20 +206,27 @@ int zxDialog::create(WORD IDD, zxWnd* wndParent, bool modal) {
 			HACCEL hAccelTable = LoadAccelerators(hInst, MAKEINTRESOURCE(IDC_ZXEMUWND));
 			MSG msg;
 			while(!nResult) {
-				while(!::PeekMessage(&msg, NULL, NULL, NULL, PM_NOREMOVE)) {
-					// функция для работы пока нет сообщений
-					//SendMsg(WM_IDLE, 0, 0);
-				}
-				if(!::GetMessage(&msg, NULL, NULL, NULL)) break;
-				if(!TranslateAccelerator(hWnd, hAccelTable, &msg)) {
-					if(!IsDialogMessage(hWnd, &msg)) {
-						TranslateMessage(&msg);
-						DispatchMessage(&msg);
+				do {
+					if(!::GetMessage(&msg, NULL, NULL, NULL)) break;
+					if(!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
+						if(!IsDialogMessage(msg.hwnd, &msg)) {
+							TranslateMessage(&msg);
+							DispatchMessage(&msg);
+						}
 					}
-				}
+				} while(::PeekMessage(&msg, NULL, NULL, NULL, PM_NOREMOVE));
 			}
+			DestroyWindow(hWnd);
+			hWnd = nullptr;
+			return nResult;
+		}
+		/*
+		while(!::PeekMessage(&msg, NULL, NULL, NULL, PM_NOREMOVE)) {
+			// функция для работы пока нет сообщений
+			//SendMsg(WM_IDLE, 0, 0);
 		}
 		return nResult;
+		*/
 	}
 	return 1;
 }

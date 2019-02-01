@@ -116,21 +116,24 @@ bool zxDlgListBps::onNotify(LPNMHDR nm) {
 }
 
 void zxDlgListBps::updateItems() {
-	auto bps = theApp.debug->bps;
-	bool is = (itemSelected != -1);
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_CHANGE, (is << 2));
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_REMOVE, (is << 2));
+	if(toolbar) {
+		HWND hTB = toolbar->getHWND();
+		auto bps = theApp.debug->bps;
+		bool is = (itemSelected != -1);
+		SendMessage(hTB, TB_SETSTATE, IDM_CHANGE, (is << 2));
+		SendMessage(hTB, TB_SETSTATE, IDM_REMOVE, (is << 2));
 
-	auto count = (int)SendMessage(hWndList, LVM_GETITEMCOUNT, 0, 0) - 1;
-	bool is2 = is & (itemSelected < count);
+		auto count = (int)SendMessage(hWndList, LVM_GETITEMCOUNT, 0, 0) - 1;
+		bool is2 = is & (itemSelected < count);
 
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_DOWN, (is2 << 2));
-	is2 = is & (itemSelected > 0);
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_UP, (is2 << 2));
+		SendMessage(hTB, TB_SETSTATE, IDM_DOWN, (is2 << 2));
+		is2 = is & (itemSelected > 0);
+		SendMessage(hTB, TB_SETSTATE, IDM_UP, (is2 << 2));
+	}
 }
 
 void zxDlgListBps::postCreate() {
-	makeToolbar(IDB_TOOLBAR_DEBUGGER, tbb, 18, 9, 16, 16);
+	if(!toolbar) toolbar = new zxToolbar(this, IDB_TOOLBAR_DEBUGGER, tbb, 18, 9, 16, 16, 2001);
 	for(int i = 0; i < 5; i++) SendMessage(hWndList, LVM_INSERTCOLUMN, i, (LPARAM)&columns[i]);
 	setItems();
 }

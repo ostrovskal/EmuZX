@@ -13,15 +13,16 @@ ssh_b flags_cond[4] = {FZ, FC, FPV, FS};
 ssh_b cnvPrefixAF[] = {RC, RB, RE, RD, RL, RH, RA, RF, RC, RB, RE, RD, RIXL, RIXH, RA, RF, RC, RB, RE, RD, RIYL, RIYH, RA, RF};
 ssh_b cnvPrefixSP[] = {RC, RB, RE, RD, RL, RH, RSPL, RSPH, RC, RB, RE, RD, RIXL, RIXH, RSPL, RSPH, RC, RB, RE, RD, RIYL, RIYH, RSPL, RSPH};
 
+extern ssh_d szMemZX;
 // пишем в память 8 битное значение
 void DecoderZX::write_mem8(ssh_b* address, ssh_b val, ssh_w ron) {
 	if(_TSTATE & ZX_DEBUG) debug->checkBPS((ssh_w)(address - memZX), true);
-	if(address < &memZX[16384] && (_TSTATE & ZX_WRITE_ROM)) { *address = val; }
+	if(address < &memZX[16384]) { if(_TSTATE & ZX_WRITE_ROM) *address = val; }
 	else if(address < &memZX[23296] && (_TSTATE & ZX_WRITE_GPU)) gpu->write(address, val);
 	else {
-		ssh_u offs = address - &memZX[65536];
-		if(offs < 1000) {
-			ssh_b* error = address;
+		ssh_u offs = 0;
+		if(address >= &portsZX[0]) {
+			offs = address - &memZX[65536];
 		}
 		*address = val;
 	}
@@ -31,7 +32,7 @@ void DecoderZX::write_mem8(ssh_b* address, ssh_b val, ssh_w ron) {
 void DecoderZX::write_mem16(ssh_w address, ssh_w val) {
 	ssh_b* mem = &memZX[address];
 	if(_TSTATE & ZX_DEBUG) debug->checkBPS(address, true);
-	if(address < 16384 && (_TSTATE & ZX_WRITE_ROM)) { *(ssh_w*)mem = val; }
+	if(address < 16384) { if(_TSTATE & ZX_WRITE_ROM) *(ssh_w*)mem = val; }
 	else if(address < 23296 && (_TSTATE & ZX_WRITE_GPU)) {
 		gpu->write(mem, (ssh_b)val);
 		gpu->write(mem + 1, val >> 8);
@@ -66,7 +67,7 @@ void DecoderZX::execCALL(ssh_w address) {
 	_PC = address;
 }
 
-ssh_b DecoderZX::rotate(ssh_b v, bool ed) {
+ssh_b DecoderZX::rotate(ssh_b v, ssh_b mask) {
 	// --503-0C | SZ503P0C
 	ssh_b ofc = getFlag(FC);
 	ssh_b fc = ((v & ((ops & 1) ? 1 : 128)) != 0);
@@ -88,11 +89,7 @@ ssh_b DecoderZX::rotate(ssh_b v, bool ed) {
 		case 6: v = 1; break;
 	}
 	v |= v1;
-	if(ed) {
-		update_flags(FS | FZ | F5 | FH | F3 | FPV | FN | FC, (v & 128) | GET_FZ(v) | (v & 0b00101000) | GET_FP(v) | fc);
-	} else {
-		update_flags(F5 | FH | F3 | FN | FC, (v & 0b00101000) | fc);
-	}
+	update_flags(mask, mask & ((v & 128) | GET_FZ(v) | (v & 0b00101000) | GET_FP(v) | fc));
 	return v;
 }
 

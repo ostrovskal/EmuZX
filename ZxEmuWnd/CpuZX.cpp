@@ -7,14 +7,16 @@
 extern ssh_cws nameROMs[];
 
 // содержмое памяти
-ssh_b* memZX;
-ssh_d szMemZX;
+ssh_b memZX[65536];
 
 // регистры
 ssh_b regsZX[COUNT_REGS];
 
 // порты
 ssh_b portsZX[65536];
+
+// банки памяти
+ssh_b memBanks[8 * 16384];
 
 // счетчик комманд
 ssh_w _PC;
@@ -54,14 +56,12 @@ volatile ssh_w _TSTATE;
 CpuZX::CpuZX() {
 	decoder = new DecoderZX();
 	ROM = nullptr; szROM = 0;
-	memZX = nullptr; szMemZX = 0;
 	signalRESET();
 }
 
 CpuZX::~CpuZX() {
 	SAFE_DELETE(decoder);
 	SAFE_DELETE(ROM);
-	SAFE_DELETE(memZX);
 }
 
 void CpuZX::signalRESET() {
@@ -92,7 +92,6 @@ void CpuZX::signalRESET() {
 	_PC = 0;
 
 	SAFE_DELETE(ROM); szROM = 0;
-	SAFE_DELETE(memZX); szMemZX = 0;
 
 	auto model = theApp.getOpt(OPT_MEM_MODEL)->dval;
 	// грузим ПЗУ
@@ -109,23 +108,10 @@ void CpuZX::signalRESET() {
 	}
 	SAFE_CLOSE1(_hf);
 
-	switch(model) {
-		// 48K
-		case 0:
-			szMemZX = 65536;
-			memZX = new ssh_b[szMemZX];
-			memset(memZX, 0, szMemZX);
-			memcpy(memZX, ROM, 16384);
-			*_SP = 65534;
-			break;
-		// 128K
-		case 1:
-			szMemZX = 131072;
-			memZX = new ssh_b[szMemZX];
-			memset(memZX, 0, szMemZX);
-			memcpy(memZX, ROM, 16384);
-			break;
-	}
+	memset(memZX, 0, 65536);
+	memset(memBanks, 0, 16384 * 8);
+	memcpy(memZX, ROM, 16384);
+	*_SP = 65534;
 
 	memset(regsZX, 0, sizeof(regsZX));
 	memset(portsZX, 255, sizeof(portsZX));
@@ -182,16 +168,14 @@ bool CpuZX::saveStateZX(const StringZX& path) {
 	try {
 		_wsopen_s(&_hf, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
 		if(_hf != -1) {
-			ssh_b temp[16];
+			ssh_b model = (ssh_b)theApp.getOpt(OPT_MEM_MODEL)->dval;
 
-			temp[0] = (ssh_b)theApp.getOpt(OPT_MEM_MODEL)->dval;
-			*(ssh_w*)(temp + 1) = _TSTATE;
-			*(ssh_w*)(temp + 3) = _PC;
-			*(ssh_d*)(temp + 5) = szMemZX;
-
-			if(_write(_hf, &temp, 9) != 9) throw(0);
+			if(_write(_hf, &model, 1) != 1) throw(0);
+			if(_write(_hf, (ssh_w*)&_TSTATE, 2) != 2) throw(0);
+			if(_write(_hf, &_PC, 2) != 2) throw(0);
 			if(_write(_hf, &regsZX, sizeof(regsZX)) != sizeof(regsZX)) throw(0);
-			if(_write(_hf, memZX, szMemZX) != szMemZX) throw(0);
+			if(_write(_hf, memZX, 65536) != 65536) throw(0);
+			if(_write(_hf, memBanks, 16384 * 8) != 16384 * 8) throw(0);
 
 			StringZX progs = theApp.opts.nameLoadProg;
 			auto l = (int)(progs.length() + 1) * 2;
@@ -214,23 +198,20 @@ bool CpuZX::loadStateZX(const StringZX& path) {
 	try {
 		_wsopen_s(&_hf, path, _O_RDONLY | _O_BINARY, _SH_DENYRD, _S_IREAD);
 		if(_hf != -1) {
-			ssh_b temp[9];
+			ssh_b model;
 
 			auto l = _filelength(_hf);
-			if(_read(_hf, &temp, 9) != 9) throw(0);
+			if(_read(_hf, &model, 1) != 1) throw(0);
+			if(_read(_hf, (ssh_w*)&_TSTATE, 2) != 2) throw(0);
+			if(_read(_hf, &_PC, 2) != 2) throw(0);
 
-			theApp.getOpt(OPT_MEM_MODEL)->dval = temp[0];
-			modifyTSTATE(*(ssh_w*)(temp + 1), 0xffff);
-			_PC		= *(ssh_w*)(temp + 3);
-			szMemZX = *(ssh_d*)(temp + 5);
+			theApp.getOpt(OPT_MEM_MODEL)->dval = model;
 			
-			SAFE_DELETE(memZX);
-			memZX = new ssh_b[szMemZX];
-
 			if(_read(_hf, &regsZX, sizeof(regsZX)) != sizeof(regsZX)) throw(0);
-			if(_read(_hf, memZX, szMemZX) != szMemZX) throw(0);
+			if(_read(_hf, memZX, 65536) != 65536) throw(0);
+			if(_read(_hf, memBanks, 16384 * 8) != 16384 * 8) throw(0);
 
-			l -= (9 + sizeof(regsZX) + szMemZX);
+			l -= (5 + sizeof(regsZX) + 16384 * 12);
 			if(_read(_hf, tmpBuf, l) != l) throw(0);
 			theApp.opts.nameLoadProg = tmpBuf;
 		}

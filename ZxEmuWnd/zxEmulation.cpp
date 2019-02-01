@@ -6,6 +6,7 @@
 #include "KeyBoardZX.h"
 #include "zxDebugger.h"
 #include "zxKeyboard.h"
+#include "zxDlgSettings.h"
 #include "Z80.h"
 
 static ssh_w old_tstate = 0;
@@ -70,11 +71,10 @@ void zxEmulation::pauseCPU(bool isPause, int adding) {
 	if(isPause) {
 		old_tstate = _TSTATE;
 		modifyTSTATE(0, ZX_EXEC);
-		
 		Wow64SuspendThread(hCpuThread);
-		Sleep(100);
 	} else {
 		modifyTSTATE(old_tstate | adding, 0xffff);
+		ResumeThread(hCpuThread);
 	}
 }
 
@@ -117,7 +117,6 @@ static ssh_d WINAPI ProcCPU(void* params) {
 
 zxEmulation::zxEmulation() : zxWnd() {
 	InitializeCriticalSection(&cs);
-	hWndToolbar = nullptr;
 	hMenuMRU = nullptr;
 	hMenuPP = nullptr;
 	hMenuModel = nullptr;
@@ -157,14 +156,14 @@ ssh_d zxEmulation::procCPU() {
 		QueryPerformanceCounter(&sample);
 		DWORD current = sample.LowPart;
 		DWORD millis = current / ms;
+		if((millis - startGpu) > delayGPU) { gpu->execute(); startGpu = millis; }
 		if((_TSTATE & ZX_EXEC)) {
 			if((current - startCpu) > delayCPU) {
 				zilog->execute(false); startCpu = current;
 				if(getOpt(OPT_SOUND)->dval) snd->execute(sndTm++);
 			}
+			if((current - startBrd) > (delayCPU * 16)) { brd->execute(); startBrd = current; }
 		}
-		if((current - startBrd) > (delayCPU * 16)) { brd->execute(); startBrd = current; }
-		if((millis - startGpu) > delayGPU) { gpu->execute(); startGpu = millis; }
 	}
 
 	modifyTSTATE(0, ZX_TERMINATE);
@@ -176,6 +175,11 @@ bool zxEmulation::onCommand(int wmId, int param, LPARAM lParam) {
 	StringZX folder(getOpt(OPT_CUR_PATH)->sval);
 	// Разобрать выбор в меню:
 	switch(wmId) {
+		case IDM_SETTINGS: {
+			zxDlgSettings dlg;
+			dlg.create(IDD_DIALOG_SETTINGS, this, true);
+			break;
+		}
 		case IDM_1X: break;
 		case IDM_2X: break;
 		case IDM_3X: break;
@@ -206,7 +210,7 @@ bool zxEmulation::onCommand(int wmId, int param, LPARAM lParam) {
 				else {
 					auto pos = folder.find_rev(L'\\') + 1;
 					getOpt(OPT_CUR_PATH)->sval = folder.left(pos);
-					opts.nameLoadProg = folder.substr(pos);
+					opts.nameLoadProg = folder.substr(pos, folder.find_rev(L'.') - pos);
 					modifyMRU(folder);
 				}
 				break;
@@ -258,18 +262,23 @@ bool zxEmulation::onClose() {
 }
 
 bool zxEmulation::onSize(WPARAM type, int nWidth, int nHeight) {
-	SendMessage(hWndToolbar, WM_SIZE, type, MAKELONG(nWidth, nHeight));
-	::GetWindowRect(hWndToolbar, &wndRect);
-	wndRect.top = wndRect.bottom - wndRect.top;
-	wndRect.left = 0;
-	wndRect.right = nWidth;
-	wndRect.bottom = nHeight;
-	return true;
+	if(toolbar) {
+		SendMessage(toolbar->getHWND(), WM_SIZE, type, MAKELONG(nWidth, nHeight));
+		::GetWindowRect(toolbar->getHWND(), &wndRect);
+		wndRect.top = wndRect.bottom - wndRect.top;
+		wndRect.left = 0;
+		wndRect.right = nWidth;
+		wndRect.bottom = nHeight;
+		return true;
+	}
+	return false;
 }
 
 bool zxEmulation::onKey(int nVirtKey, LPARAM keyData, bool pressed) {
-	if(keyb) keyb->execute((ssh_b)nVirtKey, pressed);
-	return keyb == nullptr;
+	return GetKeyboardState(keyboard->vkKeys);
+	//if(keyb) keyb->execute((ssh_b)nVirtKey, pressed);
+	return false;
+	//return keyb == nullptr;
 }
 
 bool zxEmulation::onNotify(LPNMHDR nm) {
@@ -311,7 +320,7 @@ int zxEmulation::run() {
 	if(!create(L"EmuWnd", L"EmuWnd", WS_CLIPCHILDREN | WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 640, 554, nullptr, 0, IDC_ZXEMUWND))
 		return -1;
 
-	makeToolbar(IDB_TOOLBAR_COMMON, tbb, 12, 19, 32, 32);
+	toolbar = new zxToolbar(this, IDB_TOOLBAR_COMMON, tbb, 12, 19, 32, 32, 2002);
 
 	ShowWindow(hWnd, true);
 	UpdateWindow(hWnd);
@@ -361,31 +370,25 @@ int zxEmulation::run() {
 	DWORD cpuID;
 	hCpuThread = CreateThread(nullptr, 0, ProcCPU, nullptr, 0, &cpuID);
 
-	SetForegroundWindow(hWnd);
+	SetActiveWindow(hWnd);
 		
 	HACCEL hAccelTable = LoadAccelerators(hInst, MAKEINTRESOURCE(IDC_ZXEMUWND));
 
 	MSG msg;
 
-	while(true) {
-		while(!::PeekMessage(&msg, NULL, NULL, NULL, PM_NOREMOVE)) {
-			// функция для работы пока нет сообщений
-//			SendMsg(WM_IDLE, 0, 0);
-		}
-		if(!::GetMessage(&msg, NULL, NULL, NULL)) {
-			break;
-		}
-		if(!TranslateAccelerator(nullptr, hAccelTable, &msg)) {
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
+	while(::GetMessage(&msg, NULL, NULL, NULL)) {
+		if(!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
+			if(!IsDialogMessage(msg.hwnd, &msg)) {
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
 		}
 	}
-
 	opts.save(opts.mainDir + L"settings.zx");
 	zilog->saveStateZX(opts.mainDir + L"auto_state.zx");
 	
 	modifyTSTATE(ZX_TERMINATE, 0);
-	while(!(_TSTATE & ZX_TERMINATE)) {}
+	TerminateThread(hCpuThread, 0);
 
 	return (int)msg.wParam;
 }
@@ -438,7 +441,7 @@ bool zxEmulation::changeState(int id_opt, int id, bool change) {
 	if(change) opt->dval = !opt->dval;
 	bool v = (bool)opt->dval;
 	CheckMenuItem(hMenu, id, v << 3);
-	SendMessage(hWndToolbar, TB_SETSTATE, id, TBSTATE_ENABLED | (int)v);
+	if(toolbar) SendMessage(toolbar->getHWND(), TB_SETSTATE, id, TBSTATE_ENABLED | (int)v);
 	return v;
 }
 
@@ -466,6 +469,6 @@ void zxEmulation::changeWndKeyboard(bool change) {
 void zxEmulation::changeExecute(bool change) {
 	if(change) modifyTSTATE(_TSTATE ^ ZX_EXEC, ZX_EXEC);
 	CheckMenuItem(hMenu, IDM_PAUSE, _TSTATE & ZX_EXEC);
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_PAUSE, TBSTATE_ENABLED | ((_TSTATE & ZX_EXEC) >> 3));
+	if(toolbar) SendMessage(toolbar->getHWND(), TB_SETSTATE, IDM_PAUSE, TBSTATE_ENABLED | ((_TSTATE & ZX_EXEC) >> 3));
 	if(change) debug->setProgrammPause((_TSTATE & ZX_EXEC) != ZX_EXEC, false);
 }

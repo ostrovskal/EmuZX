@@ -165,7 +165,9 @@
     <ClInclude Include="CpuZX.h" />
     <ClInclude Include="DecoderZX.h" />
     <ClInclude Include="zxDlgAddBp.h" />
+    <ClInclude Include="zxDlgSettings.h" />
     <ClInclude Include="zxListBox.h" />
+    <ClInclude Include="zxMsgMap.h" />
     <ClInclude Include="zxWnd.h" />
     <ClInclude Include="GpuZX.h" />
     <ClInclude Include="KeyboardZX.h" />
@@ -192,6 +194,7 @@
     <ClCompile Include="DecoderZX_No00.cpp" />
     <ClCompile Include="DecoderZX_No11.cpp" />
     <ClCompile Include="zxDlgAddBp.cpp" />
+    <ClCompile Include="zxDlgSettings.cpp" />
     <ClCompile Include="zxListBox.cpp" />
     <ClCompile Include="zxWnd.cpp" />
     <ClCompile Include="GpuZX.cpp" />

@@ -95,7 +95,7 @@ bool zxDebugger::preCreate() {
 
 void zxDebugger::show(bool visible) {
 	if(visible) {
-		makeToolbar(IDB_TOOLBAR_DEBUGGER, tbb, 15, 17, 16, 16);
+		if(!toolbar) toolbar = new zxToolbar(this, IDB_TOOLBAR_DEBUGGER, tbb, 15, 17, 16, 16, 2000);
 		showWindow(true);
 		updateWindow();
 		updateHexDec(false);
@@ -156,10 +156,12 @@ void zxDebugger::updateStack(int sp) {
 }
 
 void zxDebugger::updatePrevNextBP() {
-	bool is = curIndexBP > 0 && (bps[curIndexBP - 1].address1 != -1);
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_PREV_BREAKPOINT, (is << 2));
-	is = curIndexBP < (COUNT_BP - 1) && (bps[curIndexBP + 1].address1 != -1);
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_NEXT_BREAKPOINT, is << 2);
+	if(toolbar) {
+		bool is = curIndexBP > 0 && (bps[curIndexBP - 1].address1 != -1);
+		SendMessage(toolbar->getHWND(), TB_SETSTATE, IDM_PREV_BREAKPOINT, (is << 2));
+		is = curIndexBP < (COUNT_BP - 1) && (bps[curIndexBP + 1].address1 != -1);
+		SendMessage(toolbar->getHWND(), TB_SETSTATE, IDM_NEXT_BREAKPOINT, is << 2);
+	}
 }
 
 void zxDebugger::updateUndoRedo(bool set) {
@@ -171,8 +173,10 @@ void zxDebugger::updateUndoRedo(bool set) {
 		storyPC[++curStoryPC] = _pc;
 		limitStoryPC = curStoryPC;
 	}
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_UNDO, ((curStoryPC > 0) << 2));
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_REDO, ((curStoryPC < limitStoryPC) << 2));
+	if(toolbar) {
+		SendMessage(toolbar->getHWND(), TB_SETSTATE, IDM_UNDO, ((curStoryPC > 0) << 2));
+		SendMessage(toolbar->getHWND(), TB_SETSTATE, IDM_REDO, ((curStoryPC < limitStoryPC) << 2));
+	}
 }
 
 void zxDebugger::updateHexDec(bool change) {
@@ -183,7 +187,7 @@ void zxDebugger::updateHexDec(bool change) {
 		InvalidateRect(hWndSP, nullptr, false);
 		InvalidateRect(hWndDA, nullptr, false);
 	}
-	SendMessage(hWndToolbar, TB_SETSTATE, IDM_HEX_DEC, TBSTATE_ENABLED | opt->dval);
+	if(toolbar) SendMessage(toolbar->getHWND(), TB_SETSTATE, IDM_HEX_DEC, TBSTATE_ENABLED | opt->dval);
 }
 
 bool zxDebugger::onSize(WPARAM type, int nWidth, int nHeight) {
@@ -440,15 +444,16 @@ bool zxDebugger::check(ssh_w address, ZX_BREAK_POINT& breakpt, int flags) {
 }
 
 void zxDebugger::setProgrammPause(bool pause, bool activate) {
-	if(hWndToolbar) {
+	if(toolbar) {
 		int state1 = pause << 2;
 		int state2 = (!pause) << 2;
 
-		SendMessage(hWndToolbar, TB_SETSTATE, IDM_PAUSE, state2);
-		SendMessage(hWndToolbar, TB_SETSTATE, IDM_STEP_OVER, state1);
-		SendMessage(hWndToolbar, TB_SETSTATE, IDM_STEP_INTO, state1);
-		SendMessage(hWndToolbar, TB_SETSTATE, IDM_RUN, state1);
-		SendMessage(hWndToolbar, TB_SETSTATE, IDM_OVER_PROC, state1);
+		HWND hTB = toolbar->getHWND();
+		SendMessage(hTB, TB_SETSTATE, IDM_PAUSE, state2);
+		SendMessage(hTB, TB_SETSTATE, IDM_STEP_OVER, state1);
+		SendMessage(hTB, TB_SETSTATE, IDM_STEP_INTO, state1);
+		SendMessage(hTB, TB_SETSTATE, IDM_RUN, state1);
+		SendMessage(hTB, TB_SETSTATE, IDM_OVER_PROC, state1);
 
 		updateUndoRedo(false);
 		updatePrevNextBP();
@@ -457,14 +462,14 @@ void zxDebugger::setProgrammPause(bool pause, bool activate) {
 		if(pause) updateRegisters(_PC, U_PC | U_REGS | U_STORY | U_SEL | U_SP | U_TOP);
 		theApp.changeExecute(false);
 
-		if(activate) SetForegroundWindow(hWnd);
+		if(activate) SetActiveWindow(hWnd);
 	}
 }
 
  bool zxDebugger::checkBPS(ssh_w address, bool mem) {
 	static ZX_BREAK_POINT bp;
 	bool res = false;
-	int flags = mem ? FBP_MEM : FBP_PC;
+	int flags = (mem ? FBP_MEM : FBP_PC);
 	if(check(address, bp, flags)) {
 		if(flags == FBP_MEM) {
 			if(bp.value != -1) {
@@ -480,7 +485,9 @@ void zxDebugger::setProgrammPause(bool pause, bool activate) {
 				}
 			}
 		} else res = true;
-		if(res) setProgrammPause(true, true);
+		if(res) {
+			setProgrammPause(true, true);
+		}
 	}
 	return res;
 }

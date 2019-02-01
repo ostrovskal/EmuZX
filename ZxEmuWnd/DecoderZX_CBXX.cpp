@@ -5,11 +5,11 @@
 void DecoderZX::ops00_CB() {
 	// 00 rot SSS. rot=110(SLL); SZ503P0C
 	if(prefix) {
-		write_mem8(preg, rotate(*preg, true), 6);
+		write_mem8(preg, rotate(*preg, 255), 6);
 		if(typeOps != 6) *fromRON1(typeOps) = *preg;
 	} else {
 		ssh_b* reg = fromRON1(typeOps);
-		write_mem8(reg, rotate(*reg, true), typeOps);
+		write_mem8(reg, rotate(*reg, 255), typeOps);
 	}
 }
 
@@ -22,7 +22,7 @@ void DecoderZX::ops01_CB() {
 	ssh_b fz = (ret & (1 << ops)) == 0;
 	ssh_b fs = ((ops == 7 && !fz) ? 128 : 0);
 
-	update_flags(FS | FZ | F5 | FH | F3 | FPV | FN, fs | (fz << 2) | 16 | (fz << 6));
+	update_flags(FS | FZ | FH | FN, fs | (fz << 2) | 16 | (fz << 6));
 }
 
 void DecoderZX::ops10_CB() {

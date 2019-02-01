@@ -48,14 +48,21 @@
 #define OPT_SND_FREQ	32
 #define OPT_MEM_MODEL	33
 #define OPT_PP			34
+#define OPT_ASPECT_RATIO 35
 
-#define OPT_WND_KEY_POS		35
-#define OPT_WND_DEBUG_POS	36
-#define OPT_WND_MAIN_POS	37
+#define OPT_WND_KEY_POS		36
+#define OPT_WND_DEBUG_POS	37
+#define OPT_WND_MAIN_POS	38
 
 #define OPTT_STRING		0
 #define OPTT_DWORD		1
 #define OPTT_BOOL		2
+
+#define AR_1X			0
+#define AR_2X			1
+#define AR_3X			2
+#define AR_4X			3
+#define AR_AS_IS		4
 
 struct ZX_OPTION {
 	ssh_b type;

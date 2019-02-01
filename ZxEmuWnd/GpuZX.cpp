@@ -3,6 +3,7 @@
 #include "GpuZX.h"
 #include "CpuZX.h"
 #include "SettingsZX.h"
+#include "zxKeyboard.h"
 
 ssh_d colours[] = {	0xff000000, 0xff2030c0, 0xffc04010, 0xffc040c0, 0xff40b010, 0xff50c0b0, 0xffe0c010, 0xffc0c0c0,
 					0xff000000, 0xff3040ff, 0xffff4030, 0xffff70f0, 0xff50e010, 0xff50e0ff, 0xffffe850, 0xffffffff};
@@ -32,6 +33,8 @@ void GpuZX::makeCanvas() {
 
 	hbmpMem = ::CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void**)&memory, NULL, 0);
 	hdcMem = ::CreateCompatibleDC(NULL);
+	ssh_d* mem = memory;
+	for(int i = 0; i < 256 * 320; i++) *mem++ = 0xffc0c0c0;
 }
 
 void GpuZX::showScreen() {
@@ -43,7 +46,7 @@ void GpuZX::showScreen() {
 		SelectObject(hdcMem, h);
 		::DeleteObject(hdc);
 		StringZX::fmt(L"SshZX (%s : %d) %s [%s]", ((_TSTATE & ZX_EXEC) ? L"execute" : L"pause"), _PC,
-					  nameROMs[theApp.getOpt(OPT_MEM_MODEL)->dval], theApp.opts.nameLoadProg);
+					  nameROMs[theApp.getOpt(OPT_MEM_MODEL)->dval], theApp.opts.nameLoadProg.str());
 		SetWindowText(theApp.getHWND(), (LPCWSTR)tmpBuf);
 	}
 }
@@ -92,6 +95,7 @@ void GpuZX::execute() {
 	invert++;
 
 	*_TRAP = 1;
+	theApp.keyboard->processKeys();
 }
 
 void GpuZX::decodeColor(ssh_b color) {
