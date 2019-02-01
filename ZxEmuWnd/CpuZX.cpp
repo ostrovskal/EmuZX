@@ -9,6 +9,9 @@ extern ssh_cws nameROMs[];
 // содержмое памяти
 ssh_b memZX[65536];
 
+ssh_b* limitROM = &memZX[16384];
+ssh_b* limitScreen = &memZX[23296];
+
 // регистры
 ssh_b regsZX[COUNT_REGS];
 
@@ -136,7 +139,7 @@ void CpuZX::signalINT() {
 				decoder->execCALL(decoder->read_mem16(*_I * 256 + 254));
 				break;
 		}
-		decoder->incrementR();
+		//decoder->incrementR();
 	}
 }
 

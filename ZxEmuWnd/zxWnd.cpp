@@ -132,7 +132,7 @@ INT_PTR zxDialog::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			return !res;
 		}
-		case WM_CTLCOLORSTATIC: return onCtlColorStatic((HDC)wParam, (HWND)lParam);
+		//case WM_CTLCOLORSTATIC: return onCtlColorStatic((HDC)wParam, (HWND)lParam);
 	}
 	return zxWnd::wndProc(hWnd, message, wParam, lParam);
 }

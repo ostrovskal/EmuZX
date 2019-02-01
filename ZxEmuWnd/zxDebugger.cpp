@@ -70,7 +70,7 @@ zxDebugger::~zxDebugger() {
 
 bool zxDebugger::preCreate() {
 	hFont = CreateFont(-12, 0, 0, 0, FW_THIN, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_TT_PRECIS,
-					   CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN, L"Courier New");
+					   CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN, L"MS Shell Dlg");
 
 	hbrSel = CreateSolidBrush(GetSysColor(COLOR_HIGHLIGHT));
 	hbrUnSel = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
@@ -115,6 +115,7 @@ void zxDebugger::show(bool visible) {
 void zxDebugger::updateRegisters(int newPC, int flags) {
 	bool decimal = theApp.getOpt(OPT_DECIMAL)->dval;
 	HWND h;
+	RECT rect;
 	if(flags & U_REGS) {
 		for(auto& zx : dlgElems) {
 			ssh_w val = (((zx.regb == nullptr) ? *zx.regw : (ssh_w)(*zx.regb)) & zx.msk) >> zx.shift;
@@ -122,7 +123,10 @@ void zxDebugger::updateRegisters(int newPC, int flags) {
 			h = zx.hWndText;
 			auto hdc = GetDC(h);
 			SetTextColor(hdc, zx.change ? RGB(0, 255, 0) : RGB(0, 0, 0));
-			SetWindowText(h, zx.text);
+			//SetBkMode(hdc, TRANSPARENT);
+			SelectObject(hdc, hFont);
+			GetClientRect(h, &rect);
+			DrawText(hdc, zx.text, -1, &rect, DT_SINGLELINE | DT_CENTER);
 			ReleaseDC(h, hdc);
 			zx.val = val;
 			auto fmt = (zx.msk < 255 ? L"%d" : (zx.regb ? radix[decimal] : radix[decimal + 10]));
@@ -323,6 +327,7 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 			setProgrammPause(true, false);
 			break;
 		case IDM_RUN:
+			theApp.zilog->execute(true);
 			setProgrammPause(false, false);
 			break;
 		case IDM_HEX_DEC:

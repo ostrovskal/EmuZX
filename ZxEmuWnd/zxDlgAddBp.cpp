@@ -24,7 +24,7 @@ void zxDlgAddBp::onInitDialog(HWND hWnd, LPARAM lParam) {
 		SetWindowText(hWndAddr1, fromNum(_bp->address1, radix[dec + 10]));
 		SetWindowText(hWndAddr2, fromNum(_bp->address2, radix[dec + 10]));
 		if(_bp->value != -1) SetWindowText(hWndValue, fromNum(_bp->value, radix[dec + 16]));
-		if(_bp->value != -1) SendMessage(hWndCond, CB_SETCURSEL, ((_bp->flags & FBP_COND) >> 3), 0);
+		if(_bp->value != -1) SendMessage(hWndCond, CB_SETCURSEL, ((_bp->flags & FBP_COND) >> 2), 0);
 		SendMessage(hWndAccess, CB_SETCURSEL, ((_bp->flags & FBP_ACCESS) >> 1), 0);
 	} else {
 		isAddr2 = true;
@@ -57,7 +57,7 @@ bool zxDlgAddBp::onCommand(int wmId, int param, LPARAM lParam) {
 			result.flags = ((f == -1) ? 0 : 1 << f);
 			if(f == 1) {
 				f = (int)SendMessage(hWndCond, CB_GETCURSEL, 0, 0);
-				result.flags |= (f == -1 ? 0 : (f == 0 ? 4 : (f << 3)));
+				result.flags |= (f == -1 ? 0 : (f << 2));
 			} else {
 				result.value = -1;
 			}

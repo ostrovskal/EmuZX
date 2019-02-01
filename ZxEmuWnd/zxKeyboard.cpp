@@ -13,11 +13,35 @@
 //	port[0x7ffe] = 255;// SPACE SYMBOL_SHIFT M N B
 // DEL fefe-254,effe-254,bffe-254
 
+struct ZX_KEY {
+	int butID;
+	ssh_cws name_k;
+	ssh_cws name_l;
+	ssh_cws name_c;
+	ssh_cws name_e;
+	ssh_cws name_sh_e;
+	ssh_cws name_sh_k;
+	ssh_cws name_g;
+	ssh_b port;
+	ssh_b bit;
+	ssh_b vk_code;
+	HWND hWndKey;
+};
+
 struct ZX_KEY_EX {
 	ssh_b vk_code;
 	ssh_b vk_codeKey;
 	ssh_b vk_codeKeyEx;
 };
+
+#define KM_K		0
+#define KM_L		1
+#define KM_C		2
+#define KM_E		3
+#define KM_G		4
+#define KM_SH_E		5
+#define KM_SH_KL	6
+#define KM_CH		7
 
 ZX_KEY_EX keysExDef[] = {
 	{VK_BACK, '0', VK_CONTROL},
@@ -66,11 +90,11 @@ static ZX_KEY keys[] = {
 	{IDC_BUTTON_K3, L"3", L"3", L"3", L"magenta", L"LINE", L"#", L"tr video", 0xf7, 0x4, '3'},
 	{IDC_BUTTON_K4, L"4", L"4", L"4", L"green", L"OPEN", L"$", L"inv video", 0xf7, 0x8, '4'},
 	{IDC_BUTTON_K5, L"5", L"5", L"5", L"cyan", L"CLOSE", L"%", L"left", 0xf7, 0x10, '5'},
-	{IDC_BUTTON_K6, L"6", L"6", L"6", L"yellow", L"MOVE", L"'", L"down", 0xef, 0x10, '6'},
-	{IDC_BUTTON_K7, L"7", L"7", L"7", L"white", L"ERASE", L"&&", L"right", 0xef, 0x8, '7'},
-	{IDC_BUTTON_K8, L"8", L"8", L"8", L"", L"POINT", L"*", L"up", 0xef, 0x4, '8'},
-	{IDC_BUTTON_K9, L"9", L"9", L"9", L"bright", L"CAT", L"(", L"graphics", 0xef, 0x2, '9'},
-	{IDC_BUTTON_K0, L"0", L"0", L"0", L"black", L"FORMAT", L")", L"delete", 0xef, 0x1, '0'},
+	{IDC_BUTTON_K6, L"6", L"6", L"6", L"yellow", L"MOVE", L"&&", L"down", 0xef, 0x10, '6'},
+	{IDC_BUTTON_K7, L"7", L"7", L"7", L"white", L"ERASE", L"'", L"right", 0xef, 0x8, '7'},
+	{IDC_BUTTON_K8, L"8", L"8", L"8", L"", L"POINT", L"(", L"up", 0xef, 0x4, '8'},
+	{IDC_BUTTON_K9, L"9", L"9", L"9", L"bright", L"CAT", L")", L"graphics", 0xef, 0x2, '9'},
+	{IDC_BUTTON_K0, L"0", L"0", L"0", L"black", L"FORMAT", L"_", L"delete", 0xef, 0x1, '0'},
 	{IDC_BUTTON_KQ, L"PLOT", L"q", L"Q", L"SIN", L"ASN", L"<=", L"Q", 0xfb, 0x1, 'Q'},
 	{IDC_BUTTON_KW, L"DRAW", L"w", L"W", L"COS", L"ACS", L"<>", L"W", 0xfb, 0x2, 'W'},
 	{IDC_BUTTON_KE, L"REM", L"e", L"E", L"TAN", L"ATN", L">=", L"E", 0xfb, 0x4, 'E'},
@@ -91,7 +115,7 @@ static ZX_KEY keys[] = {
 	{IDC_BUTTON_KK, L"LIST", L"k", L"K", L"LEN", L"SCRN$", L"+", L"K", 0xbf, 0x4, 'K'},
 	{IDC_BUTTON_KL, L"LET", L"l", L"L", L"USR", L"ATTR", L"=", L"L", 0xbf, 0x2, 'L'},
 	{IDC_BUTTON_ENTER, L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", 0xbf, 0x1, VK_RETURN},
-	//{IDC_BUTTON_ENTER1, L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", 0xbf, 0x1, VK_RETURN},
+	{IDC_BUTTON_ENTER1, L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", 0xbf, 0x1, VK_RETURN},
 	{IDC_BUTTON_CAPS_SHIFT, L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", 0xfe, 0x1, VK_CONTROL},
 	{IDC_BUTTON_KZ, L"COPY", L"z", L"Z", L"LN", L"BEEP", L":", L"Z", 0xfe, 0x2, 'Z'},
 	{IDC_BUTTON_KX, L"CLEAR", L"x", L"X", L"EXP", L"INK", L"FUNT", L"X", 0xfe, 0x4, 'X'},
@@ -104,65 +128,6 @@ static ZX_KEY keys[] = {
 	{IDC_BUTTON_SPACE, L"", L"", L"", L"", L"", L"", L"", 0x7f, 0x1, VK_SPACE}
 };
 
-static ssh_d WINAPI KeyProc(void* params) {
-	return theApp.keyboard->procKEY();
-}
-
-DWORD zxKeyboard::procKEY() {
-	int val, val1, val2;
-	LARGE_INTEGER sample;
-
-	QueryPerformanceFrequency(&sample);
-	DWORD ms = sample.LowPart / 1000;
-
-	QueryPerformanceCounter(&sample);
-	DWORD start = sample.LowPart / ms;
-
-	while(!(_TSTATE & ZX_TERMINATE)) {
-		QueryPerformanceCounter(&sample);
-		DWORD millis = sample.LowPart / ms;
-		if((millis - start) < 10) continue;
-		start = millis;
-		// проверить режим клавиатуры
-		int nmode = -1;
-		if(!memZX) continue;
-		val = memZX[23617];
-		int sh = (GetKeyState(VK_SHIFT) & 128);
-		switch(val) {
-			case 0:
-				val1 = memZX[23658];
-				val2 = memZX[23611];
-				if(val1 & 8) nmode = KM_C; else { if(val2 & 8) nmode = KM_L; else if(val1 & 16) nmode = KM_K; }
-				if(sh) nmode = KM_SH_KL;
-				if(nmode == KM_L && (GetKeyState(VK_CONTROL) & 128)) nmode = KM_CH;
-				break;
-			case 1: nmode = (sh ? KM_SH_E : KM_E); break;
-			default: nmode = KM_G; break;
-		}
-		// проверить на нажатые кнопки
-		if(mode == nmode) continue;
-		for(auto& k : keys) {
-			int p = ((k.port << 8) | 0xfe);
-			auto v = portsZX[p];
-			//if(!(v & k.bit)) SendMessage(k.hWndKey, BM_CLICK, 0, 0);
-			ssh_cws name = nullptr;
-			switch(nmode) {
-				case KM_K: name = k.name_k; break;
-				case KM_L: name = k.name_l; break;
-				case KM_C: name = k.name_c; break;
-				case KM_E: name = k.name_e; break;
-				case KM_G: name = k.name_l; break;
-				case KM_SH_E: name = k.name_sh_e; break;
-				case KM_SH_KL: name = k.name_sh_k; break;
-				case KM_CH: name = k.name_c; break;
-			}
-			if(nmode != mode && name != nullptr) SetWindowText(k.hWndKey, name);
-		}
-		mode = nmode;
-	}
-	return 0;
-}
-
 void zxKeyboard::onInitDialog(HWND hWnd, LPARAM lParam) {
 	for(auto& k : keys) {
 		k.hWndKey = GetDlgItem(hWnd, k.butID);
@@ -171,60 +136,23 @@ void zxKeyboard::onInitDialog(HWND hWnd, LPARAM lParam) {
 }
 
 bool zxKeyboard::preCreate() {
-	DWORD keyID;
-	hKeyThread = CreateThread(nullptr, 0, KeyProc, nullptr, CREATE_SUSPENDED, &keyID);
-	hFont = CreateFont(-10, 0, 0, 0, FW_THIN, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_TT_PRECIS,
-					   CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN, L"Courier New");
+	hFont = CreateFont(-8, 0, 0, 0, FW_THIN, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_TT_PRECIS,
+					   CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN, L"Ms Shell Dlg");
 
 	hbrSel = CreateSolidBrush(RGB(255, 0, 0));
 	hbrUnsel = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
+	hPen = CreatePen(PS_SOLID, 1, RGB(0, 255, 0));
 	return true;
 }
 
 void zxKeyboard::show(bool visible) {
-	if(visible) {
-		showWindow(true);
-		updateWindow();
-		ResumeThread(hKeyThread);
-	} else {
-		if(isWindowVisible()) {
-			showWindow(false);
-			Wow64SuspendThread(hKeyThread);
-		}
-	}
-}
-
-bool zxKeyboard::onDrawItem(UINT idCtl, LPDRAWITEMSTRUCT dis) {
-	auto isStat = (dis->itemState & ODS_SELECTED) != 0;
-	if(isStat) {
-		isStat = isStat;
-	}
-	GetWindowText(dis->hwndItem, tmpBuf, 260);
-	StringZX txt(tmpBuf);
-	RECT* r = &dis->rcItem;
-	HDC hdc = dis->hDC;
-	POINT pt;
-
-	SetTextColor(hdc, GetSysColor(isStat ? COLOR_HIGHLIGHTTEXT : COLOR_BTNTEXT));
-	SetBkMode(hdc, TRANSPARENT);
-	FillRect(hdc, r, isStat ? hbrSel : hbrUnsel);
-	DrawText(hdc, txt, (int)txt.length(), r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-	MoveToEx(hdc, r->left, r->top, &pt);
-	LineTo(hdc, r->right - 1, r->top);
-	LineTo(hdc, r->right - 1, r->bottom - 1);
-	LineTo(hdc, r->left, r->bottom - 1);
-	LineTo(hdc, r->left, r->top);
-	return true;
+	showWindow(visible);
+	updateWindow();
 }
 
 void zxKeyboard::processKeys() {
-	ssh_b* stdPort = &portsZX[0xfe];
-	(*stdPort) = 0xff;
-	portsZX[0x7ffe] = 0xff; portsZX[0xf7fe] = 0xff;
-	portsZX[0xeffe] = 0xff; portsZX[0xfefe] = 0xff;
-	portsZX[0xdffe] = 0xff; portsZX[0xfdfe] = 0xff;
-	portsZX[0xbffe] = 0xff; portsZX[0xfbfe] = 0xff;
-	if(vkKeys[VK_SHIFT] & 0x80) {
+	bool sh = (vkKeys[VK_SHIFT] & 0x80);
+	if(sh) {
 		for(auto& k : keysExShift) {
 			if(vkKeys[k.vk_code] & 0x80) {
 				vkKeys[k.vk_code] = 0;
@@ -243,11 +171,58 @@ void zxKeyboard::processKeys() {
 		}
 	}
 	for(auto& k : keys) {
-		ssh_b* port = &portsZX[((k.port << 8) | 0xfe)];
 		ssh_b bit = k.bit;
+		ssh_b* port = &portsZX[((k.port << 8) | 0xfe)];
 		if(vkKeys[k.vk_code] & 0x80) {
-			(*port) &= ~bit;
-			(*stdPort) &= ~bit;
+			portsZX[0xfe] &= ~bit;
+			*port &= ~bit;
+		} else {
+			portsZX[0xfe] |= bit;
+			*port |= bit;
 		}
+	}
+	// проверить режим клавиатуры
+	RECT rect;
+	int nmode = -1;
+	int val = memZX[23617], val1, val2;
+	switch(val) {
+		case 0:
+			val1 = memZX[23658];
+			val2 = memZX[23611];
+			if(val1 & 8) nmode = KM_C; else { if(val2 & 8) nmode = KM_L; else if(val1 & 16) nmode = KM_K; }
+			if(sh) nmode = KM_SH_KL;
+			if(nmode == KM_L && (vkKeys[VK_CONTROL] & 0x80)) nmode = KM_CH;
+			break;
+		case 1: nmode = (sh ? KM_SH_E : KM_E); break;
+		default: nmode = KM_G; break;
+	}
+	// проверить на нажатые кнопки
+	for(auto& k : keys) {
+		int p = ((k.port << 8) | 0xfe);
+		auto v = portsZX[p];
+		ssh_cws name = nullptr;
+		switch(nmode) {
+			case KM_K: name = k.name_k; break;
+			case KM_L: name = k.name_l; break;
+			case KM_C: name = k.name_c; break;
+			case KM_E: name = k.name_e; break;
+			case KM_G: name = k.name_l; break;
+			case KM_SH_E: name = k.name_sh_e; break;
+			case KM_SH_KL: name = k.name_sh_k; break;
+			case KM_CH: name = k.name_c; break;
+		}
+		if(name) {
+			bool is = !(v & k.bit);
+			auto h = k.hWndKey;
+			auto hdc = GetDC(h);
+			auto hfont = SelectObject(hdc, hFont);
+			SetTextColor(hdc, is ? RGB(255, 255, 255) : RGB(0, 0, 0));
+			GetClientRect(h, &rect);
+			SetBkMode(hdc, TRANSPARENT);
+			FillRect(hdc, &rect, is ? hbrSel : hbrUnsel);
+			DrawText(hdc, name, -1, &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+			ReleaseDC(h, hdc);
+		}
+		mode = nmode;
 	}
 }

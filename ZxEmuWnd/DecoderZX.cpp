@@ -17,8 +17,8 @@ extern ssh_d szMemZX;
 // пишем в память 8 битное значение
 void DecoderZX::write_mem8(ssh_b* address, ssh_b val, ssh_w ron) {
 	if(_TSTATE & ZX_DEBUG) debug->checkBPS((ssh_w)(address - memZX), true);
-	if(address < &memZX[16384]) { if(_TSTATE & ZX_WRITE_ROM) *address = val; }
-	else if(address < &memZX[23296] && (_TSTATE & ZX_WRITE_GPU)) gpu->write(address, val);
+	if(address < limitROM) { if(_TSTATE & ZX_WRITE_ROM) *address = val; }
+	else if(address < limitScreen && (_TSTATE & ZX_WRITE_GPU)) gpu->write(address, val);
 	else {
 		ssh_u offs = 0;
 		if(address >= &portsZX[0]) {
@@ -76,11 +76,11 @@ ssh_b DecoderZX::rotate(ssh_b v, ssh_b mask) {
 		// RLC
 		case 0: v = fc; break;
 		// RRC
-		case 1: v = fc << 7; break;
+		case 1: v = (fc << 7); break;
 		// RL
 		case 2: v = ofc; break;
 		// RR
-		case 3: v = ofc << 7; break;
+		case 3: v = (ofc << 7); break;
 		// SLA SRL
 		case 4: case 7: v = 0; break;
 		// SRA

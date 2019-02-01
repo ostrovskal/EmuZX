@@ -18,9 +18,9 @@ void DecoderZX::ops10_ED() {
 				ssh_b bt = read_mem8(hl);
 				write_mem8(*_DE, bt); (*_DE) += d; (*_HL) += d; (*_BC)--;
 				is = *_BC != 0;
-				if(!is || !rep) {
+				//if(!is || !rep) {
 					update_flags(F5 | FH | F3 | FPV | FN, (is << 2) | (((bt + a) & 1) << 5) | ((bt + a) & 0b00001000));
-				}
+				//}
 				if(rep && is) _PC -= 2;
 				break;
 			}

@@ -79,7 +79,7 @@ protected:
 	ssh_b getFlag(ssh_b fl) { return ((regsZX[RF] & fl) == fl); }
 
 	// установка флагов по маске
-	void update_flags(int msk, ssh_b val) { regsZX[RF] = (regsZX[RF] & ~msk) | val; }
+	void update_flags(int msk, ssh_b val) { regsZX[RF] = ((regsZX[RF] & ~msk) | val); }
 
 	// читаем 16 бит из памяти
 	inline ssh_w read_mem16(ssh_w address) { return *(ssh_w*)(memZX + address); }

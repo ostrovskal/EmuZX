@@ -165,7 +165,7 @@ void zxDlgListBps::setItems() {
 		SendMessage(hWndList, LVM_SETITEM, 1, (LPARAM)&lvi);
 
 		lvi.iSubItem = 2;
-		lvi.pszText = (bp->value == -1) ? L"" : cond_bp[(bp->flags & FBP_COND) >> 3];
+		lvi.pszText = (bp->value == -1) ? L"" : cond_bp[(bp->flags & FBP_COND) >> 2];
 		SendMessage(hWndList, LVM_SETITEM, 3, (LPARAM)&lvi);
 
 		lvi.iSubItem = 3;

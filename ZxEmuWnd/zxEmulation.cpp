@@ -130,7 +130,7 @@ zxEmulation::zxEmulation() : zxWnd() {
 
 zxEmulation::~zxEmulation() {
 	pauseCPU(true, 0);
-	CloseHandle(hCpuThread);
+//	CloseHandle(hCpuThread);
 	SAFE_DELETE(debug);
 	SAFE_DELETE(snd);
 	SAFE_DELETE(brd);
@@ -275,10 +275,11 @@ bool zxEmulation::onSize(WPARAM type, int nWidth, int nHeight) {
 }
 
 bool zxEmulation::onKey(int nVirtKey, LPARAM keyData, bool pressed) {
-	return GetKeyboardState(keyboard->vkKeys);
-	//if(keyb) keyb->execute((ssh_b)nVirtKey, pressed);
+	if(GetKeyboardState(keyboard->vkKeys)) {
+		keyboard->processKeys();
+		return true;
+	}
 	return false;
-	//return keyb == nullptr;
 }
 
 bool zxEmulation::onNotify(LPNMHDR nm) {
@@ -377,12 +378,12 @@ int zxEmulation::run() {
 	MSG msg;
 
 	while(::GetMessage(&msg, NULL, NULL, NULL)) {
-		if(!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
-			if(!IsDialogMessage(msg.hwnd, &msg)) {
+		//if(!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
+			//if(!IsDialogMessage(msg.hwnd, &msg)) {
 				TranslateMessage(&msg);
 				DispatchMessage(&msg);
-			}
-		}
+//			}
+	//	}
 	}
 	opts.save(opts.mainDir + L"settings.zx");
 	zilog->saveStateZX(opts.mainDir + L"auto_state.zx");

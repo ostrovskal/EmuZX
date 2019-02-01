@@ -95,7 +95,6 @@ void GpuZX::execute() {
 	invert++;
 
 	*_TRAP = 1;
-	theApp.keyboard->processKeys();
 }
 
 void GpuZX::decodeColor(ssh_b color) {
@@ -107,6 +106,7 @@ void GpuZX::decodeColor(ssh_b color) {
 }
 
 void GpuZX::write(ssh_b* address, ssh_b val) {
+	return;
 	ssh_w offs = (ssh_w)(address - &memZX[16384]);
 	int x, y;
 	ssh_d* addr = &memory[32 * 320 + 32];
