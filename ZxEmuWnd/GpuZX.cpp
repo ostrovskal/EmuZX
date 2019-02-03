@@ -55,40 +55,42 @@ void GpuZX::execute() {
 
 	if(!hbmpMem) makeCanvas();
 	
-	int graph = 16384;
-	int colors = 22528;
-	
-	ssh_d* dest = &memory[223 * 320 + 32];
-	for(int bank = 0; bank < 3; bank++) {
-		int graphN = graph;
-		for(int znak = 0; znak < 8; znak++) {
-			int graphZ = graphN;
-			for(int line = 0; line < 8; line++) {
-				ssh_d* graphics = dest;
-				for(int x = 0; x < 32; x++) {
-					decodeColor(memZX[colors + x]);
-					drawLine(graphics, memZX[graphZ + x]);
-					graphics += 8;
+	if(!(_TSTATE & ZX_WRITE_GPU)) {
+		ssh_b* graph = memScreen;
+		ssh_b* colors = graph + 6144;
+
+		ssh_d* dest = &memory[223 * 320 + 32];
+		for(int bank = 0; bank < 3; bank++) {
+			auto graphN = graph;
+			for(int znak = 0; znak < 8; znak++) {
+				auto graphZ = graphN;
+				for(int line = 0; line < 8; line++) {
+					ssh_d* graphics = dest;
+					for(int x = 0; x < 32; x++) {
+						decodeColor(*(colors + x));
+						drawLine(graphics, *(graphZ + x));
+						graphics += 8;
+					}
+					dest -= 320;
+					graphZ += 256;
 				}
-				dest -= 320;
-				graphZ += 256;
+				colors += 32;
+				graphN += 32;
 			}
-			colors += 32;
-			graphN += 32;
+			graph += 2048;
 		}
-		graph += 2048;
-	}
-	auto filter = theApp.getOpt(OPT_PP)->dval;
-	if(filter > 0) {
-		dest = &memory[32 * 320 + 32];
-		int x = 0, y = 1;
-		while(y++ < 191) {
-			while(x++ < 256) {
-				*dest++ = filter == 1 ? asm_ssh_mixed(dest, dest + 320) : asm_ssh_bilinear(x, y, 320, dest);
+		auto filter = theApp.getOpt(OPT_PP)->dval;
+		if(filter > 0) {
+			dest = &memory[32 * 320 + 32];
+			int x = 0, y = 1;
+			while(y++ < 191) {
+				while(x++ < 256) {
+					*dest++ = (filter == 1 ? asm_ssh_mixed(dest, dest + 320) : asm_ssh_bilinear(x, y, 320, dest));
+				}
+				dest += 64;
+				x = 0;
 			}
-			dest += 64;
-			x = 0;
-		} 
+		}
 	}
 	showScreen();
 
@@ -106,8 +108,7 @@ void GpuZX::decodeColor(ssh_b color) {
 }
 
 void GpuZX::write(ssh_b* address, ssh_b val) {
-	return;
-	ssh_w offs = (ssh_w)(address - &memZX[16384]);
+	ssh_w offs = (ssh_w)(address - memScreen);
 	int x, y;
 	ssh_d* addr = &memory[32 * 320 + 32];
 	if(offs >= 6144) {

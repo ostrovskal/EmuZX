@@ -30,6 +30,10 @@ enum CPU_REG {
 	RIM,
 	RTRAP,
 	RFE,
+	RFD,
+	RAM,
+	ROM,
+	VID,
 	RPC_EXIT_CALL1,
 	RPC_EXIT_CALL2,
 	COUNT_REGS
@@ -77,6 +81,7 @@ extern ssh_w* _SP;
 extern ssh_w* _PC_EXIT_CALL;
 
 extern ssh_b* _PORT_FE;
+extern ssh_b* _PORT_FD;
 extern ssh_b* _TRAP;
 
 extern ssh_b memZX[65536];
@@ -89,7 +94,6 @@ extern ssh_b portsZX[65536];
 class CpuZX;
 class GpuZX;
 class BorderZX;
-class KeyboardZX;
 class SoundZX;
 class zxDebugger;
 class zxKeyboard;
@@ -151,7 +155,6 @@ protected:
 	bool changeState(int id_opt, int id, bool change);
 
 	BorderZX*	brd;
-	KeyboardZX* keyb;
 	SoundZX*	snd;
 
 	ssh_d delayCPU;

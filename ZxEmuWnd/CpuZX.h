@@ -19,8 +19,4 @@ protected:
 	void signalRESET();
 	void signalINT();
 	void signalNMI();
-
-	// ÏÇÓ
-	ssh_b* ROM;
-	ssh_d szROM;
 };

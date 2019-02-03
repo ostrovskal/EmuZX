@@ -132,7 +132,6 @@ INT_PTR zxDialog::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			return !res;
 		}
-		//case WM_CTLCOLORSTATIC: return onCtlColorStatic((HDC)wParam, (HWND)lParam);
 	}
 	return zxWnd::wndProc(hWnd, message, wParam, lParam);
 }
@@ -208,12 +207,12 @@ int zxDialog::create(WORD IDD, zxWnd* wndParent, bool modal) {
 			while(!nResult) {
 				do {
 					if(!::GetMessage(&msg, NULL, NULL, NULL)) break;
-					if(!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
-						if(!IsDialogMessage(msg.hwnd, &msg)) {
+//					if(!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
+//						if(!IsDialogMessage(msg.hwnd, &msg)) {
 							TranslateMessage(&msg);
 							DispatchMessage(&msg);
-						}
-					}
+	//					}
+		//			}
 				} while(::PeekMessage(&msg, NULL, NULL, NULL, PM_NOREMOVE));
 			}
 			DestroyWindow(hWnd);

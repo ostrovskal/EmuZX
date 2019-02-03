@@ -9,9 +9,6 @@ extern ssh_cws nameROMs[];
 // содержмое памяти
 ssh_b memZX[65536];
 
-ssh_b* limitROM = &memZX[16384];
-ssh_b* limitScreen = &memZX[23296];
-
 // регистры
 ssh_b regsZX[COUNT_REGS];
 
@@ -20,6 +17,9 @@ ssh_b portsZX[65536];
 
 // банки памяти
 ssh_b memBanks[8 * 16384];
+
+ssh_b* limitROM = &memZX[16384];
+ssh_b* limitScreen = &memZX[23296];
 
 // счетчик комманд
 ssh_w _PC;
@@ -41,6 +41,21 @@ ssh_b* _IFF2;
 
 // содержимое порта FE
 ssh_b* _PORT_FE;
+ssh_b* _PORT_FD;
+
+// ROM
+ssh_b* ptrROM;
+int szROM;
+
+// RAM
+ssh_b* _RAM;
+
+// VID
+ssh_b* _VID;
+ssh_b* memScreen;
+
+// ROM
+ssh_b* _ROM;
 
 // признак наличия прерывания INT
 ssh_b* _TRAP;
@@ -58,13 +73,13 @@ volatile ssh_w _TSTATE;
 
 CpuZX::CpuZX() {
 	decoder = new DecoderZX();
-	ROM = nullptr; szROM = 0;
+	ptrROM = nullptr; szROM = 0;
 	signalRESET();
 }
 
 CpuZX::~CpuZX() {
 	SAFE_DELETE(decoder);
-	SAFE_DELETE(ROM);
+	SAFE_DELETE(ptrROM);
 }
 
 void CpuZX::signalRESET() {
@@ -81,6 +96,10 @@ void CpuZX::signalRESET() {
 	_IFF1 = &regsZX[RIFF1];
 	_IFF2 = &regsZX[RIFF2];
 	_PORT_FE = &regsZX[RFE];
+	_PORT_FD = &regsZX[RFD];
+	_RAM = &regsZX[RAM];
+	_ROM = &regsZX[ROM];
+	_VID = &regsZX[VID];
 	_TRAP = &regsZX[RTRAP];
 
 	_BC = (ssh_w*)&regsZX[RC];
@@ -92,34 +111,35 @@ void CpuZX::signalRESET() {
 	*_R = *_I = *_IM = *_TRAP = 0;
 	*_IFF1 = *_IFF2 = 0;
 	*_PORT_FE = 224;
+	*_PORT_FD = 192;
+	*_RAM = *_ROM = *_VID = 0;
 	_PC = 0;
 
-	SAFE_DELETE(ROM); szROM = 0;
+	SAFE_DELETE(ptrROM); szROM = 0;
 
 	auto model = theApp.getOpt(OPT_MEM_MODEL)->dval;
 	// грузим ПЗУ
 	try {
-		StringZX pathROM(theApp.opts.mainDir + L"Roms\\" + nameROMs[model] + L".rom");
+		StringZX pathROM(theApp.opts.mainDir + L"Roms\\" + nameROMs[model] + ".rom");
 		_wsopen_s(&_hf, pathROM, _O_RDONLY | _O_BINARY, _SH_DENYRD, _S_IREAD);
 		if(_hf != -1) {
 			szROM = _filelength(_hf);
-			ROM = new ssh_b[szROM];
-			if(_read(_hf, ROM, szROM) != szROM) throw(0);
+			ptrROM = new ssh_b[szROM];
+			if(_read(_hf, ptrROM, szROM) != szROM) throw(0);
 		}
-	} catch(...) {
-
-	}
+	} catch(...) { }
 	SAFE_CLOSE1(_hf);
 
 	memset(memZX, 0, 65536);
 	memset(memBanks, 0, 16384 * 8);
-	memcpy(memZX, ROM, 16384);
-	*_SP = 65534;
-
 	memset(regsZX, 0, sizeof(regsZX));
 	memset(portsZX, 255, sizeof(portsZX));
-
 	portsZX[31] = 0;
+
+	*_SP = 0;
+
+	memScreen = &memZX[16384];
+	memcpy(memZX, ptrROM, 16384);
 
 	modifyTSTATE(ZX_EXEC, 0);
 }
@@ -139,7 +159,7 @@ void CpuZX::signalINT() {
 				decoder->execCALL(decoder->read_mem16(*_I * 256 + 254));
 				break;
 		}
-		//decoder->incrementR();
+		decoder->incrementR();
 	}
 }
 

@@ -565,10 +565,20 @@ asm_ssh_wton proc public
 		push r12
 		push r13
 		push r14
+		push r15
 		mov r14, r8
 		xor rax, rax
 		jrcxz @f
-		mov r10, rcx
+		; знак
+		xor r15, r15
+		xor r13, r13
+		cmp word ptr [rcx], '+'
+		setz r13b
+		cmp word ptr [rcx], '-'
+		setz r15b
+		lea rcx, [rcx + r15 * 2]
+		lea rcx, [rcx + r13 * 2]
+nznak:	mov r10, rcx
 		xor r13, r13
 		mov r9, offset radix
 		imul rdx, 24
@@ -576,11 +586,15 @@ asm_ssh_wton proc public
 		mov r9, [rdx + 8]; множитель порядка
 		mov r8, [rdx + 16]; маска
 		call qword ptr [rdx]
+		test r15, r15
+		jz @f
+		neg rax
 @@:		mov qword ptr [result], rax
 		test r14, r14
 		jz @f
 		mov [r14], r11
-@@:		pop r14
+@@:		pop r15
+		pop r14
 		pop r13
 		pop r12
 		pop r11

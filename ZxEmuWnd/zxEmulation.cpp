@@ -3,7 +3,6 @@
 #include "GpuZX.h"
 #include "BorderZX.h"
 #include "SoundZX.h"
-#include "KeyBoardZX.h"
 #include "zxDebugger.h"
 #include "zxKeyboard.h"
 #include "zxDlgSettings.h"
@@ -111,10 +110,6 @@ bool dlgSaveOrOpenFile(bool bOpen, ssh_cws title, ssh_cws filter, ssh_cws defExt
 	return result;
 }
 
-static ssh_d WINAPI ProcCPU(void* params) {
-	return theApp.procCPU();
-}
-
 zxEmulation::zxEmulation() : zxWnd() {
 	InitializeCriticalSection(&cs);
 	hMenuMRU = nullptr;
@@ -139,7 +134,7 @@ zxEmulation::~zxEmulation() {
 	DeleteCriticalSection(&cs);
 }
 
-ssh_d zxEmulation::procCPU() {
+static ssh_d WINAPI ProcCPU(void* params) {
 	LARGE_INTEGER sample;
 	QueryPerformanceFrequency(&sample);
 
@@ -156,13 +151,13 @@ ssh_d zxEmulation::procCPU() {
 		QueryPerformanceCounter(&sample);
 		DWORD current = sample.LowPart;
 		DWORD millis = current / ms;
-		if((millis - startGpu) > delayGPU) { gpu->execute(); startGpu = millis; }
+		if((millis - startGpu) > theApp.delayGPU) { theApp.gpu->execute(); startGpu = millis; }
 		if((_TSTATE & ZX_EXEC)) {
-			if((current - startCpu) > delayCPU) {
-				zilog->execute(false); startCpu = current;
-				if(getOpt(OPT_SOUND)->dval) snd->execute(sndTm++);
+			if((current - startCpu) > theApp.delayCPU) {
+				theApp.zilog->execute(false); startCpu = current;
+				if(theApp.getOpt(OPT_SOUND)->dval) theApp.snd->execute(sndTm++);
 			}
-			if((current - startBrd) > (delayCPU * 16)) { brd->execute(); startBrd = current; }
+			if((current - startBrd) > (theApp.delayCPU * 16)) { theApp.brd->execute(); startBrd = current; }
 		}
 	}
 
@@ -364,7 +359,6 @@ int zxEmulation::run() {
 	gpu = new GpuZX;
 	brd = new BorderZX;
 	snd = new SoundZX;
-	keyb = new KeyboardZX;
 
 	debug->updateRegisters(_PC, zxDebugger::U_PC | zxDebugger::U_REGS | zxDebugger::U_SEL | zxDebugger::U_SP | zxDebugger::U_TOP);
 

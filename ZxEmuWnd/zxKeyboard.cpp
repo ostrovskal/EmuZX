@@ -141,7 +141,6 @@ bool zxKeyboard::preCreate() {
 
 	hbrSel = CreateSolidBrush(RGB(255, 0, 0));
 	hbrUnsel = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-	hPen = CreatePen(PS_SOLID, 1, RGB(0, 255, 0));
 	return true;
 }
 

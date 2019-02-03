@@ -2,6 +2,7 @@
 #include "resource.h"
 #include "zxDebugger.h"
 #include "zxDisAsm.h"
+#include "zxAssembler.h"
 #include "CpuZX.h"
 #include "DecoderZX.h"
 #include "SettingsZX.h"
@@ -47,7 +48,10 @@ ZX_DEBUGGER dlgElems[] = {
 	{L"PC", IDC_EDIT_PC, IDC_STATIC_PC, nullptr, &_PC, 0xffff},
 	{L"IFF1", IDC_EDIT_IFF1, IDC_STATIC_IFF1, &regsZX[RIFF1], nullptr, 1},
 	{L"IFF2", IDC_EDIT_IFF2, IDC_STATIC_IFF2, &regsZX[RIFF2], nullptr, 1},
+	{L"RAM", IDC_EDIT_RAM, IDC_STATIC_RAM, &regsZX[RAM], nullptr, 7},
+	{L"ROM", IDC_EDIT_ROM, IDC_STATIC_ROM, &regsZX[ROM], nullptr, 1},
 	{L"IM", IDC_EDIT_IM, IDC_STATIC_IM, &regsZX[RIM], nullptr, 0x3},
+	{L"VID", IDC_EDIT_VID, IDC_STATIC_VID, &regsZX[VID], nullptr, 0x7},
 	{L" I ", IDC_EDIT_I, IDC_STATIC_I, &regsZX[RI], nullptr, 0xff},
 	{L" R ", IDC_EDIT_R, IDC_STATIC_R, &regsZX[RR], nullptr, 0xff},
 	{L" S ", IDC_EDIT_S, IDC_STATIC_S, &regsZX[RF], nullptr, FS, 7},
@@ -57,12 +61,12 @@ ZX_DEBUGGER dlgElems[] = {
 	{L" 3 ", IDC_EDIT_3, IDC_STATIC_3, &regsZX[RF], nullptr, F3, 3},
 	{L" P ", IDC_EDIT_P, IDC_STATIC_P, &regsZX[RF], nullptr, FPV,2},
 	{L" N ", IDC_EDIT_N, IDC_STATIC_N, &regsZX[RF], nullptr, FN, 1},
-	{L" C ", IDC_EDIT_C, IDC_STATIC_C, &regsZX[RF], nullptr, FC, 0},
-	{L"TSTATE", IDC_EDIT_TSTATE1, IDC_STATIC_TSTATE, nullptr, (ssh_w*)&_TSTATE, 0xffff}
+	{L" C ", IDC_EDIT_C, IDC_STATIC_C, &regsZX[RF], nullptr, FC, 0}
 };
 
 zxDebugger::~zxDebugger() {
 	SAFE_DELETE(da);
+	SAFE_DELETE(assm);
 	DeleteObject(hFont);
 	DeleteObject(hbrSel);
 	DeleteObject(hbrUnSel);
@@ -76,6 +80,7 @@ bool zxDebugger::preCreate() {
 	hbrUnSel = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
 
 	da = new zxDisAsm;
+	assm = new zxAssembler;
 	// прочитать точки останова из установок
 	int count = 0;
 	for(int i = OPT_BPS0; i <= OPT_BPS9; i++) {
@@ -307,12 +312,12 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 		}
 		case IDM_STEP_OVER: {
 			*_TRAP = 0;
-			// если CALL nn/CALL ccc,nn -> выполняем до тех пор пока PC не станет следующей командой
-			bool isCall = da->isCALL(sel);
+			// если RET/RECT CCC/JP/JP CCC/JR/JR CC/DJNZ -> выполняем как STEP_INTO
+			bool isREP = da->isJump(sel);
 			auto nextPC = da->move(_PC, 1);
 			do {
 				theApp.zilog->execute(true);
-			} while(_PC != nextPC && isCall);
+			} while(_PC != nextPC && !isREP);
 			updateRegisters(_PC, U_REGS | U_PC | U_SP | U_SEL);
 			break;
 		}
@@ -339,8 +344,21 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 		case IDC_BUTTON_TO_SP:
 			updateStack(*_SP);
 			break;
-		case IDC_BUTTON_SET_COMMAND:
+		case IDC_BUTTON_SET_COMMAND: {
+			HWND h = GetDlgItem(hWnd, IDC_EDIT_CURRENT_COMMAND);
+			GetWindowText(h, tmpBuf, 260);
+			int posErr = 0;
+			int len = assm->parseCommand(tmpBuf, FASM_LABEL, &posErr);
+			if(len) {
+				// вставить комманду
+				memcpy(&memZX[da->getCmdAddress(sel)], assm->code, len);
+				da->decode(_pc, countVisibleItems);
+				InvalidateRect(hWndDA, nullptr, false);
+			} else {
+				SendMessage(h, EM_SETSEL, posErr, posErr + 100);
+			}
 			break;
+		}
 		case IDC_EDIT_S:
 		case IDC_EDIT_Z:
 		case IDC_EDIT_5:
@@ -425,6 +443,7 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 	return true;
 }
 
+/*
 INT_PTR zxDebugger::onCtlColorStatic(HDC hDC, HWND hWnd) {
 	auto id = GetDlgCtrlID(hWnd);
 	for(auto& zx : dlgElems) {
@@ -436,6 +455,7 @@ INT_PTR zxDebugger::onCtlColorStatic(HDC hDC, HWND hWnd) {
 	}
 	return (INT_PTR)0;
 }
+*/
 
 bool zxDebugger::check(ssh_w address, ZX_BREAK_POINT& breakpt, int flags) {
 	for(auto& bp : bps) {

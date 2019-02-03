@@ -21,6 +21,5 @@ protected:
 	virtual bool preCreate() override;
 	HFONT hFont;
 	HBRUSH hbrSel, hbrUnsel;
-	HPEN hPen;
 	int mode;
 };

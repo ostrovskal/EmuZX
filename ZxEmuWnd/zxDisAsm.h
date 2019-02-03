@@ -7,6 +7,8 @@
 #define DA_FADDR			8
 #define DA_FPADDR			16
 
+#define SIZE_CMD			16
+
 #define C_RB				0
 #define C_RC				1
 #define C_RD				2
@@ -185,8 +187,8 @@ public:
 	// вернуть адрес комманды
 	int getCmdAddress(ssh_d num) const;
 
-	// вернуть признак того, что текущая команда это CALL
-	bool isCALL(ssh_d num);
+	// вернуть признак того, что текущая команда передает управление
+	bool isJump(ssh_d num);
 
 	// вернуть индекс комманды по ее адресу
 	int indexFromAddress(ssh_d pc) const;
@@ -242,7 +244,7 @@ protected:
 		if(ron == 6) {
 			auto r = fromHL();
 			DA_PUT(r);
-			if(prefix) { n = read8(); DA_PUT(C_D); DA_PUT(n); DA_PUT(C_ADDR); put16((addrReg(r) + (char)n) & 0xffff); }
+			if(prefix) { n = read8(); DA_PUT(C_D); DA_PUT(n); DA_PUT(C_ADDR); auto addr = addrReg(r); put16((addr + (char)n) & 0xffff); }
 		} else DA_PUT(prefRON[(prefix << 3) + ron]);
 	}
 

@@ -47,17 +47,44 @@ ssh_b DecoderZX::readPort(ssh_w address) {
 }
 
 void DecoderZX::writePort(ssh_w address, ssh_b val) {
-	if((address % 256 ) == 254) {
-		// 0, 1, 2 - бордер
-		// 3 MIC - при записи/загрузке
-		// 4 - SOUND
-		*_PORT_FE &= 224;
-		*_PORT_FE |= (val & 31);
-		modifyTSTATE(ZX_SOUND | ZX_BORDER, 0);
-		return;
+	if(address == 0x7ffd) {
+		// 1, 2, 4 - страница 0-7
+		// 8 - экран 5/7
+		// 16 - ПЗУ 0 - 128К 1 - 48К
+		// 32 - блокировка
+		*_PORT_FD &= 224;
+		if(!(*_PORT_FD & 32)) {
+			*_PORT_FD |= (val & 63);
+			// ROM
+			int rom = ((val & 16) >> 4);
+			if(rom != (*_ROM)) {
+				memcpy(&memZX, ptrROM + (rom * 16384), 16384);
+				*_ROM = rom;
+			}
+			// SCREEN
+			*_VID = ((val & 8) ? 7 : 5);
+			//memScreen = &memBanks[(*_VID) * 16384];
+			// PAGE
+			int page = val & 7;
+			if(page != *_RAM) {
+				memcpy(&memBanks[(*_RAM) * 16384], &memZX[0xc000], 16384);
+				memcpy(&memZX[0xc000], &memBanks[page * 16384], 16384);
+				*_RAM = page;
+			}
+		}
+	} else {
+		if((address % 256) == 0xfe) {
+			// 0, 1, 2 - бордер
+			// 3 MIC - при записи/загрузке
+			// 4 - SOUND
+			*_PORT_FE &= 224;
+			*_PORT_FE |= (val & 31);
+			modifyTSTATE(ZX_SOUND | ZX_BORDER, 0);
+			return;
+		} else {
+			portsZX[address] = val;
+		}
 	}
-	portsZX[address] = val;
-
 }
 
 void DecoderZX::execCALL(ssh_w address) {

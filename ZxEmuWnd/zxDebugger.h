@@ -16,6 +16,7 @@ struct ZX_DEBUGGER {
 
 #include "zxListBox.h"
 
+class zxAssembler;
 class zxDisAsm;
 class zxDebugger : public zxDialog {
 	friend class zxDlgListBps;
@@ -44,7 +45,6 @@ protected:
 	virtual bool onClose() override;
 	virtual bool onDrawItem(UINT idCtl, LPDRAWITEMSTRUCT lpdis) override;
 	virtual void onInitDialog(HWND hWnd, LPARAM lParam);
-	virtual INT_PTR onCtlColorStatic(HDC hDC, HWND hWnd) override;
 	virtual bool preCreate() override;
 	void updateUndoRedo(bool set);
 	void updatePrevNextBP();
@@ -56,6 +56,7 @@ protected:
 	zxListBox zxDA;
 	zxListBox zxSP;
 	zxDisAsm* da;
+	zxAssembler* assm;
 	HFONT hFont;
 	HBRUSH hbrSel, hbrUnSel;
 	ZX_BREAK_POINT bps[COUNT_BP];
