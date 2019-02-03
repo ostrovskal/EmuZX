@@ -47,7 +47,7 @@ void DecoderZX::writePort(ssh_w address, ssh_b val) {
 		// 16 - ПЗУ 0 - 128К 1 - 48К
 		// 32 - блокировка
 		*_PORT_FD &= 224;
-		if(!(*_PORT_FD & 32)) {
+		if(!((*_PORT_FD) & 32)) {
 			*_PORT_FD |= (val & 63);
 			// ROM
 			int rom = ((val & 16) >> 4);
@@ -73,8 +73,6 @@ void DecoderZX::writePort(ssh_w address, ssh_b val) {
 			// 4 - SOUND
 			*_PORT_FE &= 224;
 			*_PORT_FE |= (val & 31);
-			modifyTSTATE(ZX_SOUND | ZX_BORDER, 0);
-			return;
 		} else {
 			portsZX[address] = val;
 		}

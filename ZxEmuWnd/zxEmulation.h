@@ -120,7 +120,7 @@ public:
 	void changeExecute(bool change);
 
 	// ѕауза/возонобление треда
-	void pauseCPU(bool isPause, int adding);
+	void pauseCPU(bool isPause);
 
 	// область главного окна
 	RECT wndRect;
@@ -146,6 +146,7 @@ protected:
 	virtual bool onSize(WPARAM type, int nWidth, int nHeight) override;
 	virtual bool onKey(int nVirtKey, LPARAM keyData, bool pressed) override;
 	virtual bool onNotify(LPNMHDR nm) override;
+	virtual int onCalcSize(bool isParams, LPARAM lParam) override;
 
 	void modifyMRU(StringZX path);
 	bool checkedModelOrPP(HMENU hMenu, int id_opt, int val, int* ids);

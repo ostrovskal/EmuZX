@@ -81,7 +81,11 @@ void HookWindowCreate(zxWnd* wnd) {
 
 INT_PTR zxWnd::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	switch(message) {
-		case WM_NCCALCSIZE: break;
+		case WM_NCCALCSIZE: {
+			int ret = onCalcSize((bool)wParam, lParam);
+			if(ret) return ret;
+			break;
+		}
 		case WM_PAINT: if(onPaint()) return 0; break;
 		case WM_CREATE: return (onCreate((LPCREATESTRUCT)lParam) ? 0 : -1);
 		case WM_SIZE: if(onSize(wParam, LOWORD(lParam), HIWORD(lParam))) return 0; break;

@@ -13,14 +13,14 @@ ssh_w buffer[16384];
 
 void SoundZX::execute(ssh_u new_tm) {
 	ssh_u tm = (new_tm - old_tm);
-	if((_TSTATE & ZX_SOUND) == 0) {
-		if(tm > 32768) {
-			cur_signal = -1;
-			old_tm = new_tm;
-		}
-		return;
-	}
-	modifyTSTATE(0, ZX_SOUND);
+//	if((_TSTATE & ZX_SOUND) == 0) {
+//		if(tm > 32768) {
+//			cur_signal = -1;
+//			old_tm = new_tm;
+//		}
+//		return;
+//	}
+//	modifyTSTATE(0, ZX_SOUND);
 	return;
 
 	ssh_b signal = ((*_PORT_FE) & 16) != 0;

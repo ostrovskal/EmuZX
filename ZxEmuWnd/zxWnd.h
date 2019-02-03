@@ -40,6 +40,7 @@ protected:
 	virtual bool onMouseMove(int vkKey, int x, int y) { return false; }
 	virtual bool onMouseButtonDblClk(int vkKey, int x, int y, bool left) { return false; }
 	virtual bool onPaint() { return false; }
+	virtual int onCalcSize(bool isParams, LPARAM lParam) { return 0; }
 	virtual void onFont(HFONT hFont, bool redraw) { }
 	virtual bool preCreate() { return true; }
 	virtual void postCreate() {  }

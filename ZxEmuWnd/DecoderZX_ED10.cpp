@@ -15,12 +15,9 @@ void DecoderZX::ops10_ED() {
 			// LDI; --*0**0-
 			// PV = 1 если после декремента BC<>0; F3 = бит 3 операции переданный байт + A; F5 = бит 1 операции переданный байт + A
 			case 0: {
-				ssh_b bt = read_mem8(hl);
-				write_mem8(*_DE, bt); (*_DE) += d; (*_HL) += d; (*_BC)--;
-				is = *_BC != 0;
-				//if(!is || !rep) {
-					update_flags(F5 | FH | F3 | FPV | FN, (is << 2) | (((bt + a) & 1) << 5) | ((bt + a) & 0b00001000));
-				//}
+				write_mem8(*_DE, read_mem8(hl)); (*_DE) += d; (*_HL) += d; (*_BC)--;
+				is = ((*_BC) != 0);
+				update_flags(FH | FPV | FN, (is << 2));
 				if(rep && is) _PC -= 2;
 				break;
 			}

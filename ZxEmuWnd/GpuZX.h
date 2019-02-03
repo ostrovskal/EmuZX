@@ -12,11 +12,12 @@ protected:
 	void drawLine(ssh_d* addr, ssh_b val);
 	void decodeColor(ssh_b color);
 	void makeCanvas();
-	ssh_d* memory;
+	ssh_d* memBuffer(bool back);
+	ssh_d* memoryPrimary, *memoryBack;
 	ssh_b invert;
 	ssh_d ink;
 	ssh_d paper;
-	HBITMAP hbmpMem;
-	HDC hdcMem;
+	HBITMAP hbmpMemPrimary, hbmpMemBack;
+	HDC hdcMemPrimary, hdcMemBack;
 };
 

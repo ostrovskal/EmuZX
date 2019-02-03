@@ -53,6 +53,7 @@ protected:
 	void quickBP(int adr);
 	void updateStack(int sp);
 	void updateHexDec(bool change);
+	int comparePredefinedNames(ssh_cws buf);
 	int _pc, _sp, _lastPC, _dt;
 	int countVisibleItems;
 	zxListBox zxDA;

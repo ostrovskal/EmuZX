@@ -20,14 +20,19 @@ ssh_d scan_offs[] = {
 };
 GpuZX::GpuZX() {
 	invert = 0;
-	hbmpMem = nullptr;
-	hdcMem = nullptr;
-	memory = nullptr;
+	hbmpMemPrimary = nullptr;
+	hdcMemPrimary = nullptr;
+	hbmpMemBack = nullptr;
+	hdcMemBack = nullptr;
+	memoryPrimary = nullptr;
+	memoryBack = nullptr;
 }
 
 GpuZX::~GpuZX() {
-	::DeleteObject(hbmpMem);
-	::DeleteObject(hdcMem);
+	::DeleteObject(hbmpMemPrimary);
+	::DeleteObject(hdcMemPrimary);
+	::DeleteObject(hbmpMemBack);
+	::DeleteObject(hdcMemBack);
 }
 
 void GpuZX::makeCanvas() {
@@ -41,19 +46,27 @@ void GpuZX::makeCanvas() {
 	bmi.bmiHeader.biBitCount = USHORT(32);
 	bmi.bmiHeader.biCompression = BI_RGB;
 
-	hbmpMem = ::CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void**)&memory, NULL, 0);
-	hdcMem = ::CreateCompatibleDC(NULL);
-	ssh_d* mem = memory;
-	for(int i = 0; i < 224 * 288; i++) *mem++ = 0xffc0c0c0;
+	hbmpMemPrimary = ::CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void**)&memoryPrimary, NULL, 0);
+	hdcMemPrimary = ::CreateCompatibleDC(NULL);
+	hbmpMemBack = ::CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void**)&memoryBack, NULL, 0);
+	hdcMemBack = ::CreateCompatibleDC(NULL);
 }
 
 void GpuZX::showScreen() {
 	HDC hdc;
 	if((hdc = ::GetDC(theApp.getHWND()))) {
-		HGDIOBJ h = SelectObject(hdcMem, hbmpMem);
+		HGDIOBJ h;
+		HDC hMem;
+		if(!(_TSTATE & ZX_BUFFER_GPU)) {
+			hMem = hdcMemPrimary;
+			h = SelectObject(hdcMemPrimary, hbmpMemPrimary);
+		} else {
+			hMem = hdcMemBack;
+			h = SelectObject(hdcMemBack, hbmpMemBack);
+		}
 		LPRECT r = &theApp.wndRect;
-		StretchBlt(hdc, r->left, r->top, r->right - r->left, r->bottom - r->top, hdcMem, 0, 0, 288, 224, SRCCOPY);
-		SelectObject(hdcMem, h);
+		StretchBlt(hdc, r->left, r->top, r->right - r->left, r->bottom - r->top, hMem, 0, 0, 288, 224, SRCCOPY);
+		SelectObject(hMem, h);
 		::DeleteObject(hdc);
 		StringZX::fmt(L"SshZX (%s : %d) %s [%s]", ((_TSTATE & ZX_EXEC) ? L"execute" : L"pause"), _PC,
 					  nameROMs[theApp.getOpt(OPT_MEM_MODEL)->dval], theApp.opts.nameLoadProg.str());
@@ -64,10 +77,11 @@ void GpuZX::showScreen() {
 
 void GpuZX::execute() {
 
-	if(!hbmpMem) makeCanvas();
+	if(!hbmpMemPrimary) makeCanvas();
 	
 	int y = *_SCAN;
-	auto dest = &memory[y * 288];
+	ssh_d* dest = memBuffer(true);
+	dest += y * 288;
 	ssh_b col = (*_PORT_FE) & 7;
 	ssh_d c = colours[col];
 
@@ -97,19 +111,26 @@ void GpuZX::execute() {
 	if(!y) {
 		auto filter = theApp.getOpt(OPT_PP)->dval;
 		if(filter > 0) {
-			dest = &memory[0];
+			dest = memBuffer(true);
 			int x = 0, y = 1;
 			while(y++ < 223) {
 				while(x++ < 287) {
 					*dest++ = (filter == 1 ? asm_ssh_mixed(dest, dest + 288) : asm_ssh_bilinear(x, y, 288, dest));
 				}
-				//dest += 32;
 				x = 0;
 			}
 		}
+		modifyTSTATE(_TSTATE ^ ZX_BUFFER_GPU, ZX_BUFFER_GPU);
 	}
 }
 
+ssh_d* GpuZX::memBuffer(bool primary) {
+	if(_TSTATE & ZX_BUFFER_GPU) {
+		return primary ? memoryPrimary : memoryBack;
+	} else {
+		return primary ? memoryBack: memoryPrimary;
+	}
+}
 void GpuZX::decodeColor(ssh_b color) {
 	bool inv = ((color & 128) ? ((invert & 15) >> 3) == 0 : false);
 	ssh_d ink1 = colours[(color & 7) | (color & 64) >> 3];
@@ -121,7 +142,7 @@ void GpuZX::decodeColor(ssh_b color) {
 void GpuZX::write(ssh_b* address, ssh_b val) {
 	ssh_w offs = (ssh_w)(address - memScreen);
 	int x, y;
-	ssh_d* addr = &memory[32 * 320 + 32];
+	ssh_d* addr = memBuffer(true);
 	if(offs >= 6144) {
 		// атрибуты
 		offs -= 6144;
@@ -158,13 +179,14 @@ void GpuZX::drawLine(ssh_d* addr, ssh_b val) {
 }
 
 bool GpuZX::saveScreen(ssh_cws path) {
-	bool result = true;
+	bool result = false;
 
-	theApp.pauseCPU(true, 0);
+	theApp.pauseCPU(true);
 
 	try {
 		_wsopen_s(&_hf, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
 		if(_hf != -1) {
+			result = true;
 			HEADER_TGA head;
 
 			head.bIdLength = 0;
@@ -177,24 +199,24 @@ bool GpuZX::saveScreen(ssh_cws path) {
 
 			head.wXorg = 0;
 			head.wYorg = 0;
-			head.wWidth = 320;
-			head.wHeight = 256;
+			head.wWidth = 288;
+			head.wHeight = 224;
 
 			head.bBitesPerPixel = 32;
 			head.bFlags = 0x28;
 
 			if(_write(_hf, &head, sizeof(HEADER_TGA)) != sizeof(HEADER_TGA)) throw(0);
-			ssh_d* ptr = (memory + 320 * 255);
+			ssh_d* ptr = (memoryPrimary + 288 * 223);
 			for(int i = 0; i < 256; i++) {
-				if(_write(_hf, ptr, 1280) != 1280) throw(0);
-				ptr -= 320;
+				if(_write(_hf, ptr, 1152) != 1152) throw(0);
+				ptr -= 288;
 			}
 		}
 	} catch(...) { result = false; }
 
 	SAFE_CLOSE1(_hf);
 
-	theApp.pauseCPU(false, 0);
+	theApp.pauseCPU(false);
 
 	return result;
 }

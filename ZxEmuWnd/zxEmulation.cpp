@@ -10,6 +10,8 @@
 static ssh_w old_tstate = 0;
 static int idsModel[] = {IDM_48K, IDM_128K, 0};
 static int idsPP[] = {IDM_PP_NONE, IDM_PP_MIXED, IDM_PP_BILINEAR, 0};
+static int idsAR[] = {IDM_1X, IDM_2X, IDM_3X, IDM_4X, IDM_AS_IS, 0};
+
 static CRITICAL_SECTION cs;
 
 HMENU hMenu = nullptr;
@@ -65,13 +67,13 @@ ssh_w modifyTSTATE(int adding, int remove) {
 	return _TSTATE;
 }
 
-void zxEmulation::pauseCPU(bool isPause, int adding) {
+void zxEmulation::pauseCPU(bool isPause) {
 	if(isPause) {
 		old_tstate = _TSTATE;
 		modifyTSTATE(0, ZX_EXEC);
 		Wow64SuspendThread(hCpuThread);
 	} else {
-		modifyTSTATE(old_tstate | adding, 0xffff);
+		modifyTSTATE(old_tstate, 0xffff);
 		ResumeThread(hCpuThread);
 	}
 }
@@ -122,7 +124,7 @@ zxEmulation::zxEmulation() : zxWnd() {
 }
 
 zxEmulation::~zxEmulation() {
-	pauseCPU(true, 0);
+	pauseCPU(true);
 	//	CloseHandle(hCpuThread);
 	SAFE_DELETE(debug);
 	SAFE_DELETE(snd);
@@ -179,11 +181,9 @@ bool zxEmulation::onCommand(int wmId, int param, LPARAM lParam) {
 			dlg.create(IDD_DIALOG_SETTINGS, this, true);
 			break;
 		}
-		case IDM_1X: break;
-		case IDM_2X: break;
-		case IDM_3X: break;
-		case IDM_4X: break;
-		case IDM_AS_IS: break;
+		case IDM_1X: case IDM_2X: case IDM_3X: case IDM_4X: case IDM_AS_IS: 
+			checkedModelOrPP(hMenu, OPT_ASPECT_RATIO, wmId - IDM_1X, idsAR); break;
+			break;
 		case 1000: case 1001: case 1002: case 1003: case 1004:
 		case 1005: case 1006: case 1007: case 1008: case 1009:
 			mii.fMask = MIIM_TYPE;
@@ -258,6 +258,33 @@ bool zxEmulation::onClose() {
 	setOrGetWndPos(debug->getHWND(), OPT_WND_DEBUG_POS, true, false);
 	setOrGetWndPos(keyboard->getHWND(), OPT_WND_KEY_POS, true, false);
 	return true;
+}
+
+int zxEmulation::onCalcSize(bool isParams, LPARAM lParam) {
+	return 0;
+	int mode = getOpt(OPT_ASPECT_RATIO)->dval;
+	int cx = 288, cy = 224;
+	switch(mode) {
+		case AR_2X: cx *= 2; cy *= 2; break;
+		case AR_3X: cx *= 3; cy *= 3; break;
+		case AR_4X: cx *= 4; cy *= 4; break;
+		case AR_AS_IS: return 0;
+	}
+	if(isParams) {
+		auto lp = (LPNCCALCSIZE_PARAMS)lParam;
+		LPRECT r = &lp->rgrc[1];
+		RECT r1;
+		SetRect(&lp->rgrc[2], r->left, r->top, r->right, r->bottom);
+
+		SetRect(&r1, r->left, r->top, r->left + cx + 16, r->top + cy + 50);
+		SetRect(&lp->rgrc[0], r1.left + 8, r1.top + 50, r1.right - 8, r1.bottom - 8);
+		memcpy(&lp->rgrc[1], &r1, sizeof(RECT));
+		return WVR_VALIDRECTS;
+	}
+	auto lp = (LPRECT)lParam;
+	lp->right = lp->left + cx + 8;
+	lp->bottom = lp->top + cy + 8;
+	return 0;
 }
 
 bool zxEmulation::onSize(WPARAM type, int nWidth, int nHeight) {

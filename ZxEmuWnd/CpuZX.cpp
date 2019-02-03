@@ -188,13 +188,14 @@ void CpuZX::execute(bool run_debugger) {
 }
 
 bool CpuZX::saveStateZX(const StringZX& path) {
-	bool result = true;
+	bool result = false;
 
-	theApp.pauseCPU(true, 0);
+	theApp.pauseCPU(true);
 
 	try {
 		_wsopen_s(&_hf, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
 		if(_hf != -1) {
+			result = true;
 			ssh_b model = (ssh_b)theApp.getOpt(OPT_MEM_MODEL)->dval;
 
 			if(_write(_hf, &model, 1) != 1) throw(0);
@@ -212,19 +213,20 @@ bool CpuZX::saveStateZX(const StringZX& path) {
 
 	SAFE_CLOSE1(_hf);
 
-	theApp.pauseCPU(false, 0);
+	theApp.pauseCPU(false);
 
 	return result;
 }
 
 bool CpuZX::loadStateZX(const StringZX& path) {
-	bool result = true;
+	bool result = false;
 
-	theApp.pauseCPU(true, 0);
+	theApp.pauseCPU(true);
 
 	try {
 		_wsopen_s(&_hf, path, _O_RDONLY | _O_BINARY, _SH_DENYRD, _S_IREAD);
 		if(_hf != -1) {
+			result = true;
 			ssh_b model;
 
 			auto l = _filelength(_hf);
@@ -248,7 +250,7 @@ bool CpuZX::loadStateZX(const StringZX& path) {
 	
 	SAFE_CLOSE1(_hf);
 
-	theApp.pauseCPU(false, ZX_BORDER | ZX_SOUND);
+	theApp.pauseCPU(false);
 
 	return result;
 }

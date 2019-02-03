@@ -33,7 +33,7 @@ bool loadZ80(const StringZX& path) {
 	ssh_b* ptr;
 	long sz;
 
-	theApp.pauseCPU(true, 0);
+	theApp.pauseCPU(true);
 
 	try {
 		_wsopen_s(&_hf, path, _O_RDONLY | _O_BINARY, _SH_DENYRD, _S_IREAD);
@@ -97,20 +97,21 @@ bool loadZ80(const StringZX& path) {
 	SAFE_CLOSE1(_hf);
 	SAFE_DELETE(pptr);
 
-	theApp.pauseCPU(false, ZX_BORDER);
+	theApp.pauseCPU(false);
 
 	return result;
 }
 
 bool saveZ80(const StringZX& path) {
 	ssh_b* pptr = nullptr;
-	bool result = true;
+	bool result = false;
 
-	theApp.pauseCPU(true, 0);
+	theApp.pauseCPU(true);
 
 	try {
 		_wsopen_s(&_hf, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
-		if(_hf) {
+		if(_hf != -1) {
+			result = true;
 			HEAD1_Z80 z80;
 			z80.AF = *(ssh_w*)&regsZX[RA];
 			z80.IX = *(ssh_w*)&regsZX[RIXL];
@@ -171,7 +172,7 @@ bool saveZ80(const StringZX& path) {
 	SAFE_CLOSE1(_hf);
 	SAFE_DELETE(pptr);
 
-	theApp.pauseCPU(false, 0);
+	theApp.pauseCPU(false);
 
 	return result;
 }

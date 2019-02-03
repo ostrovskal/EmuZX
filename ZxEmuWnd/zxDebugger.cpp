@@ -196,7 +196,7 @@ void zxDebugger::updateHexDec(bool change) {
 		updateRegisters(_pc, U_PC | U_SP | U_REGS);
 		InvalidateRect(hWndSP, nullptr, false);
 		InvalidateRect(hWndDA, nullptr, false);
-		InvalidateRect(hWndDT, nullptr, false);
+		InvalidateRect(hWndDT, nullptr, true);
 	}
 	if(toolbar) SendMessage(toolbar->getHWND(), TB_SETSTATE, IDM_HEX_DEC, TBSTATE_ENABLED | opt->dval);
 }
@@ -215,7 +215,7 @@ bool zxDebugger::onClose() {
 void zxDebugger::onInitDialog(HWND hWnd, LPARAM lParam) {
 	hWndDA = zxDA.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 5, 33, 379, 515, this, IDC_LIST_DA, 0);
 	hWndSP = zxSP.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 390, 320, 171, 225, this, IDC_LIST_SP, 0);
-	hWndDT = zxDT.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 5, 575, 558, 177, this, IDC_LIST_DT, 0);
+	hWndDT = zxDT.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 5, 575, 558, 131, this, IDC_LIST_DT, 0);
 
 	for(auto& zx : dlgElems) {
 		zx.hWndMain = GetDlgItem(hWnd, zx.idMain);
@@ -235,7 +235,7 @@ void zxDebugger::onInitDialog(HWND hWnd, LPARAM lParam) {
 
 	SendMessage(hWndDT, WM_SETFONT, WPARAM(hFont), TRUE);
 	SendMessage(hWndDT, LB_SETITEMHEIGHT, 0, 16);
-	SendMessage(hWndDT, LB_SETCOUNT, 4096, 0);
+	SendMessage(hWndDT, LB_SETCOUNT, 4097, 0);
 	_sp = -1;
 }
 
@@ -261,12 +261,14 @@ bool zxDebugger::onDrawItem(UINT id, LPDRAWITEMSTRUCT dis) {
 		txt = StringZX::fmt(dec ? L"%s%05d %05d %s" : L"%s%04X %04X %s", sp, idx, val, chars.buffer());
 	} else if(id == IDC_LIST_DT) {
 		// адресс 16 значений текстовое представление
-		auto idx = _dt + (item * 16);
+		auto idx = (_dt % 16) + (item * 16);
+		if(idx > 65535) return true;
 		StringZX vals(fromNum(idx, radix[dec + 22]));
 		vals += L"  ";
 		StringZX chars;
 		for(int i = 0; i < 16; i++) {
-			ssh_w v = (ssh_w)memZX[idx + i];
+			if(idx > 65535) break;
+			ssh_w v = (ssh_w)memZX[idx++];
 			fromNum(v, radix[dec + 2]);
 			vals += tmpBuf;
 			if(v < 32) v = 32;
@@ -280,6 +282,24 @@ bool zxDebugger::onDrawItem(UINT id, LPDRAWITEMSTRUCT dis) {
 	SetTextColor(hdc, GetSysColor(isStat ? COLOR_BTNHIGHLIGHT : COLOR_WINDOWTEXT));
 	DrawText(hdc, txt, (int)txt.length(), &dis->rcItem, DT_SINGLELINE | DT_LEFT | DT_EXPANDTABS);
 	return true;
+}
+
+struct ZX_REG_TMP {
+	ssh_w* ptr;
+	ssh_cws name;
+};
+	
+static ZX_REG_TMP regs[] = {
+	{(ssh_w*)&regsZX[RC + 8], L"BC'"}, {(ssh_w*)&regsZX[RE + 8], L"DE'"}, {(ssh_w*)&regsZX[RL + 8], L"HL'"},
+	{(ssh_w*)&regsZX[RC], L"BC"}, {(ssh_w*)&regsZX[RE], L"DE"}, {(ssh_w*)&regsZX[RL], L"HL"},
+	{(ssh_w*)&regsZX[RSPL], L"SP"},{&_PC, L"PC"}, {(ssh_w*)&regsZX[RIXL], L"IX"}, {(ssh_w*)&regsZX[RIYL], L"IY"}
+};
+
+int zxDebugger::comparePredefinedNames(ssh_cws buf) {
+	for(auto& r : regs) {
+		if(wcscmp(r.name, buf) == 0) return *r.ptr;
+	}
+	return -1;
 }
 
 bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
@@ -378,8 +398,12 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 		case IDC_BUTTON_SET_DATA: {
 			HWND h = GetDlgItem(hWnd, IDC_EDIT_ADDRESS_DATA);
 			GetWindowText(h, tmpBuf, 260);
-			_dt = *(ssh_w*)asm_ssh_wton(tmpBuf, (ssh_u)Radix::_dec);
-			InvalidateRect(hWndDT, nullptr, false);
+			auto addr = comparePredefinedNames(tmpBuf);
+			if(addr != -1) _dt = addr; else {
+				_dt = *(ssh_w*)asm_ssh_wton(tmpBuf, (ssh_u)Radix::_dec);
+			}
+			SendMessage(hWndDT, LB_SETTOPINDEX, _dt / 16, 0);
+			InvalidateRect(hWndDT, nullptr, true);
 			break;
 		}
 		case IDC_BUTTON_SET_COMMAND: {
@@ -435,7 +459,7 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 					_pc = da->move(_pc, delta);
 					_lastPC = da->decode(_pc, countVisibleItems);
 					SendMessage(hWndDA, LB_SETTOPINDEX, _pc, 0);
-					InvalidateRect(hWnd, nullptr, false);
+					//InvalidateRect(hWnd, nullptr, false);
 					break;
 				}
 				case LBN_DBLCLK: {
@@ -448,7 +472,7 @@ bool zxDebugger::onCommand(int wmId, int param, LPARAM lParam) {
 						if(addr1 != -1) {
 							fromNum(addr1, radix[dec + 22]);
 							SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS_DATA), tmpBuf);
-							SendMessage(hWndDT, LB_SETTOPINDEX, addr1 / 16, 0);
+							_dt = addr1; SendMessage(hWndDT, LB_SETTOPINDEX, _dt / 16, 0);
 						}
 					}
 					break;
