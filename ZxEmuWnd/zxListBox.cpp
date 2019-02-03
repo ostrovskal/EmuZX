@@ -124,11 +124,16 @@ bool zxListBox::onScroll(UINT code, UINT p, HWND hWndScroll, int type) {
 		int pos = si.nPos;
 
 		switch(code) {
-			case SB_LINEDOWN: if(pos < si.nMax) pos++; break;
-			case SB_LINEUP: if(pos > si.nMin) pos--; break;
-			case SB_PAGEDOWN: pos += si.nPage; if(pos > si.nMax) pos = si.nMax; break;
-			case SB_PAGEUP: pos -= si.nPage; if(pos < si.nMin) pos = si.nMin; break;
-			case SB_THUMBTRACK: pos = p; if(pos < si.nMin) pos = si.nMin; if(pos > si.nMax) pos = si.nMax; break;
+			case SB_LINEDOWN: pos++; break;
+			case SB_LINEUP: pos--; break;
+			case SB_PAGEDOWN: pos += si.nPage; break;
+			case SB_PAGEUP: pos -= si.nPage; break;
+			case SB_THUMBTRACK: pos = p; break;
+		}
+		if(pos >= (si.nMax - countVisibleItems)) {
+			pos = si.nMax - countVisibleItems;
+		} else if(pos < si.nMin) {
+			pos = si.nMin;
 		}
 		topIndex = pos;
 		si.nPos = pos;

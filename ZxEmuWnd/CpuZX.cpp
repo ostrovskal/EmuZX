@@ -68,6 +68,9 @@ ssh_w* _DE;
 ssh_w* _HL;
 ssh_w* _SP;
 
+// скан строка
+ssh_b* _SCAN;
+
 // статус
 volatile ssh_w _TSTATE;
 
@@ -100,6 +103,7 @@ void CpuZX::signalRESET() {
 	_RAM = &regsZX[RAM];
 	_ROM = &regsZX[ROM];
 	_VID = &regsZX[VID];
+	_SCAN = &regsZX[SCAN];
 	_TRAP = &regsZX[RTRAP];
 
 	_BC = (ssh_w*)&regsZX[RC];
@@ -112,7 +116,7 @@ void CpuZX::signalRESET() {
 	*_IFF1 = *_IFF2 = 0;
 	*_PORT_FE = 224;
 	*_PORT_FD = 192;
-	*_RAM = *_ROM = *_VID = 0;
+	*_RAM = *_ROM = *_VID = *_SCAN = 0;
 	_PC = 0;
 
 	SAFE_DELETE(ptrROM); szROM = 0;
@@ -156,7 +160,7 @@ void CpuZX::signalINT() {
 				decoder->execCALL(0x38);
 				break;
 			case 2:
-				decoder->execCALL(decoder->read_mem16(*_I * 256 + 254));
+				decoder->execCALL(decoder->read_mem16((*_I) * 256 + 254));
 				break;
 		}
 		decoder->incrementR();

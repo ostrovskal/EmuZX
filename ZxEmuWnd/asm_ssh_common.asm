@@ -576,9 +576,14 @@ asm_ssh_wton proc public
 		setz r13b
 		cmp word ptr [rcx], '-'
 		setz r15b
-		lea rcx, [rcx + r15 * 2]
 		lea rcx, [rcx + r13 * 2]
-nznak:	mov r10, rcx
+		lea rcx, [rcx + r15 * 2]
+		mov r10, 3
+		cmp word ptr [rcx], '#'
+		setz r13b
+		lea rcx, [rcx + r13 * 2]
+		cmovz rdx, r10
+		mov r10, rcx
 		xor r13, r13
 		mov r9, offset radix
 		imul rdx, 24

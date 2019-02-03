@@ -165,7 +165,8 @@ ssh_cws zxWnd::registerClass(ssh_cws name, int idMenu, WNDPROC proc) {
 }
 
 HWND zxWnd::create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, int x, int y, int cx, int cy, zxWnd* wndParent, UINT nID, UINT nMenu) {
-	if(!preCreate()) return false;
+	if(hWnd) return 0;
+	if(!preCreate()) return 0;
 	HookWindowCreate(this);
 	if(!(hWnd = CreateWindowW(registerClass(className, nMenu, MainWndProc), windowName, dwStyle, 
 							  x, y, cx, cy, (wndParent ? wndParent->hWnd : nullptr), nullptr, hInst, nullptr)))

@@ -16,7 +16,7 @@ public:
 
 	SoundZX() : dSnd(nullptr), sndBuf0(nullptr) { sndStk.lp = nullptr; init(44100); }
 	virtual ~SoundZX() { uninit();  }
-	void execute(DWORD tm);
+	void execute(ssh_u tm);
 protected:
 	LPDIRECTSOUND dSnd;
 	LPDIRECTSOUNDBUFFER	sndBuf0;

@@ -182,13 +182,10 @@ public:
 	StringZX makeCommand(ssh_d num, int flags);
 
 	// вернуть адрес операнда комманды передачи управления(CALL, JP, JR)/загрузки или взятия адреса(LD A/RP, NN/LD A/RP,[NN]/ LD [NN], A/RP)
-	int getCmdOperand(ssh_d num, bool pc);
+	void getCmdOperand(ssh_d num, bool pc, bool call, bool ret, int* addr1, int* addr2);
 
 	// вернуть адрес комманды
 	int getCmdAddress(ssh_d num) const;
-
-	// вернуть признак того, что текущая команда передает управление
-	bool isJump(ssh_d num);
 
 	// вернуть индекс комманды по ее адресу
 	int indexFromAddress(ssh_d pc) const;

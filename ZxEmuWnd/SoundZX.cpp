@@ -7,12 +7,12 @@ int play_index = 0;
 int cur_index = 0;
 
 int cur_signal = -1;
-DWORD old_tm = 0;
+ssh_u old_tm = 0;
 
 ssh_w buffer[16384];
 
-void SoundZX::execute(DWORD new_tm) {
-	ssh_d tm = (new_tm - old_tm);
+void SoundZX::execute(ssh_u new_tm) {
+	ssh_u tm = (new_tm - old_tm);
 	if((_TSTATE & ZX_SOUND) == 0) {
 		if(tm > 32768) {
 			cur_signal = -1;

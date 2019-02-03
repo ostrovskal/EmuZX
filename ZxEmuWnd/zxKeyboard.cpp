@@ -188,7 +188,9 @@ void zxKeyboard::processKeys() {
 		case 0:
 			val1 = memZX[23658];
 			val2 = memZX[23611];
-			if(val1 & 8) nmode = KM_C; else { if(val2 & 8) nmode = KM_L; else if(val1 & 16) nmode = KM_K; }
+			if(val2 & 8) {
+				nmode = (val1 & 8) ? KM_C : KM_L;
+			} else if(val1 & 16) nmode = KM_K;
 			if(sh) nmode = KM_SH_KL;
 			if(nmode == KM_L && (vkKeys[VK_CONTROL] & 0x80)) nmode = KM_CH;
 			break;

@@ -34,6 +34,7 @@ enum CPU_REG {
 	RAM,
 	ROM,
 	VID,
+	SCAN,
 	RPC_EXIT_CALL1,
 	RPC_EXIT_CALL2,
 	COUNT_REGS
@@ -93,7 +94,6 @@ extern ssh_b portsZX[65536];
 
 class CpuZX;
 class GpuZX;
-class BorderZX;
 class SoundZX;
 class zxDebugger;
 class zxKeyboard;
@@ -146,7 +146,6 @@ protected:
 	virtual bool onSize(WPARAM type, int nWidth, int nHeight) override;
 	virtual bool onKey(int nVirtKey, LPARAM keyData, bool pressed) override;
 	virtual bool onNotify(LPNMHDR nm) override;
-	virtual void postCreate() override;
 
 	void modifyMRU(StringZX path);
 	bool checkedModelOrPP(HMENU hMenu, int id_opt, int val, int* ids);
@@ -154,11 +153,10 @@ protected:
 	void changeSound(bool change);
 	bool changeState(int id_opt, int id, bool change);
 
-	BorderZX*	brd;
 	SoundZX*	snd;
 
-	ssh_d delayCPU;
-	ssh_d delayGPU;
+	ssh_u delayCPU;
+	ssh_u delayGPU;
 
 	HMENU hMenuMRU;
 	HMENU hMenuPP;

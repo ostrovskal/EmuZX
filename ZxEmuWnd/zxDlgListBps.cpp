@@ -9,6 +9,7 @@ static LVCOLUMN columns[] = {
 	{LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_MINWIDTH | LVCF_IDEALWIDTH | LVCF_DEFAULTWIDTH, LVCFMT_LEFT, 120, L"Диапазон", 0, 0, 0, 0, 50, 50, 50},
 	{LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_MINWIDTH | LVCF_IDEALWIDTH | LVCF_DEFAULTWIDTH, LVCFMT_LEFT, 70, L"Условие", 0, 0, 0, 0, 20, 20, 20},
 	{LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_MINWIDTH | LVCF_IDEALWIDTH | LVCF_DEFAULTWIDTH, LVCFMT_LEFT, 60, L"Значение", 0, 0, 0, 0, 40, 40, 40},
+	{LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_MINWIDTH | LVCF_IDEALWIDTH | LVCF_DEFAULTWIDTH, LVCFMT_LEFT, 60, L"Маска", 0, 0, 0, 0, 40, 40, 40},
 	{LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_MINWIDTH | LVCF_IDEALWIDTH | LVCF_DEFAULTWIDTH, LVCFMT_CENTER, 70, L"Тип доступа", 0, 0, 0, 0, 40, 40, 40},
 };
 
@@ -58,7 +59,7 @@ bool zxDlgListBps::onCommand(int wmId, int param, LPARAM lParam) {
 				} else {
 					for(int i = 0; i < COUNT_BP; i++) {
 						auto bp = &bps[i];
-						if(bp->address1 == -1) {
+						if(!(bp->flags & FBP_ADDR)) {
 							// установка
 							memcpy(bp, _bp, sizeof(ZX_BREAK_POINT));
 							break;
@@ -144,6 +145,7 @@ void zxDlgListBps::setItems() {
 	auto dec = theApp.getOpt(OPT_DECIMAL)->dval;
 
 	ListView_DeleteAllItems(hWndList);
+	itemSelected = -1;
 
 	memset(&lvi, 0, sizeof(LVITEM));
 	lvi.mask = LVIF_TEXT;
@@ -151,7 +153,7 @@ void zxDlgListBps::setItems() {
 
 	for(int i = 0; i < COUNT_BP; i++) {
 		auto bp = &theApp.debug->bps[i];
-		if(bp->address1 == -1) continue;
+		if(!(bp->flags & FBP_ADDR)) continue;
 		lvi.iItem = i;
 
 		lvi.iSubItem = 0;
@@ -165,15 +167,20 @@ void zxDlgListBps::setItems() {
 		SendMessage(hWndList, LVM_SETITEM, 1, (LPARAM)&lvi);
 
 		lvi.iSubItem = 2;
-		lvi.pszText = (bp->value == -1) ? L"" : cond_bp[(bp->flags & FBP_COND) >> 2];
-		SendMessage(hWndList, LVM_SETITEM, 3, (LPARAM)&lvi);
-
-		lvi.iSubItem = 3;
-		lvi.pszText = (bp->value == -1) ? L"" : fromNum(bp->value, radix[dec + 16]);
+		lvi.pszText = (bp->flags & FBP_VAL) ? cond_bp[(bp->flags & FBP_COND) >> 2] : L"";
 		SendMessage(hWndList, LVM_SETITEM, 2, (LPARAM)&lvi);
 
-		lvi.iSubItem = 4;
-		lvi.pszText = (bp->flags & FBP_MEM) ? L"MEM" : L"PC";
+		lvi.iSubItem = 3;
+		lvi.pszText = (bp->flags & FBP_VAL) ? fromNum(bp->value, radix[dec + 16]) : L"";
 		SendMessage(hWndList, LVM_SETITEM, 3, (LPARAM)&lvi);
+
+		lvi.iSubItem = 4;
+		lvi.pszText = (bp->flags & (FBP_VAL | FBP_MASK)) == (FBP_VAL | FBP_MASK) ? fromNum(bp->mask, radix[dec + 16]) : L"";
+		SendMessage(hWndList, LVM_SETITEM, 4, (LPARAM)&lvi);
+
+		lvi.iSubItem = 5;
+		lvi.pszText = (bp->flags & FBP_MEM) ? L"MEM" : L"PC";
+		SendMessage(hWndList, LVM_SETITEM, 5, (LPARAM)&lvi);
 	}
+	updateItems();
 }

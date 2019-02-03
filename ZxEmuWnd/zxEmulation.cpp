@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "CpuZX.h"
 #include "GpuZX.h"
-#include "BorderZX.h"
 #include "SoundZX.h"
 #include "zxDebugger.h"
 #include "zxKeyboard.h"
@@ -118,23 +117,25 @@ zxEmulation::zxEmulation() : zxWnd() {
 	hCpuThread = nullptr;
 	zilog = nullptr;
 	gpu = nullptr;
-	brd = nullptr;
 	snd = nullptr;
 	debug = nullptr;
 }
 
 zxEmulation::~zxEmulation() {
 	pauseCPU(true, 0);
-//	CloseHandle(hCpuThread);
+	//	CloseHandle(hCpuThread);
 	SAFE_DELETE(debug);
 	SAFE_DELETE(snd);
-	SAFE_DELETE(brd);
 	SAFE_DELETE(gpu);
 	SAFE_DELETE(zilog);
 	DeleteCriticalSection(&cs);
 }
 
 static ssh_d WINAPI ProcCPU(void* params) {
+	return theApp.procCPU();
+}
+
+ssh_d zxEmulation::procCPU() {
 	LARGE_INTEGER sample;
 	QueryPerformanceFrequency(&sample);
 
@@ -142,26 +143,29 @@ static ssh_d WINAPI ProcCPU(void* params) {
 
 	QueryPerformanceCounter(&sample);
 
-	DWORD sndTm = 0;
-	DWORD startCpu = sample.LowPart;
-	DWORD startBrd = startCpu;
-	DWORD startGpu = startCpu / ms;
+	ssh_u sndTm = 0;
+	ssh_u startCpu = sample.LowPart;
+	ssh_u startBrd = startCpu;
+	ssh_u startGpu = startCpu;
 
 	while(!(_TSTATE & ZX_TERMINATE)) {
 		QueryPerformanceCounter(&sample);
-		DWORD current = sample.LowPart;
-		DWORD millis = current / ms;
-		if((millis - startGpu) > theApp.delayGPU) { theApp.gpu->execute(); startGpu = millis; }
+		ssh_u current = sample.LowPart;
+		if((current - startGpu) > (ms * delayGPU)) {
+			gpu->showScreen();
+			*_TRAP = 1; startGpu = current;
+		}
 		if((_TSTATE & ZX_EXEC)) {
-			if((current - startCpu) > theApp.delayCPU) {
-				theApp.zilog->execute(false); startCpu = current;
-				if(theApp.getOpt(OPT_SOUND)->dval) theApp.snd->execute(sndTm++);
+			if((current - startCpu) > delayCPU) {
+				zilog->execute(false); startCpu = current;
+				if(getOpt(OPT_SOUND)->dval) snd->execute(sndTm++);
 			}
-			if((current - startBrd) > (theApp.delayCPU * 16)) { theApp.brd->execute(); startBrd = current; }
+			if((current - startBrd) > (delayCPU * 16)) {
+				gpu->execute();
+				startBrd = current;
+			}
 		}
 	}
-
-	modifyTSTATE(0, ZX_TERMINATE);
 
 	return 0;
 }
@@ -208,8 +212,8 @@ bool zxEmulation::onCommand(int wmId, int param, LPARAM lParam) {
 					opts.nameLoadProg = folder.substr(pos, folder.find_rev(L'.') - pos);
 					modifyMRU(folder);
 				}
-				break;
 			}
+			break;
 		case IDM_SAVE:
 			if(dlgSaveOrOpenFile(false, L"Сохранение", L"Снепшот\0*.z80\0Состояние\0*.zx\0Экран\0*.tga\0", L"z80", folder)) {
 				StringZX ext(folder.substr(folder.find_rev(L'.') + 1).lower());
@@ -308,10 +312,6 @@ bool zxEmulation::onNotify(LPNMHDR nm) {
 	return false;
 }
 
-void zxEmulation::postCreate() {
-
-}
-
 int zxEmulation::run() {
 	if(!create(L"EmuWnd", L"EmuWnd", WS_CLIPCHILDREN | WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 640, 554, nullptr, 0, IDC_ZXEMUWND))
 		return -1;
@@ -357,7 +357,6 @@ int zxEmulation::run() {
 	}
 
 	gpu = new GpuZX;
-	brd = new BorderZX;
 	snd = new SoundZX;
 
 	debug->updateRegisters(_PC, zxDebugger::U_PC | zxDebugger::U_REGS | zxDebugger::U_SEL | zxDebugger::U_SP | zxDebugger::U_TOP);
@@ -372,16 +371,19 @@ int zxEmulation::run() {
 	MSG msg;
 
 	while(::GetMessage(&msg, NULL, NULL, NULL)) {
-		//if(!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
-			//if(!IsDialogMessage(msg.hwnd, &msg)) {
+//		if(!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
+//			if(!IsDialogMessage(msg.hwnd, &msg)) {
 				TranslateMessage(&msg);
 				DispatchMessage(&msg);
 //			}
-	//	}
+//		}
 	}
 	opts.save(opts.mainDir + L"settings.zx");
 	zilog->saveStateZX(opts.mainDir + L"auto_state.zx");
 	
+	DestroyWindow(hWnd);
+//	detach();
+
 	modifyTSTATE(ZX_TERMINATE, 0);
 	TerminateThread(hCpuThread, 0);
 

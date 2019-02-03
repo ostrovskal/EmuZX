@@ -111,7 +111,7 @@ void SettingsZX::save(const StringZX& path) {
 				case OPTT_BOOL:
 					value = o.dval ? L"true" : L"false";
 					break;
-				case OPTT_STRING:
+				default:
 					value = o.sval;
 					break;
 			}

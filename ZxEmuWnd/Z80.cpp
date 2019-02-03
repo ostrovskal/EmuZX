@@ -29,7 +29,7 @@ void decodePage(ssh_b* ptr, ssh_b* dst, ssh_b* dstE, int sz, bool packed) {
 
 bool loadZ80(const StringZX& path) {
 	ssh_b* pptr = nullptr;
-	bool result = true;
+	bool result = false;
 	ssh_b* ptr;
 	long sz;
 
@@ -37,7 +37,8 @@ bool loadZ80(const StringZX& path) {
 
 	try {
 		_wsopen_s(&_hf, path, _O_RDONLY | _O_BINARY, _SH_DENYRD, _S_IREAD);
-		if(_hf) {
+		if(_hf != -1) {
+			result = true;
 			sz = _filelength(_hf);
 			pptr = new ssh_b[sz];
 			ptr = pptr;

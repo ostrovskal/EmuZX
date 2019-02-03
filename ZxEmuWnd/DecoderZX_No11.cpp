@@ -11,9 +11,6 @@ void DecoderZX::funcN11_000() {
 	bool flg = false;
 	if(typeOps < 6) {
 		if(typeOps > 0) nn = read_mem16PC();
-		if(ops > 3) {
-			ops = ops;
-		}
 		if(!isFlag(ops)) return;
 	}
 	switch(typeOps) {

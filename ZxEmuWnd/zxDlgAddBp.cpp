@@ -11,6 +11,7 @@ void zxDlgAddBp::onInitDialog(HWND hWnd, LPARAM lParam) {
 	hWndAddr1 = GetDlgItem(hWnd, IDC_EDIT_ADDRESS1);
 	hWndAddr2 = GetDlgItem(hWnd, IDC_EDIT_ADDRESS2);
 	hWndValue = GetDlgItem(hWnd, IDC_EDIT_VALUE);
+	hWndMsk = GetDlgItem(hWnd, IDC_EDIT_MASK);
 
 	hWndOK = GetDlgItem(hWnd, IDOK);
 
@@ -21,10 +22,11 @@ void zxDlgAddBp::onInitDialog(HWND hWnd, LPARAM lParam) {
 
 	if(_bp) {
 		auto dec = theApp.getOpt(OPT_DECIMAL)->dval;
-		SetWindowText(hWndAddr1, fromNum(_bp->address1, radix[dec + 10]));
-		SetWindowText(hWndAddr2, fromNum(_bp->address2, radix[dec + 10]));
-		if(_bp->value != -1) SetWindowText(hWndValue, fromNum(_bp->value, radix[dec + 16]));
-		if(_bp->value != -1) SendMessage(hWndCond, CB_SETCURSEL, ((_bp->flags & FBP_COND) >> 2), 0);
+		if(_bp->flags & FBP_ADDR) SetWindowText(hWndAddr1, fromNum(_bp->address1, radix[dec + 10]));
+		if(_bp->flags & FBP_ADDR) SetWindowText(hWndAddr2, fromNum(_bp->address2, radix[dec + 10]));
+		if(_bp->flags & FBP_VAL) SetWindowText(hWndValue, fromNum(_bp->value, radix[dec + 16]));
+		if(_bp->flags & FBP_VAL) SendMessage(hWndCond, CB_SETCURSEL, ((_bp->flags & FBP_COND) >> 2), 0);
+		if(_bp->flags & FBP_VAL) SetWindowText(hWndMsk, fromNum(_bp->mask, radix[dec + 16]));
 		SendMessage(hWndAccess, CB_SETCURSEL, ((_bp->flags & FBP_ACCESS) >> 1), 0);
 	} else {
 		isAddr2 = true;
@@ -33,33 +35,39 @@ void zxDlgAddBp::onInitDialog(HWND hWnd, LPARAM lParam) {
 	updateAccess();
 }
 
-int zxDlgAddBp::getValue(HWND hWnd, int def) {
-	auto ret = (GetWindowText(hWnd, tmpBuf, 260) == 0) ?
-		def : *(int*)asm_ssh_wton(tmpBuf, ((theApp.getOpt(OPT_DECIMAL)->dval == 0) ? (ssh_u)Radix::_hex : (ssh_u)Radix::_dec));
-	return ret;
+int zxDlgAddBp::getValue(HWND hWnd, int flag) {
+	result.flags &= ~flag;
+	if(GetWindowText(hWnd, tmpBuf, 260) == 0) return 0;
+	result.flags |= flag;
+	return *(int*)asm_ssh_wton(tmpBuf, (ssh_u)Radix::_dec);
 }
 
 bool zxDlgAddBp::onCommand(int wmId, int param, LPARAM lParam) {
 	switch(wmId) {
 		case IDOK: {
-			result.address1 = getValue(hWndAddr1, -1);
-			result.address2 = getValue(hWndAddr2, result.address1);
-			result.value = getValue(hWndValue, -1);
+			result.address1 = getValue(hWndAddr1, FBP_ADDR);
+			result.address2 = getValue(hWndAddr2, FBP_ADDR);
 			auto f = (int)SendMessage(hWndAccess, CB_GETCURSEL, 0, 0);
-			if(result.address1 > 65535 || result.address2 > 65535 || (f == 1 && result.value > 255)) {
-				MessageBox(hWnd, L"Слишком большие величины. Недопустимо заданы адреса/значение!", L"Ошибка", MB_ICONERROR);
+			if(f == 1) {
+				result.value = getValue(hWndValue, FBP_VAL);
+				result.mask = getValue(hWndMsk, FBP_MASK);
+			}
+			if(result.address1 > 65535 || result.address2 > 65535 ||
+			   (f == 1 && result.flags & FBP_VAL && result.value > 255) ||
+			   (f == 1 && result.flags & FBP_MASK && result.mask > 255)) {
+				MessageBox(hWnd, L"Слишком большие величины. Недопустимо заданы адреса/значение/маска !", L"Ошибка", MB_ICONERROR);
 				return false;
 			}
 			if(result.address1 > result.address2) {
 				MessageBox(hWnd, L"Начальный адрес диапазона должен быть меньше последнего!", L"Ошибка", MB_ICONERROR);
 				return false;
 			}
-			result.flags = ((f == -1) ? 0 : 1 << f);
+			result.flags |= ((f == -1) ? 0 : 1 << f);
 			if(f == 1) {
 				f = (int)SendMessage(hWndCond, CB_GETCURSEL, 0, 0);
 				result.flags |= (f == -1 ? 0 : (f << 2));
 			} else {
-				result.value = -1;
+				result.flags &= ~(FBP_VAL | FBP_MASK);
 			}
 			break;
 		}
@@ -87,5 +95,5 @@ bool zxDlgAddBp::onCommand(int wmId, int param, LPARAM lParam) {
 
 void zxDlgAddBp::updateAccess() {
 	auto f = (SendMessage(hWndAccess, CB_GETCURSEL, 0, 0) == 1);
-	EnableWindow(hWndCond, f); EnableWindow(hWndValue, f);
+	EnableWindow(hWndCond, f); EnableWindow(hWndValue, f); EnableWindow(hWndMsk, f);
 }

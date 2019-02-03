@@ -16,7 +16,7 @@ protected:
 	void updateAccess();
 	ZX_BREAK_POINT* _bp;
 	HWND hWndAddr1, hWndAddr2;
-	HWND hWndValue, hWndOK;
+	HWND hWndValue, hWndMsk, hWndOK;
 	HWND hWndCond, hWndAccess;
 	bool isAddr2, owner;
 };

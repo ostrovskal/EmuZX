@@ -3,14 +3,14 @@
 #include "zxDisAsm.h"
 #include "zxDebugger.h"
 
-static int operands[] = {4, 2, 6, 1, 8, 1, 16, 1, 10, 2, -1, 2, -1, 2, 18, 1};
+static int operands[] = {4, 2, 6, 1, 8, 1, 16, 1, 22, 2, -1, 2, -1, 2, 18, 1};
 
 ssh_cws radix[] = {	L"%02X", L"%03d", L"%02X ", L"%03d ",
 					L"(#%04X)", L"(%05d)", L"(#%02X)", L"(%03d)",
 					L"+#%02X)", L"%+03d)", L"%04X", L"%05d",
 					L"[#%04X]", L"[%05d]", L"{#%02X}", L"{%03d}",
 					L"#%02X", L"%d", L"%X", L"%d",
-					L"-#%02X)", L"-%02d)", L"#%04X", L"%05d"};
+					L"-#%02X)", L"-%03d)", L"#%04X", L"%05d"};
 
 ssh_cws namesCode[] = {	L"B", L"C", L"D", L"E", L"H", L"IXH", L"IYH", L"L", L"IXL", L"IYL", L"(HL)", L"(IX", L"(IY", L"A", L"F",
 						L"BC", L"DE", L"HL", L"AF", L"SP", L"IX", L"IY", L"R", L"I", L"IM ",
@@ -327,7 +327,8 @@ StringZX zxDisAsm::makeCommand(ssh_d num, int flags) {
 		if((flags & DA_FCODE) == DA_FCODE) {
 			StringZX code(makeCode(address, adrs[num + 1] - address, dec));
 			ssh_u l = code.length();
-			ssh_cws tabs = (l > 11 ? L"\t" : (l >= 8 ? L"\t\t" : L"\t\t\t"));
+			ssh_cws tabs = (l >= 8 ? L"\t" : L"\t\t");
+//			ssh_cws tabs = (l > 11 ? L"\t" : (l >= 8 ? L"\t\t" : L"\t\t\t"));
 			command += code + tabs;
 		}
 		ssh_b idx;
@@ -377,23 +378,64 @@ ssh_w zxDisAsm::move(ssh_w pc, int count) {
 	return _pc;
 }
 
-int zxDisAsm::getCmdOperand(ssh_d num, bool isPC) {
+void zxDisAsm::getCmdOperand(ssh_d num, bool isPC, bool isCall, bool isRet, int* addr1, int* addr2) {
 	if(adrs && num < cmdCount) {
 		_pc = adrs[num];
-		readOps();
+		*addr1 = *addr2 = -1;
+		auto b = memZX[_pc];
+		if(b == 0xdd || b == 0xfd || b == 0xed) _pc++;
 		if(isPC) {
-			// JP XXX, JP, CALL, CALL XXX, JR CC, JR. DJNZ
+			// JP			type = 3 code = 0
+			// JP XXX		type = 2
+			// CALL			type = 5 code = 1
+			// CALL XXX		type = 4
+			// DJNZ			type = 0 code = 2
+			// JR			type = 0 code = 3
+			// JR XXX		type = 0 code > 3
+			// RET			type = 1 code = 1
+			// RET CCC		type = 0
+			// RST			type = 7
+			// JP HL		type = 1 code = 5
+			readOps();
 			if(groupOps == 3) {
-				bool is = (typeOps == 2 || typeOps == 4) || (typeOps == 3 && codeOps == 0) || (typeOps == 5 && codeOps == 1);
-				if(is) return *(ssh_w*)(memZX + _pc);
+				bool is = (typeOps == 2 || typeOps == 7 || (typeOps == 3 && codeOps == 0) || (typeOps == 1 && codeOps == 5));
+				if(!is && isCall) is = (typeOps == 4 || (typeOps == 5 && codeOps == 1));
+				if(!is && isRet) is = ((typeOps == 1 && codeOps == 1) || typeOps == 0);
+				if(is) {
+					if(typeOps == 7) {
+						// rst
+						*addr1 = *(ssh_w*)(memZX + (codeOps << 3));
+						*addr2 = _pc;
+					}
+					else if((typeOps == 1 && codeOps == 1) || typeOps == 0) {
+						// ret
+						*addr1 = *(ssh_w*)(memZX + (*_SP));
+						*addr2 = _pc;
+					} else if(typeOps == 1 && codeOps == 5) {
+						// jp hl/ix/iy
+						ssh_w* reg = (b == 0xdd ? (ssh_w*)&regsZX[RIXL] : (b == 0xfd ? (ssh_w*)&regsZX[RIYL] : _HL));
+						*addr1 = *addr2 = *reg;
+					} else {
+						*addr1 = *(ssh_w*)(memZX + _pc);
+						*addr2 = (_pc + 2);
+					}
+				}
 			} else if(groupOps == 0 && typeOps == 0 && codeOps > 1) {
-				return ((_pc + 1) + (char)memZX[_pc]);
+				char d = (char)memZX[_pc++];
+				*addr1 = (_pc + d);
+				*addr2 = _pc;
 			}
 		} else {
-			// LD RP, NN/LD NN, RP/LD A/RP,[NN]/LD [NN], A/RP
+			// LD RP, (NN)/LD A,(NN)/LD (NN), RP/LD (NN), A
+			auto b1 = memZX[_pc++];
+			bool is = (b1 == 0x01 || b1 == 0x11 || b1 == 0x21 || b1 == 0x31 || b1 == 0x22 || b1 == 0x2a || b1 == 0x32 || b1 == 0x3a);
+			if(b == 0xed) {
+				b1 &= 0b01'001'011;
+				is = (b1 == 0b01'000'011 || b1 == 0b01'001'011);
+			}
+			*addr1 = *addr2 = (is ? *(ssh_w*)(memZX + _pc) : -1);
 		}
 	}
-	return -1;
 }
 
 int zxDisAsm::getCmdAddress(ssh_d num) const {
@@ -401,16 +443,6 @@ int zxDisAsm::getCmdAddress(ssh_d num) const {
 		return adrs[num];
 	}
 	return -1;
-}
-
-bool zxDisAsm::isJump(ssh_d num) {
-	if(adrs && num < cmdCount) {
-		// если RET/RECT CCC/JP/JP CCC/JR/JR CC/DJNZ
-		_pc = adrs[num];
-		if(readOps() == 3) return (typeOps == 0 || typeOps == 2 || typeOps == 7 || (typeOps == 1 && codeOps == 1) || (typeOps == 3 && codeOps == 0));
-		if(groupOps == 0) return (typeOps == 0 && codeOps > 1);
-	}
-	return false;
 }
 
 int zxDisAsm::indexFromAddress(ssh_d pc) const {

@@ -19,13 +19,7 @@ void DecoderZX::write_mem8(ssh_b* address, ssh_b val, ssh_w ron) {
 	if(_TSTATE & ZX_DEBUG) debug->checkBPS((ssh_w)(address - memZX), true);
 	if(address < limitROM) { if(_TSTATE & ZX_WRITE_ROM) *address = val; }
 	else if(address < limitScreen && (_TSTATE & ZX_WRITE_GPU)) gpu->write(address, val);
-	else {
-		ssh_u offs = 0;
-		if(address >= &portsZX[0]) {
-			offs = address - &memZX[65536];
-		}
-		*address = val;
-	}
+	else *address = val;
 }
 
 // пишем в память 16 битное значение
@@ -168,7 +162,7 @@ void DecoderZX::ops00_NO() {
 void DecoderZX::ops01_NO() {
 	if(typeOps == ops && ops == 6) {
 		// halt
-	if(!_TRAP) _PC--;
+	if(!(*_TRAP)) _PC--;
 	} else {
 		if(typeOps == 6) {
 			// LD DDD, [HL/IX]

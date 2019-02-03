@@ -30,7 +30,9 @@ public:
 		U_TOP	= 32
 	};
 	zxDebugger() : zxDialog(), hWndDA(nullptr), hWndSP(nullptr), da(nullptr), hFont(nullptr), countVisibleItems(0),
-								_pc(-1), _sp(-1), _lastPC(-1), curIndexBP(-1), curStoryPC(-1), limitStoryPC(0) { }
+					_pc(-1), _sp(-1), _lastPC(-1), _dt(0), curIndexBP(-1), curStoryPC(-1), limitStoryPC(0) {
+		memset(bps, 0, sizeof(bps)); 
+	}
 	virtual ~zxDebugger();
 	bool checkBPS(ssh_w address, bool mem);
 	void show(bool visible);
@@ -51,17 +53,18 @@ protected:
 	void quickBP(int adr);
 	void updateStack(int sp);
 	void updateHexDec(bool change);
-	int _pc, _sp, _lastPC;
+	int _pc, _sp, _lastPC, _dt;
 	int countVisibleItems;
 	zxListBox zxDA;
 	zxListBox zxSP;
+	zxListBox zxDT;
 	zxDisAsm* da;
 	zxAssembler* assm;
 	HFONT hFont;
 	HBRUSH hbrSel, hbrUnSel;
 	ZX_BREAK_POINT bps[COUNT_BP];
 	ssh_w storyPC[COUNT_STORY_PC];
-	HWND hWndDA, hWndSP;
+	HWND hWndDA, hWndSP, hWndDT;
 	int curStoryPC, limitStoryPC;
 	int curIndexBP;
 	DECL_MSG_MAP()
