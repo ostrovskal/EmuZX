@@ -10,15 +10,14 @@ extern funcDecoder table_opsED01_XXX[];
 extern funcDecoder table_opsED10_XXX[];
 
 ssh_b flags_cond[4] = {FZ, FC, FPV, FS};
-ssh_b cnvPrefixAF[] = {RC, RB, RE, RD, RL, RH, RA, RF, RC, RB, RE, RD, RIXL, RIXH, RA, RF, RC, RB, RE, RD, RIYL, RIYH, RA, RF};
-ssh_b cnvPrefixSP[] = {RC, RB, RE, RD, RL, RH, RSPL, RSPH, RC, RB, RE, RD, RIXL, RIXH, RSPL, RSPH, RC, RB, RE, RD, RIYL, RIYH, RSPL, RSPH};
+ssh_b cnvPrefAF[] = {RC, RB, RE, RD, RL, RH, RF, RA, RC, RB, RE, RD, RXL, RXH, RF, RA, RC, RB, RE, RD, RYL, RYH, RF, RA};
+ssh_b cnvPrefSP[] = {RC, RB, RE, RD, RL, RH, RSPL, RSPH, RC, RB, RE, RD, RXL, RXH, RSPL, RSPH, RC, RB, RE, RD, RYL, RYH, RSPL, RSPH};
+ssh_b cnvPrefRON[] = {RB, RC, RD, RE, RH, RL, RF, RA, RB, RC, RD, RE, RXH, RXL, RF, RA, RB, RC, RD, RE, RYH, RYL, RF, RA};
 
-extern ssh_d szMemZX;
 // пишем в память 8 битное значение
 void DecoderZX::write_mem8(ssh_b* address, ssh_b val, ssh_w ron) {
 	if(_TSTATE & ZX_DEBUG) debug->checkBPS((ssh_w)(address - memZX), true);
 	if(address < limitROM) { if(_TSTATE & ZX_WRITE_ROM) *address = val; }
-	else if(address < limitScreen && (_TSTATE & ZX_WRITE_GPU)) gpu->write(address, val);
 	else *address = val;
 }
 
@@ -27,10 +26,7 @@ void DecoderZX::write_mem16(ssh_w address, ssh_w val) {
 	ssh_b* mem = &memZX[address];
 	if(_TSTATE & ZX_DEBUG) debug->checkBPS(address, true);
 	if(address < 16384) { if(_TSTATE & ZX_WRITE_ROM) *(ssh_w*)mem = val; }
-	else if(address < 23296 && (_TSTATE & ZX_WRITE_GPU)) {
-		gpu->write(mem, (ssh_b)val);
-		gpu->write(mem + 1, val >> 8);
-	} else *(ssh_w*)mem = val;
+	else *(ssh_w*)mem = val;
 }
 
 ssh_b DecoderZX::readPort(ssh_w address) {
@@ -80,15 +76,20 @@ void DecoderZX::writePort(ssh_w address, ssh_b val) {
 }
 
 void DecoderZX::execCALL(ssh_w address) {
-	*_PC_EXIT_CALL = _PC;
+	*_PC_EXIT_CALL = (*_PC);
 	(*_SP) -= 2;
-	write_mem16(*_SP, _PC);
-	_PC = address;
+	write_mem16(*_SP, (*_PC));
+	(*_PC) = address;
 }
 
 ssh_b DecoderZX::rotate(ssh_b v, ssh_b mask) {
 	// --503-0C | SZ503P0C
-	ssh_b ofc = getFlag(FC);
+	ssh_b fl = getFlag(FC);
+	v = asm_ssh_rotate(v, ops, &fl);
+	update_flags(mask, mask & fl);
+	return v;
+	/*
+	ssh_b ofc = fl;
 	ssh_b fc = ((v & ((ops & 1) ? 1 : 128)) != 0);
 	ssh_b v1 = ((ops & 1) ? v >> 1 : v << 1);
 	switch(ops) {
@@ -108,49 +109,95 @@ ssh_b DecoderZX::rotate(ssh_b v, ssh_b mask) {
 		case 6: v = 1; break;
 	}
 	v |= v1;
-	update_flags(mask, mask & ((v & 128) | GET_FZ(v) | (v & 0b00101000) | GET_FP(v) | fc));
+	update_flags(mask, mask & ( _FS(v) | _FZ(v) | _FP(v) | fc));
 	return v;
+	*/
+}
+
+void DecoderZX::opsAccum2() {
+	ssh_b fl = getFlag(FC);
+	*_HL = asm_ssh_accum2(*_HL, *fromRP_SP(ops), (!(ops & 1)) << 1, &fl);
+	update_flags(FS | FZ | FH | FPV | FN | FC, fl);
+	/*
+	ssh_w op1 = *_HL;
+	ssh_w op2 = *fromRP_SP(ops);
+	ssh_d val = (fn ? op1 - (op2 + fl) : op1 + (op2 + fl));
+	ssh_w res = (ssh_w)val;
+	ssh_b fc = val > 65535;
+	ssh_b fz = (res == 0) << 6;
+	ssh_b fh = _FH(op1 >> 8, op2 >> 8, fl, fn);
+	ssh_b fv = _FV2(op1, op2, fl, fn);
+	ssh_b fs = _FS(res >> 8);
+	*_HL = (ssh_w)res;
+	ssh_w res1 = asm_ssh_accum2(op1, op2, fn, &fl);
+	ssh_b flags = fs | fz | fh | fv | fn | fc;
+	if(res != res1 || flags != fl) {
+		fl = getFlag(FC);
+		fh = _FH(op1 >> 8, op2 >> 8, fl, fn);
+		fv = _FV2(op1, op2, fl, fn);
+		res1 = asm_ssh_accum2(op1, op2, fn, &fl);
+	}
+	update_flags(FS | FZ | FH | FPV | FN | FC, flags);
+	*/
 }
 
 void DecoderZX::opsAccum(ssh_b d) {
-	ssh_w nVal = 0;
+	ssh_b fl = getFlag(FC);
+	ssh_b ret = asm_ssh_accum(*_A, d, ops, &fl);
+	if(ops != 7) *_A = ret;
+	update_flags(FS | FZ | FH | FPV | FN | FC, fl);
+	/*
 	ssh_b a = *_A;
+	ssh_b op1 = a;
+	ssh_b op2 = d;
+	ssh_w res = 0;
+
+	ssh_b fl = getFlag(FC);
 	ssh_b fn = 0;
 	ssh_b fh = 255;
-	ssh_b fc = getFlag(FC);
-
+	ssh_b fc = 0;
+	
 	switch(ops) {
 		// ADD A, d; SZ5H3V0C
-		case 0: nVal = a + d; break;
+		case 0: res = op1 + op2; break;
 		// ADC A, d; SZ5H3V0C
-		case 1: nVal = a + (d + fc); break;
-		// SUB A, d; SZ5H3V1C
-		case 2: nVal = a - d; fn = 2; break;
+		case 1: res = op1 + op2 + fl; fc = fl; break;
+		// SUB A, d/CP A, d; SZ5H3V1C
+		case 2: case 7: res = op1 - op2; fn = 2; break;
 		// SBC A, d; SZ5H3V1C
-		case 3: nVal = a - (d + fc); fn = 2; break;
+		case 3: res = op1 - (op2 + fl); fc = fl; fn = 2; break;
 		// AND A, d; SZ513P00
-		case 4: nVal = a & d; fh = 16; break;
+		case 4: res = op1 & op2; fh = 16; break;
 		// XOR A, d; SZ503P00
-		case 5: nVal = a ^ d; fh = 0; break;
+		case 5: res = op1 ^ op2; fh = 0; break;
 		// OR A, d; SZ503P00
-		case 6: nVal = a | d; fh = 0; break;
-		// CP A, d; SZ*H*V1C; F5 и F3 - копия d
-		case 7: nVal = a - d; fn = 2; break;
+		case 6: res = op1 | op2; fh = 0; break;
 	}
-	ssh_b val = (ssh_b)nVal;
+	ssh_b val = (ssh_b)res;
 	ssh_b fpv;
-	if(fh == 255) fh = calcFH(a, d, fn);
+	if(fh == 255) fh = _FH(op1, op2, fc, fn);
 	if(ops < 4 || ops >= 7) {
-		fc = nVal > 255;
-		fpv = GET_FV(a, val);
+		fpv = _FV1(op1, op2, fc, fn);
+		fc = res > 255;
 	}
 	else {
+		fpv = _FP(val);
 		fc = 0;
-		fpv = GET_FP(val); 
 	}
 	if(ops != 7) *_A = val;
+	ssh_b flags = _FS(val) | _FZ(val) | fh | fpv | fn | fc;
 
-	update_flags(FS | FZ | F5 | FH | F3 | FPV | FN | FC, ((ops == 7 ? d : val) & 0b00101000) | (val & 128) | GET_FZ(val) | fh | fpv | fn | fc);
+	ssh_b res1 = asm_ssh_accum(op1, d, ops, &fl);
+
+	//fl |= fh;
+	if(fl != flags) {
+		fl = getFlag(FC);
+		fh = _FH(op1, op2, fl, fn);;
+		fpv = calcFV1(op1, op2, fl, fn);
+		asm_ssh_accum(op1, op2, ops, &fl);
+	}
+	update_flags(FS | FZ | FH | FPV | FN | FC, flags);
+	*/
 }
 
 void DecoderZX::ops00_NO() {
@@ -160,14 +207,14 @@ void DecoderZX::ops00_NO() {
 void DecoderZX::ops01_NO() {
 	if(typeOps == ops && ops == 6) {
 		// halt
-	if(!(*_TRAP)) _PC--;
+	if(!(_TSTATE & ZX_TRAP)) (*_PC)--;
 	} else {
 		if(typeOps == 6) {
 			// LD DDD, [HL/IX]
-			regsZX[(RC + ((ops & 7) ^ 1))] = *fromRON(typeOps);
+			regsZX[cnvPrefRON[ops]] = *fromRON(typeOps);
 		} else if(ops == 6) {
 			// LD [HL/IX], SSS
-			write_mem8(fromRON(ops), regsZX[(RC + ((typeOps & 7) ^ 1))], ops);
+			write_mem8(fromRON(ops), regsZX[cnvPrefRON[typeOps]], ops);
 		} else {
 			// LD DDD, SSS
 			write_mem8(fromRON(ops), *fromRON(typeOps), ops);
@@ -188,7 +235,6 @@ void DecoderZX::ops01_ED() {
 }
 
 void DecoderZX::opsXX_ED() {
-	_PC--;
 	noni();
 }
 
@@ -203,7 +249,7 @@ void DecoderZX::execOps(int prefix1, int prefix2) {
 	incrementR();
 	// читаем операцию
 	ssh_b group = readOps();
-	prefix = prefix1;
+	prefix = (prefix1 << 3);
 	if(prefix2 == 1 && prefix) { fromRON(6); group = readOps(); }
 	(this->*table_ops[group * 3 + prefix2])();
 }

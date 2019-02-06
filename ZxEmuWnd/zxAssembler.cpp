@@ -109,7 +109,7 @@ zxAssembler::ZX_ASM_CMD* zxAssembler::parseLexem() {
 	skipSpace();
 	for(int i = 0 ; i < (sizeof(cmds) / sizeof(ZX_ASM_CMD)); i++) {
 		auto cmd = &cmds[i];
-		if(wcsncmp(cmd->name, text, cmd->len) == 0) {
+		if(_wcsnicmp(cmd->name, text, cmd->len) == 0) {
 			text += cmd->len;
 			return cmd;
 		}
@@ -127,10 +127,10 @@ zxAssembler::ZX_ASM_OPERAND operands[] = {
 	{0x00, 0b001'000, 1, FASM_FLAG, L"Z"},
 	{0x00, 0b111'000, 1, FASM_FLAG, L"M"},
 	{0x00, 0b110'000, 1, FASM_FLAG, L"P"},
-	{0xdd, 0b100'000, 3, FASM_R, L"IXH"},
-	{0xdd, 0b101'000, 3, FASM_R, L"IXL"},
-	{0xfd, 0b100'000, 3, FASM_R, L"IYH"},
-	{0xfd, 0b101'000, 3, FASM_R, L"IYL"},
+	{0xdd, 0b100'000, 3, FASM_R, L"XH"},
+	{0xdd, 0b101'000, 3, FASM_R, L"XL"},
+	{0xfd, 0b100'000, 3, FASM_R, L"YH"},
+	{0xfd, 0b101'000, 3, FASM_R, L"YL"},
 	{0xdd, 0b110'000, 3, FASM_D | FASM_PRP1, L"(IX"},
 	{0xfd, 0b110'000, 3, FASM_D | FASM_PRP1, L"(IY"},
 	{0x00, 0b000'000, 4, FASM_PRP2, L"(BC)"},
@@ -163,7 +163,7 @@ zxAssembler::ZX_ASM_OPERAND* zxAssembler::parseOperand(int flags) {
 	if(flags & (FASM_RP | FASM_R | FASM_R1 | FASM_FLAG | FASM_PRP1 | FASM_PRP2 | FASM_RP_SP | FASM_RP_AF)) {
 		for(auto& o : operands) {
 			if(o.flags & flags) {
-				if(wcsncmp(o.name, text, o.len) == 0) {
+				if(_wcsnicmp(o.name, text, o.len) == 0) {
 					text += o.len;
 					result = &o;
 					break;
@@ -180,10 +180,9 @@ zxAssembler::ZX_ASM_OPERAND* zxAssembler::parseOperand(int flags) {
 			if(*text == L'(') { bracket = true; text++; skipSpace(); }
 		}
 		skipSpace();
-		ssh_cws begin = text;
 		nn = *(int*)asm_ssh_wton(text, (ssh_u)Radix::_dec, (ssh_ws*)&text);
+		if(asm_ssh_length_last_number() == 0) return nullptr; // no number
 		skipSpace();
-		if(begin == text) return nullptr; // no number
 		if(flags & FASM_PNN || is1) {
 			if(*text != L')') {
 				if(bracket) return nullptr;
@@ -255,6 +254,10 @@ void zxAssembler::parseArifth(ZX_ASM_CMD* cmd) {
 			if(op->prefix) code[pos++] = op->prefix;
 			code[pos++] = (cod | (cmd->code << 3));
 			if(op->prefix) code[pos++] = (ssh_b)nn;
+			if(!op->len) {
+				if(nn > 255) pos = 0;
+				else code[pos++] = (ssh_b)nn;
+			}
 		}
 	}
 }
@@ -351,7 +354,7 @@ void zxAssembler::parsePort(ZX_ASM_CMD* cmd) {
 void zxAssembler::parseCB(ZX_ASM_CMD* cmd) {
 	// ROTATE
 	ssh_b ops = cmd->code;
-	if(cmd->code == 0b11'000'000) {
+	if(cmd->code & 192) {
 		// BIT/SET/RES
 		if((op = parseOperand(FASM_BIT))) {
 			ops |= (ssh_b)(nn << 3);
@@ -437,7 +440,6 @@ void zxAssembler::parseLd(ZX_ASM_CMD* cmd) {
 							if(op1->prefix) code[pos++] = (char)nn;
 						} else if(op1->flags == FASM_R) {
 							// LD R, R
-							if(op1->prefix) return;
 							if(op->prefix) code[pos++] = op->prefix;
 							code[pos++] = (0b01'000'000 | op->type | (op1->type >> 3));
 						} else if(op1->flags == FASM_NN) {

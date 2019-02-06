@@ -1,6 +1,7 @@
 
 #include "stdafx.h"
 #include "zxKeyboard.h"
+#include "zxGamePad.h"
 
 // fe fd fb f7 ef df bf 7f
 //	port[0xfefe] = 255;// CAPS_SHIFT Z X C V
@@ -13,35 +14,9 @@
 //	port[0x7ffe] = 255;// SPACE SYMBOL_SHIFT M N B
 // DEL fefe-254,effe-254,bffe-254
 
-struct ZX_KEY {
-	int butID;
-	ssh_cws name_k;
-	ssh_cws name_l;
-	ssh_cws name_c;
-	ssh_cws name_e;
-	ssh_cws name_sh_e;
-	ssh_cws name_sh_k;
-	ssh_cws name_g;
-	ssh_b port;
-	ssh_b bit;
-	ssh_b vk_code;
-	HWND hWndKey;
-};
-
-struct ZX_KEY_EX {
-	ssh_b vk_code;
-	ssh_b vk_codeKey;
-	ssh_b vk_codeKeyEx;
-};
-
-#define KM_K		0
-#define KM_L		1
-#define KM_C		2
-#define KM_E		3
-#define KM_G		4
-#define KM_SH_E		5
-#define KM_SH_KL	6
-#define KM_CH		7
+BEGIN_MSG_MAP(zxKeyboard, zxDialog)
+	ON_WM_CLOSE()
+END_MSG_MAP()
 
 ZX_KEY_EX keysExDef[] = {
 	{VK_BACK, '0', VK_CONTROL},
@@ -85,6 +60,7 @@ ZX_KEY_EX keysExShift[] = {
 };
 
 static ZX_KEY keys[] = {
+	{IDC_BUTTON_CAPS_LOCK},
 	{IDC_BUTTON_K1, L"1", L"1", L"1", L"blue", L"DEF FN", L"!", L"edit", 0xf7, 0x1, '1'},
 	{IDC_BUTTON_K2, L"2", L"2", L"2", L"red", L"FN", L"@", L"caps lock", 0xf7, 0x2, '2'},
 	{IDC_BUTTON_K3, L"3", L"3", L"3", L"magenta", L"LINE", L"#", L"tr video", 0xf7, 0x4, '3'},
@@ -125,10 +101,10 @@ static ZX_KEY keys[] = {
 	{IDC_BUTTON_KN, L"NEXT", L"n", L"N", L"INKEYS$", L"OVER", L",", L"N", 0x7f, 0x8, 'N'},
 	{IDC_BUTTON_KM, L"PAUSE", L"m", L"M", L"PI", L"INVERSE", L".", L"M", 0x7f, 0x4, 'M'},
 	{IDC_BUTTON_SYMBOL_SHIFT, L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", 0x7f, 0x2, VK_SHIFT},
-	{IDC_BUTTON_SPACE, L"", L"", L"", L"", L"", L"", L"", 0x7f, 0x1, VK_SPACE}
+	{IDC_BUTTON_SPACE, L"", L"", L"", L"", L"", L"", L"", 0x7f, 0x1, VK_SPACE},
 };
 
-void zxKeyboard::onInitDialog(HWND hWnd, LPARAM lParam) {
+void zxKeyboard::postCreate() {
 	for(auto& k : keys) {
 		k.hWndKey = GetDlgItem(hWnd, k.butID);
 		SendMessage(k.hWndKey, WM_SETFONT, (WPARAM)hFont, true);
@@ -145,12 +121,13 @@ bool zxKeyboard::preCreate() {
 }
 
 void zxKeyboard::show(bool visible) {
-	showWindow(visible);
-	updateWindow();
+	ShowWindow(hWnd, visible);
+	UpdateWindow(hWnd);
 }
 
 void zxKeyboard::processKeys() {
 	bool sh = (vkKeys[VK_SHIFT] & 0x80);
+	bool caps = (vkKeys[VK_CONTROL] & 0x80);
 	if(sh) {
 		for(auto& k : keysExShift) {
 			if(vkKeys[k.vk_code] & 0x80) {
@@ -181,9 +158,8 @@ void zxKeyboard::processKeys() {
 		}
 	}
 	// проверить режим клавиатуры
-	RECT rect;
 	int nmode = -1;
-	int val = memZX[23617], val1, val2;
+	int val = memZX[23617], val1 = 0, val2 = 0;
 	switch(val) {
 		case 0:
 			val1 = memZX[23658];
@@ -192,15 +168,13 @@ void zxKeyboard::processKeys() {
 				nmode = (val1 & 8) ? KM_C : KM_L;
 			} else if(val1 & 16) nmode = KM_K;
 			if(sh) nmode = KM_SH_KL;
-			if(nmode == KM_L && (vkKeys[VK_CONTROL] & 0x80)) nmode = KM_CH;
+			if(nmode == KM_L && caps) nmode = KM_CH;
 			break;
 		case 1: nmode = (sh ? KM_SH_E : KM_E); break;
 		default: nmode = KM_G; break;
 	}
 	// проверить на нажатые кнопки
 	for(auto& k : keys) {
-		int p = ((k.port << 8) | 0xfe);
-		auto v = portsZX[p];
 		ssh_cws name = nullptr;
 		switch(nmode) {
 			case KM_K: name = k.name_k; break;
@@ -212,18 +186,38 @@ void zxKeyboard::processKeys() {
 			case KM_SH_KL: name = k.name_sh_k; break;
 			case KM_CH: name = k.name_c; break;
 		}
-		if(name) {
-			bool is = !(v & k.bit);
-			auto h = k.hWndKey;
-			auto hdc = GetDC(h);
-			auto hfont = SelectObject(hdc, hFont);
-			SetTextColor(hdc, is ? RGB(255, 255, 255) : RGB(0, 0, 0));
-			GetClientRect(h, &rect);
-			SetBkMode(hdc, TRANSPARENT);
-			FillRect(hdc, &rect, is ? hbrSel : hbrUnsel);
-			DrawText(hdc, name, -1, &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
-			ReleaseDC(h, hdc);
-		}
-		mode = nmode;
+		if(name) highlightKey(name, &k, 0x80);
+		highlightKey(L"CAPS LOCK", &keys[0], ((val1 & 8) || caps) ? 1 : 0);
+	}
+}
+
+void zxKeyboard::highlightKey(ssh_cws name, ZX_KEY* k, int isVirt) {
+	RECT rect;
+	bool is = (isVirt & 1);
+	if(isVirt & 0x80) {
+		int p = ((k->port << 8) | 0xfe);
+		auto v = portsZX[p];
+		is = !(v & k->bit);
+	}
+	auto h = k->hWndKey;
+	auto hdc = GetDC(h);
+	auto hfont = SelectObject(hdc, hFont);
+	SetTextColor(hdc, is ? RGB(255, 255, 255) : RGB(0, 0, 0));
+	GetClientRect(h, &rect);
+	SetBkMode(hdc, TRANSPARENT);
+	FillRect(hdc, &rect, is ? hbrSel : hbrUnsel);
+	DrawText(hdc, name, -1, &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+	ReleaseDC(h, hdc);
+}
+
+void zxKeyboard::processJoystick() {
+	auto pad = theApp.gamepad;
+	pad->update();
+	if(pad->is_connected(0)) {
+		pad->remap(0, zxGamepad::crossUp);
+		pad->remap(0, zxGamepad::crossDown);
+		pad->remap(0, zxGamepad::crossLeft);
+		pad->remap(0, zxGamepad::crossRight);
+		pad->remap(0, zxGamepad::A);
 	}
 }

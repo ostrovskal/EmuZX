@@ -48,24 +48,24 @@ bool loadZ80(const StringZX& path) {
 			ptr += sizeof(HEAD1_Z80);
 			sz -= sizeof(HEAD1_Z80);
 
-			*(ssh_w*)&regsZX[RA] = z80->AF;
-			*(ssh_w*)&regsZX[RIXL] = z80->IX;
-			*(ssh_w*)&regsZX[RIYL] = z80->IY;
-			*_BC = z80->BC; *_DE = z80->DE; *_HL = z80->HL; *_SP = z80->SP; _PC = z80->PC;
-			*_I = z80->I; *_R = z80->R; *_IM = z80->STATE2 & 3; *_IFF1 = z80->IFF1; *_IFF2 = z80->IFF2;
+			ssh_w af = z80->AF;
+			*(ssh_w*)&regsZX[RF] = af;
+			*_IX = z80->IX; *_IY = z80->IY;
+			*_BC = z80->BC; *_DE = z80->DE; *_HL = z80->HL; *_SP = z80->SP; (*_PC) = z80->PC;
+			*_I = z80->I; (*_R) = z80->R; *_IM = z80->STATE2 & 3; *_IFF1 = z80->IFF1; *_IFF2 = z80->IFF2;
 			memcpy(&regsZX[RC_], &z80->BC_, 8);
 			ssh_b state1 = z80->STATE1;
 			if(state1 == 255) state1 = 1;
-			*_R |= (state1 & 1) << 7;
-			*_PORT_FE &= ~31;
-			*_PORT_FE |= (state1 & 14) >> 1;
+			(*_R) |= (state1 & 1) << 7;
+			(*_PORT_FE) &= ~31;
+			(*_PORT_FE) |= (state1 & 14) >> 1;
 			if(_PC == 0) {
 				// version 2
 				HEAD2_Z80* head2 = (HEAD2_Z80*)ptr;
 				ptr += sizeof(HEAD2_Z80);
 				int length = head2->length;
 				sz -= length;
-				_PC = head2->PC;
+				(*_PC) = head2->PC;
 				if(length > 23) {
 					// version 3
 					HEAD3_Z80* head2 = (HEAD3_Z80*)ptr;
@@ -114,9 +114,9 @@ bool saveZ80(const StringZX& path) {
 			result = true;
 			HEAD1_Z80 z80;
 			z80.AF = *(ssh_w*)&regsZX[RA];
-			z80.IX = *(ssh_w*)&regsZX[RIXL];
-			z80.IY = *(ssh_w*)&regsZX[RIYL];
-			z80.BC = *_BC; z80.DE = *_DE; z80.HL = *_HL; z80.SP = *_SP; z80.PC = _PC;
+			z80.IX = *(ssh_w*)&regsZX[RXL];
+			z80.IY = *(ssh_w*)&regsZX[RYL];
+			z80.BC = *_BC; z80.DE = *_DE; z80.HL = *_HL; z80.SP = *_SP; z80.PC = (*_PC);
 			z80.I = *_I; z80.IFF1 = *_IFF1; z80.IFF2 = *_IFF2; z80.STATE2 = *_IM; z80.R = *_R;
 			memcpy(&z80.BC_, &regsZX[RC_], 8);
 			z80.STATE1 = ((*_R) >> 7) | (((*_PORT_FE) & 7) << 1) | 32;

@@ -58,9 +58,10 @@ base64_chars	dw 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 
 				dw 97, 98, 99, 100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122
 				dw 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 43, 47, 0
 ALIGN 16
-_fp255x4	dd 255.0, 255.0, 255.0, 255.0
-_blur		dd 0.25, 0.25, 0.25, 0.25
-
+_fp255x4			dd 255.0, 255.0, 255.0, 255.0
+_blur				dd 0.25, 0.25, 0.25, 0.25
+length_last_number	dq 0
+fc					db 0
 .code
 
 ; 0 - register(offs), 1 - bit check, 2 - bit set 
@@ -557,7 +558,7 @@ asm_ssh_parse_spec endp
 ; преобразовать строку в число в зависимости от системы счисления
 ; rcx - ptr
 ; rdx - radix
-; r8 -  &ptr end
+; r8 -  &length number
 asm_ssh_wton proc public
 		push rbx
 		push r10
@@ -570,18 +571,19 @@ asm_ssh_wton proc public
 		xor rax, rax
 		jrcxz @f
 		; знак
-		xor r15, r15
+		xor r12, r12
 		xor r13, r13
 		cmp word ptr [rcx], '+'
 		setz r13b
 		cmp word ptr [rcx], '-'
-		setz r15b
+		setz r12b
 		lea rcx, [rcx + r13 * 2]
-		lea rcx, [rcx + r15 * 2]
+		lea rcx, [rcx + r12 * 2]
 		mov r10, 3
 		cmp word ptr [rcx], '#'
 		setz r13b
 		lea rcx, [rcx + r13 * 2]
+		mov r15, rcx
 		cmovz rdx, r10
 		mov r10, rcx
 		xor r13, r13
@@ -591,13 +593,16 @@ asm_ssh_wton proc public
 		mov r9, [rdx + 8]; множитель порядка
 		mov r8, [rdx + 16]; маска
 		call qword ptr [rdx]
-		test r15, r15
+		test r12, r12
 		jz @f
 		neg rax
 @@:		mov qword ptr [result], rax
 		test r14, r14
 		jz @f
 		mov [r14], r11
+		sub r11, r15
+		shr r11, 1
+		mov length_last_number, r11
 @@:		pop r15
 		pop r14
 		pop r13
@@ -613,7 +618,7 @@ _HEX	= 4
 _DEC	= 8
 tbl_hex dw 0, _HEX, _HEX, _HEX, _HEX, _HEX, _HEX, 0, 0, 0, 0, 0, 0, 0, 0, 0, _DEC + _BIN + _OCT + _HEX, _DEC + _BIN + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _OCT + _HEX
 		dw _DEC + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _HEX, _DEC + _HEX
-radix	dq wto_dec, 10, _DEC, wto_obh, 2, _BIN, wto_obh, 8, _OCT, wto_obh, 16, _HEX, wto_dbl, 10, _DEC, wto_flt, 10, _DEC, wto_bool, 0, 0
+radix	dq wto_obh, 10, _DEC, wto_obh, 2, _BIN, wto_obh, 8, _OCT, wto_obh, 16, _HEX, wto_dbl, 10, _DEC, wto_flt, 10, _DEC, wto_bool, 0, 0
 wto_bool:
 		xor rax, rax
 		cmp dword ptr [rcx], 00720074h
@@ -651,18 +656,8 @@ wto_obh:sub rcx, 2
 		imul r8, r9
 		jmp @b
 @@:		ret
-wto_dec:; определяем признак отрицательного значения
-		xor r12, r12
-		cmp word ptr [rcx], '-'
-		setz r12b
-		lea rcx, [rcx + r12 * 2]
-		call wto_obh
-		test r12, r12
-		jz @f
-		neg rax
-@@:		ret
 wto_flt:inc r13
-wto_dbl:call wto_dec
+wto_dbl:call wto_obh
 		mov r10, r11
 		cvtsi2sd xmm0, rax
 		xorps xmm1, xmm1
@@ -689,6 +684,11 @@ wto_dbl:call wto_dec
 @@:		movd rax, xmm0
 		ret
 asm_ssh_wton endp
+
+asm_ssh_length_last_number proc
+		mov rax, length_last_number
+		ret
+asm_ssh_length_last_number endp
 
 ;rcx - src, rdx - vec
 ;<[/]tag [attr = value ...][/]>
@@ -1044,5 +1044,137 @@ asm_ssh_bilinear proc
 
 		ret
 asm_ssh_bilinear endp
+
+;(ssh_w op1, ssh_w op2, ssh_u fn, ssh_b* fl);
+asm_ssh_accum2 proc
+		push rbx
+		mov bx, cx
+		movzx ax, byte ptr [r9]		; in/out flags
+		test r8, r8
+		jz @f
+		add ax, 0ffffh
+		sbb cx, dx
+		jmp _f
+@@:		add ax, 0ffffh
+		adc cx, dx
+_f:		lahf
+		mov al, ah
+		seto ah					; OVERFLOW
+		shl ah, 2
+		and al, 11000001b		; FLAGS (S Z 0 0 0 0 0 C)
+		or al, r8b				; N
+		or al, ah				; OVERFLOW
+		mov r8w, cx
+		; half carry
+		mov cl, [r9]			; in/out flags
+		test al, 2
+		jz @f
+		add cl, 0ffh
+		sbb bh, dh
+		jmp _f1
+@@:		add cl, 0ffh
+		adc bh, dh
+_f1:	lahf
+		and ah, 00010000b
+		or al, ah
+		mov [r9], al
+		mov ax, r8w
+		pop rbx
+		ret
+asm_ssh_accum2 endp
+
+;(ssh_b op1, ssh_b op2, ssh_u ops, ssh_b* fc);
+asm_ssh_accum proc
+		push rbx
+		mov dh, 255
+		mov ch, 11010001b
+		mov bl, [r9]			; in/out flags
+		add bl, dh
+		mov rax, offset ops
+		call qword ptr [r8 * 8 + rax]
+		lahf
+		shl dl, 2
+		mov bl, ah
+		and bl, ch				; FLAGS (S Z 0 H 0 0 N? C)
+		or bl, dl				; O/P
+		cmp dh, 255
+		jz @f
+		and bl, 11000111b
+		or bl, dh				; H
+@@:		mov [r9], bl
+		mov al, cl
+		pop rbx
+		ret
+ops	dq _add, _adc, _sub, _sbc, _and, _xor, _or, _sub
+_adc:	adc cl, dl
+		seto dl
+		ret
+_add:	add cl, dl
+		seto dl
+		ret
+_sbc:	sbb cl, dl
+		mov ch, 11010011b
+		seto dl
+		ret
+_sub:	sub cl, dl
+		mov ch, 11010011b
+		seto dl
+		ret
+_and:	and cl, dl
+		mov dh, 16
+		setp dl
+		ret
+_xor:	xor cl, dl
+		mov dh, 0
+		setp dl
+		ret
+_or:	or cl, dl
+		mov dh, 0
+		setp dl
+		ret
+asm_ssh_accum endp
+
+;(ssh_b v, ssh_u ops, ssh_b* fl);
+asm_ssh_rotate proc
+	mov r9, offset ops1
+	mov r9, [rdx * 8 + r9]
+	mov eax, 128
+	and edx, 1
+	cmovz edx, eax
+	mov al, cl
+	mov ch, cl
+	jz @f
+	shr al, 1
+	jmp _f
+@@:	shl al, 1				; v1
+_f: and ch, dl
+	test ch, ch
+	setnz ch				; fc
+	call r9
+	or al, cl
+	lahf
+	and ah, 11000100b
+	or ah, ch
+	mov cl, ah
+	mov [r8], cl
+	ret
+ops1 dq _rlc, _rrc, _rl, _rr, _sla, _sra, _sli, _sla
+_rlc:	mov cl, ch
+		ret
+_rrc:	mov cl, ch
+		shl cl, 7
+		ret
+_rl:	mov cl, [r8]
+		ret
+_rr:	mov cl, [r8]
+		shl cl, 7
+		ret
+_sla:	xor cl, cl
+		ret
+_sra:	and cl, 128
+		ret
+_sli:	mov cl, 1
+		ret
+asm_ssh_rotate endp
 
 end

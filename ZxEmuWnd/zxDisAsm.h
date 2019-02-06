@@ -14,11 +14,11 @@
 #define C_RD				2
 #define C_RE				3
 #define C_RH				4
-#define C_RIXH				5
-#define C_RIYH				6
+#define C_RXH				5
+#define C_RYH				6
 #define C_RL				7
-#define C_RIXL				8
-#define C_RIYL				9
+#define C_RXL				8
+#define C_RYL				9
 
 #define C_PHL				10
 #define C_PIX				11
@@ -219,11 +219,11 @@ protected:
 
 	void execute(int prefix1, int prefix2);
 
-	inline ssh_b fromRP_SP(ssh_b rp) { return prefSP[(prefix << 3) + (rp & 6)]; }
+	inline ssh_b fromRP_SP(ssh_b rp) { return prefSP[prefix + (rp & 6)]; }
 
 	inline ssh_b fromHL() { return C_PHL + prefix; }
 
-	inline ssh_b fromRP_AF(ssh_b rp) { return prefAF[(prefix << 3) + (rp & 6)]; }
+	inline ssh_b fromRP_AF(ssh_b rp) { return prefAF[prefix + (rp & 6)]; }
 
 	inline ssh_b read8() { return memZX[_pc++]; }
 
@@ -236,13 +236,13 @@ protected:
 	// B C D E H L (HL) A
 	inline void fromRON1(ssh_b ron) { DA_PUT(prefRON[ron]); }
 	
-	// (HL/IX+d/IY+d)/B C D E H/IXH/IYH L/IXL/IYL
+	// (HL/IX+d/IY+d)/B C D E H/IXH/IYH L/XL/YL
 	void fromRON(ssh_b ron) {
 		if(ron == 6) {
 			auto r = fromHL();
 			DA_PUT(r);
 			if(prefix) { n = read8(); DA_PUT(C_D); DA_PUT(n); DA_PUT(C_ADDR); auto addr = addrReg(r); put16((addr + (char)n) & 0xffff); }
-		} else DA_PUT(prefRON[(prefix << 3) + ron]);
+		} else DA_PUT(prefRON[prefix + ron]);
 	}
 
 	ssh_b prefix;

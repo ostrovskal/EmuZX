@@ -78,6 +78,9 @@
     <ClInclude Include="zxAssembler.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="zxGamePad.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -147,6 +150,9 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="zxAssembler.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="zxGamePad.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

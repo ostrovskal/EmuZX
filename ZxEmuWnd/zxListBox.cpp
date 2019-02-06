@@ -2,8 +2,16 @@
 #include "stdafx.h"
 #include "zxListBox.h"
 
-//BEGIN_MSG_MAP(zxListBox, zxWnd)
-//END_MSG_MAP()
+BEGIN_MSG_MAP(zxListBox, zxWnd)
+	ON_WM_SIZE()
+	ON_WM_PAINT()
+	ON_WM_MOUSEWHEEL()
+	ON_WM_LBUTTONDBLCLK()
+	ON_WM_LBUTTONDOWN()
+	ON_WM_VSCROLL()
+	ON_WM_SETFONT()
+	ON_WM_KEYDOWN()
+END_MSG_MAP()
 
 void zxListBox::postCreate() {
 
@@ -57,14 +65,13 @@ INT_PTR zxListBox::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 	return zxWnd::wndProc(hWnd, message, wParam, lParam);
 }
 
-bool zxListBox::onSize(WPARAM type, int nWidth, int nHeight) {
+void zxListBox::onSize(UINT type, int nWidth, int nHeight) {
 	SetRect(&rectWnd, 0, 0, nWidth, nHeight);
 	countVisibleItems = ((rectWnd.bottom - rectWnd.top) / heightItem);
-	return true;
 }
 
-bool zxListBox::onPaint() {
-	if(isWindowVisible()) {
+void zxListBox::onPaint() {
+	if(IsWindowVisible(hWnd)) {
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(hWnd, &ps);
 
@@ -102,12 +109,10 @@ bool zxListBox::onPaint() {
 		SelectObject(hdc, old);
 		ReleaseDC(hWnd, hdc);
 		EndPaint(hWnd, &ps);
-		return true;
 	}
-	return false;
 }
 
-void zxListBox::onFont(HFONT hF, bool redraw) {
+void zxListBox::onSetFont(HFONT hF, BOOL redraw) {
 	if(hF) {
 		DeleteObject(hFont);
 		isFont = false;
@@ -116,7 +121,7 @@ void zxListBox::onFont(HFONT hF, bool redraw) {
 	if(redraw) InvalidateRect(hWnd, nullptr, true);
 }
 
-bool zxListBox::onScroll(UINT code, UINT p, HWND hWndScroll, int type) {
+void zxListBox::onVScroll(UINT code, UINT p, HWND hWndScroll) {
 	memset(&si, 0, sizeof(SCROLLINFO));
 	si.cbSize = sizeof(SCROLLINFO);
 	si.fMask = SIF_ALL;
@@ -139,9 +144,7 @@ bool zxListBox::onScroll(UINT code, UINT p, HWND hWndScroll, int type) {
 		si.nPos = pos;
 		auto ret = SetScrollPos(hWnd, SB_VERT, pos, true);
 		sendNotify(LBN_VSCROLL);
-		return true;
 	}
-	return false;
 }
 
 void zxListBox::sendNotify(int code) {
@@ -149,25 +152,24 @@ void zxListBox::sendNotify(int code) {
 	InvalidateRect(hWnd, nullptr, false);
 }
 
-bool zxListBox::onMouseWheel(int vkKey, int x, int y, int delta) {
-	return onScroll(SB_THUMBTRACK, topIndex + (delta < WHEEL_DELTA ? 4 : -4), hWnd, true);
+BOOL zxListBox::onMouseWheel(UINT vkKey, short delta, POINT pt) {
+	onVScroll(SB_THUMBTRACK, topIndex + (delta < WHEEL_DELTA ? 4 : -4), nullptr);
+	return TRUE;
 }
 
-bool zxListBox::onMouseButtonDown(int vkKey, int x, int y, bool left) {
+void zxListBox::onLButtonDown(UINT vkKey, POINT pt) {
 	SetFocus(hWnd);
-	curSel = topIndex + (y / heightItem);
+	curSel = topIndex + (pt.y / heightItem);
 	sendNotify(LBN_SELCHANGE);
-	return true;
 }
 
-bool zxListBox::onMouseButtonDblClk(int vkKey, int x, int y, bool left) {
+void zxListBox::onLButtonDblClk(UINT vkKey, POINT pt) {
 	SetFocus(hWnd);
-	curSel = topIndex + (y / heightItem);
+	curSel = topIndex + (pt.y / heightItem);
 	sendNotify(LBN_DBLCLK);
-	return true;
 }
 
-bool zxListBox::onKey(int nVirtKey, LPARAM keyData, bool pressed) {
+void zxListBox::onKeyDown(UINT nVirtKey, UINT nRepeat, UINT nFlags) {
 	int delta = 0;
 	switch(nVirtKey) {
 		case VK_UP: delta = -1; break;
@@ -178,9 +180,7 @@ bool zxListBox::onKey(int nVirtKey, LPARAM keyData, bool pressed) {
 	if(delta != 0) {
 		topIndex += delta;
 		sendNotify(LBN_VSCROLL);
-		return true;
 	}
-	return false;
 }
 
 void zxListBox::changeScroll(int& offs, int count, int page) {

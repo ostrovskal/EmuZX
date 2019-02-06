@@ -7,36 +7,38 @@ enum CPU_REG {
 	RD, // 3
 	RL, // 4
 	RH, // 5
-	RA, // 6
-	RF, // 7 (HL)
+	RF, // 6 (HL)
+	RA, // 7
 	RC_, // 8
 	RB_, // 9
 	RE_, // 10
 	RD_, // 11
 	RL_, // 12
 	RH_, // 13
-	RA_, // 14
-	RF_, // 15
-	RIXL, // 16
-	RIXH, // 17
-	RIYL, // 18
-	RIYH, // 19
+	RF_, // 14
+	RA_, // 15
+	RXL, // 16
+	RXH, // 17
+	RYL, // 18
+	RYH, // 19
 	RSPL, // 20
 	RSPH, // 21
+	RPCL, // 22
+	RPCH, // 23
 	RI,
 	RR,
-	RIFF1,
-	RIFF2,
-	RIM,
-	RTRAP,
-	RFE,
-	RFD,
+	IFF1,
+	IFF2,
+	IM,
+	TRAP,
+	FE,
+	FD,
 	RAM,
 	ROM,
 	VID,
 	SCAN,
-	RPC_EXIT_CALL1,
-	RPC_EXIT_CALL2,
+	PC_EXIT_CALL1,
+	PC_EXIT_CALL2,
 	COUNT_REGS
 };
 
@@ -44,9 +46,9 @@ enum CPU_FLAGS {
 	FC = 1,
 	FN = 2,// SUB,DEC,CMP
 	FPV = 4,//P=1->четность бит,V=1->переполнение
-	F3 = 8,// не используется
+	//F3 = 8,// не используется
 	FH = 16,// перенос между 3 и 4 битами
-	F5 = 32,// не используется
+	//F5 = 32,// не используется
 	FZ = 64,
 	FS = 128
 };
@@ -58,14 +60,16 @@ enum CPU_FLAGS {
 #define PREFIX_IX		1//221
 #define PREFIX_IY		2//253
 
-#define GET_FZ(val)				(val == 0) << 6
-#define GET_FV(val1, val2)		calcFV(val1, val2)
-#define GET_FP(val)				calcFP(val) << 2
-#define GET_FN(val)				val << 1
-#define GET_FC(val1, val2)		(val1 > val2)
-#define DA_PUT(c)				path[pos++] = c
+#define _FS(val)			(val & 0x80)
+#define _FZ(val)			((val == 0) << 6)
+#define _FV1(op1, op2, fc, fn)	calcFV1(op1, op2, fc, fn)
+#define _FV2(op1, op2, fc, fn)	calcFV2(op1, op2, fc, fn)
+#define _FH(op1, op2, fc, fn)	calcFH(op1, op2, fc, fn)
+#define _FP(val)			calcFP(val)
+#define _FN(val)			(val << 1)
+#define _FC(val1, val2)		(val1 > val2)
+#define DA_PUT(c)			path[pos++] = c
 
-extern ssh_w _PC;
 extern volatile ssh_w _TSTATE;
 
 extern ssh_b* _I;
@@ -79,11 +83,13 @@ extern ssh_w* _BC;
 extern ssh_w* _DE;
 extern ssh_w* _HL;
 extern ssh_w* _SP;
+extern ssh_w* _PC;
+extern ssh_w* _IX;
+extern ssh_w* _IY;
 extern ssh_w* _PC_EXIT_CALL;
 
 extern ssh_b* _PORT_FE;
 extern ssh_b* _PORT_FD;
-extern ssh_b* _TRAP;
 
 extern ssh_b memZX[65536];
 extern ssh_b memBanks[16384 * 8];
@@ -97,6 +103,7 @@ class GpuZX;
 class SoundZX;
 class zxDebugger;
 class zxKeyboard;
+class zxGamepad;
 
 class zxEmulation : public zxWnd {
 	friend ssh_d WINAPI ProcCPU(void* params);
@@ -139,22 +146,41 @@ public:
 
 	// процессор
 	CpuZX*		zilog;
-protected:
-	ssh_d procCPU();
-	virtual bool onCommand(int wmId, int param, LPARAM lParam) override;
-	virtual bool onClose() override;
-	virtual bool onSize(WPARAM type, int nWidth, int nHeight) override;
-	virtual bool onKey(int nVirtKey, LPARAM keyData, bool pressed) override;
-	virtual bool onNotify(LPNMHDR nm) override;
-	virtual int onCalcSize(bool isParams, LPARAM lParam) override;
 
+	zxGamepad*	gamepad;
+protected:
+	ssh_msg void onTimer(UINT_PTR nID);
+	ssh_msg void onSettings();
+	ssh_msg void onAspectRatio();
+	ssh_msg void onOpen();
+	ssh_msg void onSave();
+	ssh_msg void onRestore();
+	ssh_msg void onReset();
+	ssh_msg void onTurbo();
+	ssh_msg void onSound();
+	ssh_msg void onDebugger();
+	ssh_msg void onKeyboard();
+	ssh_msg void onFilter();
+	ssh_msg void onModel();
+	ssh_msg void onClose();
+	ssh_msg void onPause();
+	ssh_msg void onProcessMRU();
+	ssh_msg void onSize(UINT type, int nWidth, int nHeight);
+	ssh_msg void onKeyDown(UINT nVirtKey, UINT nRepeat, UINT nFlags);
+	ssh_msg void onKeyUp(UINT nVirtKey, UINT nRepeat, UINT nFlags);
+	ssh_msg void onNotify(LPNMHDR nmNMHDR, LRESULT* pResult);
+	ssh_msg int onCalcSize(bool isParams, LPARAM lParam);
+	ssh_msg BOOL onEraseBkgnd(HDC hdc);
+
+	void processKeys();
 	void modifyMRU(StringZX path);
-	bool checkedModelOrPP(HMENU hMenu, int id_opt, int val, int* ids);
+	bool checkedSubMenu(HMENU hMenu, int id_opt, int val, int* ids);
 	void changeTurbo(bool change);
 	void changeSound(bool change);
 	bool changeState(int id_opt, int id, bool change);
+	ssh_d procCPU();
 
-	SoundZX*	snd;
+	SoundZX* snd;
 
 	ssh_u delayCPU;
 	ssh_u delayGPU;
@@ -164,6 +190,8 @@ protected:
 	HMENU hMenuModel;
 	HANDLE hCpuThread;
 	MENUITEMINFO mii;
+
+	DECL_MSG_MAP()
 };
 
 // вычисление четности
@@ -171,20 +199,36 @@ inline ssh_b calcFP(ssh_b val) {
 	val = ((val >> 1) & 0x55) + (val & 0x55);
 	val = ((val >> 2) & 0x33) + (val & 0x33);
 	val = ((val >> 4) & 0x0F) + (val & 0x0F);
-	return !(val & 1);
+	return (!(val & 1) << 2);
 }
 
 // вычисление переполнения
-inline ssh_b calcFV(ssh_b val1, ssh_b val2) {
-	if((val1 & 128) != (val2 & 128)) return 4;
+inline ssh_b calcFV(int o1, int o2, int mx, int mn, ssh_w fn) {
+	if(!fn) {
+		if((o2 > 0 && (o1 > (mx - o2))) ||
+			(o2 < 0 && (o1 < (mn - o2)))) return 4;
+		return 0;
+	}
+	if((o2 > 0 && (o1 < (mn + o2))) ||
+		(o2 < 0 && (o1 > (mx + o2)))) return 4;
 	return 0;
 }
 
+// вычисление переполнения
+inline ssh_b calcFV1(char op1, char op2, ssh_b fc, ssh_w fn) {
+	return calcFV(op1, op2 + fc, CHAR_MAX, CHAR_MIN, fn);
+}
+
+// вычисление переполнения
+inline ssh_b calcFV2(short op1, short op2, ssh_b fc, ssh_w fn) {
+	return calcFV(op1, op2 + fc, SHRT_MAX, SHRT_MIN, fn);
+}
+
 // вычисление полупереноса
-inline ssh_b calcFH(ssh_b val, ssh_b offs, ssh_b fn) {
-	ssh_b v = val & 15;
-	ssh_b o = offs & 15;
-	ssh_b ret = fn ? v - o : v + o;
+inline ssh_b calcFH(ssh_b op1, ssh_b op2, ssh_b fc, ssh_b fn) {
+	ssh_b v = op1 & 15;
+	ssh_b o = op2 & 15;
+	ssh_b ret = fn ? v - (o + fc) : v + (o + fc);
 	return (ret > 15) << 4;
 }
 

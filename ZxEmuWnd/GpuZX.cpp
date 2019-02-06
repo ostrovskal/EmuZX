@@ -40,8 +40,8 @@ void GpuZX::makeCanvas() {
 
 	memset(&bmi.bmiHeader, 0, sizeof(bmi.bmiHeader));
 	bmi.bmiHeader.biSize = sizeof(bmi.bmiHeader);
-	bmi.bmiHeader.biWidth = 288;
-	bmi.bmiHeader.biHeight = 224;
+	bmi.bmiHeader.biWidth = WIDTH_SCREEN + SIZE_BORDER * 2;
+	bmi.bmiHeader.biHeight = HEIGHT_SCREEN + SIZE_BORDER * 2;
 	bmi.bmiHeader.biPlanes = 1;
 	bmi.bmiHeader.biBitCount = USHORT(32);
 	bmi.bmiHeader.biCompression = BI_RGB;
@@ -65,10 +65,10 @@ void GpuZX::showScreen() {
 			h = SelectObject(hdcMemBack, hbmpMemBack);
 		}
 		LPRECT r = &theApp.wndRect;
-		StretchBlt(hdc, r->left, r->top, r->right - r->left, r->bottom - r->top, hMem, 0, 0, 288, 224, SRCCOPY);
+		StretchBlt(hdc, r->left, r->top, r->right - r->left, r->bottom - r->top, hMem, 0, 0, WIDTH_SCREEN + SIZE_BORDER * 2, HEIGHT_SCREEN + SIZE_BORDER * 2, SRCCOPY);
 		SelectObject(hMem, h);
 		::DeleteObject(hdc);
-		StringZX::fmt(L"SshZX (%s : %d) %s [%s]", ((_TSTATE & ZX_EXEC) ? L"execute" : L"pause"), _PC,
+		StringZX::fmt(L"SshZX (%s : %d) %s [%s]", ((_TSTATE & ZX_EXEC) ? L"execute" : L"pause"), (*_PC),
 					  nameROMs[theApp.getOpt(OPT_MEM_MODEL)->dval], theApp.opts.nameLoadProg.str());
 		SetWindowText(theApp.getHWND(), (LPCWSTR)tmpBuf);
 	}
@@ -81,21 +81,21 @@ void GpuZX::execute() {
 	
 	int y = *_SCAN;
 	ssh_d* dest = memBuffer(true);
-	dest += y * 288;
+	dest += y * (WIDTH_SCREEN + SIZE_BORDER * 2);
 	ssh_b col = (*_PORT_FE) & 7;
 	ssh_d c = colours[col];
 
-	for(int x = 0; x < 288; x++) {
-		if(y < 16 || y > 207) *(dest + x) = c;
-		else if(x < 16 || x > 271) *(dest + x) = c;
+	for(int x = 0; x < (WIDTH_SCREEN + SIZE_BORDER * 2); x++) {
+		if(y < SIZE_BORDER || y >= (HEIGHT_SCREEN + SIZE_BORDER)) *(dest + x) = c;
+		else if(x < SIZE_BORDER || x >= (WIDTH_SCREEN + SIZE_BORDER)) *(dest + x) = c;
 	}
-	if(y > 15 && y < 208) {
+	if(y >= SIZE_BORDER && y < (HEIGHT_SCREEN + SIZE_BORDER)) {
 		// нарисовать скан линию экрана
-		int yy = 191 - (y - 16);
+		int yy = 191 - (y - SIZE_BORDER);
 		int y_bank = (yy / 64) * 2048;
 		int offs = scan_offs[yy & 63] + y_bank;
 
-		dest += 16;
+		dest += SIZE_BORDER;
 		auto src_cols = ((yy >> 3) * 32) + (memScreen + 6144);
 		auto src = memScreen + offs;
 
@@ -106,16 +106,17 @@ void GpuZX::execute() {
 		}
 	}
 	y++;
-	if(y > 223) y = 0;
+	if(y >= (HEIGHT_SCREEN + SIZE_BORDER * 2)) y = 0;
 	*_SCAN = y;
 	if(!y) {
 		auto filter = theApp.getOpt(OPT_PP)->dval;
 		if(filter > 0) {
 			dest = memBuffer(true);
 			int x = 0, y = 1;
-			while(y++ < 223) {
-				while(x++ < 287) {
-					*dest++ = (filter == 1 ? asm_ssh_mixed(dest, dest + 288) : asm_ssh_bilinear(x, y, 288, dest));
+			while(y++ < ((HEIGHT_SCREEN - 1) + SIZE_BORDER * 2)) {
+				while(x++ < ((WIDTH_SCREEN - 1) + SIZE_BORDER * 2)) {
+					*dest++ = (filter == 1 ? asm_ssh_mixed(dest, dest + (WIDTH_SCREEN + SIZE_BORDER * 2)) :
+							   asm_ssh_bilinear(x, y, (WIDTH_SCREEN + SIZE_BORDER * 2), dest));
 				}
 				x = 0;
 			}
@@ -137,39 +138,6 @@ void GpuZX::decodeColor(ssh_b color) {
 	ssh_d pap1 = colours[(color & 120) >> 3];
 	ink = (inv ? pap1 : ink1);
 	paper = (inv ? ink1 : pap1);
-}
-
-void GpuZX::write(ssh_b* address, ssh_b val) {
-	ssh_w offs = (ssh_w)(address - memScreen);
-	int x, y;
-	ssh_d* addr = memBuffer(true);
-	if(offs >= 6144) {
-		// атрибуты
-		offs -= 6144;
-		x = offs & 31;
-		y = (offs / 32);
-		decodeColor(val);
-		ssh_b* screen = &memZX[16384 + ((y / 8) * 2048 + ((y & 7) * 32)) + x];
-		addr += ((24 - y) * 8 * 320 + x * 8 - 320);
-		for(int n = 0; n < 8; n++) {
-			drawLine(addr, *screen);
-			screen += 256;
-			addr -= 320;
-		}
-	} else {
-		// графика
-		int bank = (offs / 2048) * 64;
-		offs &= 2047;
-
-		int h = offs / 256;
-		int l = offs & 255;
-
-		x = offs & 31;
-		y = 191 - (bank + (h + (l / 32) * 8));
-		addr += (y * 320 + x * 8);
-		decodeColor(memZX[22528 + (y / 8) * 32 + x]);
-		drawLine(addr, val);
-	}
 }
 
 void GpuZX::drawLine(ssh_d* addr, ssh_b val) {

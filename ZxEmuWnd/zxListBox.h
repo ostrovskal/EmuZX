@@ -9,15 +9,21 @@ public:
 							heightItem(20), topIndex(0), curSel(-1), countVisibleItems(0) { }
 	virtual ~zxListBox() { if(isFont) DeleteObject(hFont); DeleteObject(hbrSel); DeleteObject(hbrUnsel); }
 protected:
+
 	virtual INT_PTR wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) override;
-	virtual bool onScroll(UINT code, UINT pos, HWND hWnd, int type) override;
-	virtual bool onMouseWheel(int vkKey, int x, int y, int delta) override;
-	virtual bool onMouseButtonDown(int vkKey, int x, int y, bool left) override;
-	virtual bool onMouseButtonDblClk(int vkKey, int x, int y, bool left) override;
-	virtual bool onSize(WPARAM type, int nWidth, int nHeight) override;
-	virtual bool onPaint() override;
-	virtual void onFont(HFONT hF, bool redraw) override;
-	virtual bool onKey(int nVirtKey, LPARAM keyData, bool pressed) override;
+
+	ssh_msg BOOL onMouseWheel(UINT vkKey, short delta, POINT pt);
+	ssh_msg void onLButtonDown(UINT vkKey, POINT pt);
+	ssh_msg void onLButtonDblClk(UINT vkKey, POINT pt);
+	ssh_msg void onVScroll(UINT code, UINT p, HWND hWndScroll);
+	
+	
+	ssh_msg void onSize(UINT type, int nWidth, int nHeight);
+	ssh_msg void onKeyDown(UINT nVirtKey, UINT nRepeat, UINT nFlags);
+	ssh_msg void onPaint();
+	ssh_msg void onSetFont(HFONT hF, BOOL redraw);
+
+
 	virtual void postCreate() override;
 	void changeScroll(int& offs, int count, int page);
 	void sendNotify(int code);
@@ -32,5 +38,5 @@ protected:
 	SCROLLINFO si;
 	HBRUSH hbrSel, hbrUnsel;
 
-	//DECL_MSG_MAP()
+	DECL_MSG_MAP()
 };

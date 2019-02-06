@@ -1,22 +1,23 @@
 
 #pragma once
 
-#include "zxWnd.h"
-
 class zxDlgAddBp : public zxDialog {
 public:
 	zxDlgAddBp() : zxDialog(), _bp(nullptr), isAddr2(false), owner(false) {}
-	virtual ~zxDlgAddBp() {}
 	void edit(ZX_BREAK_POINT* bp) { _bp = bp; }
 	ZX_BREAK_POINT result;
 protected:
-	virtual void onInitDialog(HWND hWnd, LPARAM lParam) override;
-	virtual bool onCommand(int wmId, int param, LPARAM lParam) override;
+	ssh_msg void onNotifyAddr1(LPNMHDR nm, LRESULT* pResult);
+	ssh_msg void onNotifyAddr2(LPNMHDR nm, LRESULT* pResult);
+	ssh_msg void onNotifyAccess(LPNMHDR nm, LRESULT* pResult);
+
+	virtual void postCreate() override;
+	virtual bool onOK() override;
+
 	int getValue(HWND hWnd, int def);
 	void updateAccess();
 	ZX_BREAK_POINT* _bp;
-	HWND hWndAddr1, hWndAddr2;
-	HWND hWndValue, hWndMsk, hWndOK;
-	HWND hWndCond, hWndAccess;
 	bool isAddr2, owner;
+
+	DECL_MSG_MAP()
 };

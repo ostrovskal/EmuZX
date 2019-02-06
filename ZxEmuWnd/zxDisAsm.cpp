@@ -12,7 +12,7 @@ ssh_cws radix[] = {	L"%02X", L"%03d", L"%02X ", L"%03d ",
 					L"#%02X", L"%d", L"%X", L"%d",
 					L"-#%02X)", L"-%03d)", L"#%04X", L"%05d"};
 
-ssh_cws namesCode[] = {	L"B", L"C", L"D", L"E", L"H", L"IXH", L"IYH", L"L", L"IXL", L"IYL", L"(HL)", L"(IX", L"(IY", L"A", L"F",
+ssh_cws namesCode[] = {	L"B", L"C", L"D", L"E", L"H", L"XH", L"YH", L"L", L"XL", L"YL", L"(HL)", L"(IX", L"(IY", L"A", L"F",
 						L"BC", L"DE", L"HL", L"AF", L"SP", L"IX", L"IY", L"R", L"I", L"IM ",
 						L"(BC)", L"(DE)", 
 						L"NZ", L"Z", L"NC", L"C", L"PO", L"PE", L"P", L"M",
@@ -35,18 +35,18 @@ ssh_cws namesCode[] = {	L"B", L"C", L"D", L"E", L"H", L"IXH", L"IYH", L"L", L"IX
 						L", ", L"", L"0", L"(C)", L"(nn)", L"(n)", L"d", L"n", L"nn", L"addr", L"paddr", L"bit" };
 
 
-ssh_b offsRegs[] = {RL, RIXL, RIYL, 0, 0, RC, RE, RL, 0, 0, RIXL, RIYL, 0, 0, 0, RC, RE, RC };
-ssh_b name_flags[8] = { C_NZ, C_Z, C_NC, C_C, C_PO, C_PE, C_P, C_M };
-ssh_b prefRON[] = {	C_RB, C_RC, C_RD, C_RE, C_RH, C_RL, C_PHL, C_RA,
-					C_RB, C_RC, C_RD, C_RE, C_RIXH, C_RIXL, C_PIX, C_RA,
-					C_RB, C_RC, C_RD, C_RE, C_RIYH, C_RIYL, C_PIY, C_RA};
+ssh_b offsRegs[] = {RL, RXL, RYL, 0, 0, RC, RE, RL, 0, 0, RXL, RYL, 0, 0, 0, RC, RE, RC };
+static ssh_b name_flags[8] = { C_NZ, C_Z, C_NC, C_C, C_PO, C_PE, C_P, C_M };
+static ssh_b prefRON[] = {	C_RB, C_RC, C_RD, C_RE, C_RH, C_RL, C_PHL, C_RA,
+							C_RB, C_RC, C_RD, C_RE, C_RXH, C_RXL, C_PIX, C_RA,
+							C_RB, C_RC, C_RD, C_RE, C_RYH, C_RYL, C_PIY, C_RA};
 
-ssh_b prefAF[] = {	C_RBC, C_RBC, C_RDE, C_RDE, C_RHL, C_RHL, C_RAF, C_RAF,
-					C_RBC, C_RBC, C_RDE, C_RDE, C_RIX, C_RIX, C_RAF, C_RAF,
-					C_RBC, C_RBC, C_RDE, C_RDE, C_RIY, C_RIY, C_RAF, C_RAF};
-ssh_b prefSP[] = {	C_RBC, C_RBC, C_RDE, C_RDE, C_RHL, C_RHL, C_RSP, C_RSP,
-					C_RBC, C_RBC, C_RDE, C_RDE, C_RIX, C_RIX, C_RSP, C_RSP,
-					C_RBC, C_RBC, C_RDE, C_RDE, C_RIY, C_RIY, C_RSP, C_RSP};
+static ssh_b prefAF[] = {	C_RBC, C_RBC, C_RDE, C_RDE, C_RHL, C_RHL, C_RAF, C_RAF,
+							C_RBC, C_RBC, C_RDE, C_RDE, C_RIX, C_RIX, C_RAF, C_RAF,
+							C_RBC, C_RBC, C_RDE, C_RDE, C_RIY, C_RIY, C_RAF, C_RAF};
+static ssh_b prefSP[] = {	C_RBC, C_RBC, C_RDE, C_RDE, C_RHL, C_RHL, C_RSP, C_RSP,
+							C_RBC, C_RBC, C_RDE, C_RDE, C_RIX, C_RIX, C_RSP, C_RSP,
+							C_RBC, C_RBC, C_RDE, C_RDE, C_RIY, C_RIY, C_RSP, C_RSP};
 
 void zxDisAsm::opsCB() {
 	if(groupOps == 0) {
@@ -240,7 +240,6 @@ void zxDisAsm::opsED10() {
 }
 
 void zxDisAsm::opsEDXX() {
-	_pc--;
 	DA_PUT(C_ED_NONI);
 }
 
@@ -254,7 +253,7 @@ funcDA table_ops[] = {
 void zxDisAsm::execute(int prefix1, int prefix2) {
 	// читаем операцию
 	readOps();
-	prefix = prefix1;
+	prefix = (prefix1 << 3);
 	if(prefix2 == 1 && prefix1) {
 		_pc++;
 		readOps();
@@ -271,25 +270,25 @@ ssh_w zxDisAsm::decode(ssh_w pc, ssh_d count) {
 	}
 	cmdCount = count;
 	memset(cmds, C_END, cmdCount * SIZE_CMD);
-
-	for(ssh_d c = 0; c < count; c++) {
-		pos = 0;
-		adrs[c] = _pc;
-		execute(0, 0);
-		memcpy(cmds + c * SIZE_CMD, path, pos);
+	if(cmdCount > 0) {
+		for(ssh_d c = 0; c < count; c++) {
+			pos = 0;
+			adrs[c] = _pc;
+			execute(0, 0);
+			memcpy(cmds + c * SIZE_CMD, path, pos);
+		}
+		adrs[count] = _pc;
 	}
-	adrs[count] = _pc;
 	return _pc;
 }
 
 bool zxDisAsm::save(ssh_cws path, ssh_b dec) {
-	int h = 0;
-
-	bool result = true;
+	bool result = false;
 
 	try {
-		_wsopen_s(&h, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
-		if(h) {
+		_wsopen_s(&_hf, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
+		if(_hf != -1) {
+			result = true;
 			for(ssh_d i = 0; i < cmdCount; i++) {
 				auto address = adrs[i];
 				StringZX adr(fromNum(address, radix[dec + 10]));
@@ -298,13 +297,13 @@ bool zxDisAsm::save(ssh_cws path, ssh_b dec) {
 				ssh_cws tabs = (code.length() >= 8) ? L"\t\t" : L"\t\t\t";
 				StringZX str(adr + L'\t' + code + tabs + cmd + L"\r\n");
 				int sz = (int)str.length() * 2;
-				if(_write(h, str.buffer(), sz) != sz) throw(0);
+				if(_write(_hf, str.buffer(), sz) != sz) throw(0);
 			}
 		}
 	} catch(...) {
 		result = false;
 	}
-	if(h) _close(h);
+	SAFE_CLOSE1(_hf);
 	return result;
 }
 
@@ -328,7 +327,6 @@ StringZX zxDisAsm::makeCommand(ssh_d num, int flags) {
 			StringZX code(makeCode(address, adrs[num + 1] - address, dec));
 			ssh_u l = code.length();
 			ssh_cws tabs = (l >= 8 ? L"\t" : L"\t\t");
-//			ssh_cws tabs = (l > 11 ? L"\t" : (l >= 8 ? L"\t\t" : L"\t\t\t"));
 			command += code + tabs;
 		}
 		ssh_b idx;
@@ -413,7 +411,7 @@ void zxDisAsm::getCmdOperand(ssh_d num, bool isPC, bool isCall, bool isRet, int*
 						*addr2 = _pc;
 					} else if(typeOps == 1 && codeOps == 5) {
 						// jp hl/ix/iy
-						ssh_w* reg = (b == 0xdd ? (ssh_w*)&regsZX[RIXL] : (b == 0xfd ? (ssh_w*)&regsZX[RIYL] : _HL));
+						ssh_w* reg = (b == 0xdd ? (ssh_w*)&regsZX[RXL] : (b == 0xfd ? (ssh_w*)&regsZX[RYL] : _HL));
 						*addr1 = *addr2 = *reg;
 					} else {
 						*addr1 = *(ssh_w*)(memZX + _pc);

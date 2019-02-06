@@ -30,9 +30,7 @@ public:
 		U_TOP	= 32
 	};
 	zxDebugger() : zxDialog(), hWndDA(nullptr), hWndSP(nullptr), da(nullptr), hFont(nullptr), countVisibleItems(0),
-					_pc(-1), _sp(-1), _lastPC(-1), _dt(0), curIndexBP(-1), curStoryPC(-1), limitStoryPC(0) {
-		memset(bps, 0, sizeof(bps)); 
-	}
+					_pc(-1), _sp(-1), _lastPC(-1), _dt(0), curIndexBP(-1), curStoryPC(-1), limitStoryPC(0) { }
 	virtual ~zxDebugger();
 	bool checkBPS(ssh_w address, bool mem);
 	void show(bool visible);
@@ -42,12 +40,35 @@ public:
 	void removeBP(int index);
 	void setProgrammPause(bool pause, bool activate);
 protected:
-	virtual bool onCommand(int wmId, int param, LPARAM lParam) override;
-	virtual bool onSize(WPARAM type, int nWidth, int nHeight) override;
-	virtual bool onClose() override;
-	virtual bool onDrawItem(UINT idCtl, LPDRAWITEMSTRUCT lpdis) override;
-	virtual void onInitDialog(HWND hWnd, LPARAM lParam);
+	ssh_msg void onPrevBreakpoint();
+	ssh_msg void onNextBreakpoint();
+	ssh_msg void onQuckBreakpoint();
+	ssh_msg void onListBreakpoint();
+	ssh_msg void onStepInto();
+	ssh_msg void onStepOver();
+	ssh_msg void onPause();
+	ssh_msg void onRun();
+	ssh_msg void onPcUndo();
+	ssh_msg void onPcRedo();
+	ssh_msg void onHexDec();
+	ssh_msg void onOverProc();
+	ssh_msg void onSetPC();
+	ssh_msg void onSetSP();
+	ssh_msg void onSetData();
+	ssh_msg void onSetCmd();
+	ssh_msg void onDblkClkListDA();
+	ssh_msg void onDblkClkListSP();
+	ssh_msg void onScrollListDA();
+	ssh_msg void onSelChangeListDA();
+	ssh_msg void onChangeEditRegs();
+
+	ssh_msg void onClose();
+	ssh_msg void onDrawItem(int id, LPDRAWITEMSTRUCT dis);
+	ssh_msg BOOL onEraseBkgnd(HDC hdc);
+
 	virtual bool preCreate() override;
+	virtual void postCreate() override;
+
 	void updateUndoRedo(bool set);
 	void updatePrevNextBP();
 	void quickBP(int adr);
@@ -56,13 +77,11 @@ protected:
 	int comparePredefinedNames(ssh_cws buf);
 	int _pc, _sp, _lastPC, _dt;
 	int countVisibleItems;
-	zxListBox zxDA;
-	zxListBox zxSP;
-	zxListBox zxDT;
+	zxListBox zxDA, zxSP, zxDT;
 	zxDisAsm* da;
 	zxAssembler* assm;
 	HFONT hFont;
-	HBRUSH hbrSel, hbrUnSel;
+	HBRUSH hbrSel, hbrUnsel;
 	ZX_BREAK_POINT bps[COUNT_BP];
 	ssh_w storyPC[COUNT_STORY_PC];
 	HWND hWndDA, hWndSP, hWndDT;

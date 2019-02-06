@@ -4,139 +4,131 @@
 #include "zxDebugger.h"
 #include "zxDlgAddBp.h"
 
-static LVCOLUMN columns[] = {
-	{LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_MINWIDTH | LVCF_IDEALWIDTH | LVCF_DEFAULTWIDTH, LVCFMT_LEFT, 20, L"№", 0, 0, 0, 0, 10, 10, 10},
-	{LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_MINWIDTH | LVCF_IDEALWIDTH | LVCF_DEFAULTWIDTH, LVCFMT_LEFT, 120, L"Диапазон", 0, 0, 0, 0, 50, 50, 50},
-	{LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_MINWIDTH | LVCF_IDEALWIDTH | LVCF_DEFAULTWIDTH, LVCFMT_LEFT, 70, L"Условие", 0, 0, 0, 0, 20, 20, 20},
-	{LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_MINWIDTH | LVCF_IDEALWIDTH | LVCF_DEFAULTWIDTH, LVCFMT_LEFT, 60, L"Значение", 0, 0, 0, 0, 40, 40, 40},
-	{LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_MINWIDTH | LVCF_IDEALWIDTH | LVCF_DEFAULTWIDTH, LVCFMT_LEFT, 60, L"Маска", 0, 0, 0, 0, 40, 40, 40},
-	{LVCF_FMT | LVCF_TEXT | LVCF_WIDTH | LVCF_MINWIDTH | LVCF_IDEALWIDTH | LVCF_DEFAULTWIDTH, LVCFMT_CENTER, 70, L"Тип доступа", 0, 0, 0, 0, 40, 40, 40},
-};
-
 static TBBUTTON tbb[] = {
-	{13, IDM_NEW, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Добавить\tCtr+N"},
+	{13, IDM_NEW, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Добавить\\Ctr+N"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
-	{14, IDM_CHANGE, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Редактировать\tShift+C"},
-	{12, IDM_REMOVE, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Удалить\tDel"},
+	{14, IDM_CHANGE, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Редактировать\\Shift+C"},
+	{12, IDM_REMOVE, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Удалить\\Del"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
-	{15, IDM_SAVE, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Сохранить\tDel"},
+	{15, IDM_SAVE, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Сохранить\\Del"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
-	{17, IDM_UP, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Выше\tUp"},
-	{16, IDM_DOWN, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Ниже\tDown"},
+	{17, IDM_UP, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Выше\\Up"},
+	{16, IDM_DOWN, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Ниже\\Down"},
 };
 
-bool zxDlgListBps::onCommand(int wmId, int param, LPARAM lParam) {
-	switch(wmId) {
-		case IDM_UP:
-		case IDM_DOWN: {
-			ZX_BREAK_POINT tmp;
-			auto bps = theApp.debug->bps;
-			memcpy(&tmp, &bps[itemSelected], sizeof(ZX_BREAK_POINT));
-			int nItemSelected = (itemSelected + (wmId == IDM_UP ? -1 : 1));
-			memcpy(&bps[itemSelected], &bps[nItemSelected], sizeof(ZX_BREAK_POINT));
-			memcpy(&bps[nItemSelected], &tmp, sizeof(ZX_BREAK_POINT));
-			setItems();
-			itemSelected = nItemSelected;
-			ListView_SetItemState(hWndList, itemSelected, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
-			updateItems();
-			break;
-		}
-		case IDM_CHANGE:
-		case IDM_NEW: {
-			zxDlgAddBp add;
-			ZX_BREAK_POINT* bpItem = nullptr;
-			if(wmId == IDM_CHANGE) {
-				// fill data
-				bpItem = &theApp.debug->bps[itemSelected];
-				add.edit(bpItem);
-			}
-			if(add.create(IDD_DIALOG_ADD_BP, this, true) == IDOK) {
-				// проверка на пересечение
-				auto _bp = &add.result;
-				auto bps = theApp.debug->bps;
-				if(wmId == IDM_CHANGE) {
-					memcpy(bpItem, _bp, sizeof(ZX_BREAK_POINT));
-				} else {
-					for(int i = 0; i < COUNT_BP; i++) {
-						auto bp = &bps[i];
-						if(!(bp->flags & FBP_ADDR)) {
-							// установка
-							memcpy(bp, _bp, sizeof(ZX_BREAK_POINT));
-							break;
-						}
-						if((_bp->flags & FBP_ACCESS) != (bp->flags & FBP_ACCESS)) continue;
-						bool is1 = (_bp->address1 <= bp->address1) && (_bp->address2 >= bp->address1);
-						bool is2 = (_bp->address1 <= bp->address2) && (_bp->address2 >= bp->address2);
-						if(is1 || is2) {
-							bool dec = theApp.getOpt(OPT_DECIMAL)->dval;
-							StringZX s1(fromNum(_bp->address1, radix[dec + 10]));
-							StringZX s2(fromNum(_bp->address2, radix[dec + 10]));
-							StringZX d1(fromNum(bp->address1, radix[dec + 10]));
-							StringZX d2(fromNum(bp->address2, radix[dec + 10]));
-							MsgBox(StringZX::fmt(L"Перекрытие точки останова с <%i : %s - %s, %s - %s>!", i + 1, s1, s2, d1, d2), L"Ошибка", MB_ICONERROR);
-							break;
-						}
-					}
-				}
-				// обновление
-				setItems();
-			}
-			break;
-		}
-		case IDM_REMOVE: {
-			theApp.debug->removeBP(itemSelected);
-			ListView_DeleteItem(hWndList, itemSelected);
-			itemSelected = -1;
-			updateItems();
-			break;
-		}
-		case IDM_SAVE:
-			theApp.debug->saveBPS();
-			break;
-		case IDOK: break;
-		default: return false;
-	}
-	return true;
+BEGIN_MSG_MAP(zxDlgListBps, zxDialog)
+	ON_COMMAND_RANGE(IDM_UP, IDM_DOWN, onUpDown)
+	ON_COMMAND_RANGE(IDM_NEW, IDM_CHANGE, onNewEdit)
+	ON_COMMAND(IDM_REMOVE, onRemove)
+	ON_COMMAND(IDM_SAVE, onSave)
+	ON_NOTIFY(NM_CLICK, IDC_LIST_BP, onClickList)
+END_MSG_MAP()
+
+void zxDlgListBps::onUpDown() {
+	ZX_BREAK_POINT tmp;
+	auto bps = theApp.debug->bps;
+	memcpy(&tmp, &bps[itemSelected], sizeof(ZX_BREAK_POINT));
+	int nItemSelected = (itemSelected + (wmId == IDM_UP ? -1 : 1));
+	memcpy(&bps[itemSelected], &bps[nItemSelected], sizeof(ZX_BREAK_POINT));
+	memcpy(&bps[nItemSelected], &tmp, sizeof(ZX_BREAK_POINT));
+	setItems();
+	itemSelected = nItemSelected;
+	ListView_SetItemState(hWndList, itemSelected, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+	updateItems();
 }
 
-void zxDlgListBps::onInitDialog(HWND hWnd, LPARAM lParam) {
+void zxDlgListBps::onNewEdit() {
+	zxDlgAddBp add;
+	ZX_BREAK_POINT* bpItem = nullptr;
+	auto bps = debug->bps;
+	if(wmId == IDM_CHANGE) {
+		// fill data
+		bpItem = &bps[itemSelected];
+		add.edit(bpItem);
+	}
+	if(add.create(IDD_DIALOG_ADD_BP, 0, this, true) == IDOK) {
+		// проверка на пересечение
+		auto _bp = &add.result;
+		if(wmId == IDM_CHANGE) {
+			memcpy(bpItem, _bp, sizeof(ZX_BREAK_POINT));
+		} else {
+			for(int i = 0; i < COUNT_BP; i++) {
+				auto bp = &bps[i];
+				if(!(bp->flags & FBP_ADDR)) {
+					// установка
+					memcpy(bp, _bp, sizeof(ZX_BREAK_POINT));
+					break;
+				}
+				if((_bp->flags & FBP_ACCESS) != (bp->flags & FBP_ACCESS)) continue;
+				bool is1 = (_bp->address1 <= bp->address1) && (_bp->address2 >= bp->address1);
+				bool is2 = (_bp->address1 <= bp->address2) && (_bp->address2 >= bp->address2);
+				if(is1 || is2) {
+					bool dec = theApp.getOpt(OPT_DECIMAL)->dval;
+					StringZX s1(fromNum(_bp->address1, radix[dec + 10]));
+					StringZX s2(fromNum(_bp->address2, radix[dec + 10]));
+					StringZX d1(fromNum(bp->address1, radix[dec + 10]));
+					StringZX d2(fromNum(bp->address2, radix[dec + 10]));
+					MessageBox(hWnd, StringZX::fmt(L"Перекрытие точек останова с <%i : %s - %s, %s - %s>!", i + 1, s1, s2, d1, d2), L"Ошибка", MB_ICONERROR);
+					break;
+				}
+			}
+		}
+		// обновление
+		setItems();
+	}
+}
+
+void zxDlgListBps::onRemove() {
+	debug->removeBP(itemSelected);
+	ListView_DeleteItem(hWndList, itemSelected);
+	itemSelected = -1;
+	updateItems();
+}
+
+void zxDlgListBps::onSave() {
+	debug->saveBPS();
+}
+
+void zxDlgListBps::onClickList(LPNMHDR nm, LRESULT* pResult) {
+	itemSelected = (int)SendMessage(hWndList, LVM_GETNEXTITEM, -1, LVNI_FOCUSED);
+	updateItems();
+}
+
+void zxDlgListBps::postCreate() {
+	debug = theApp.debug;
 	hWndList = GetDlgItem(hWnd, IDC_LIST_BP);
 	ListView_SetExtendedListViewStyleEx(hWndList, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
-}
+	if(!hWndToolbar) makeToolbar(IDB_TOOLBAR_DEBUGGER, tbb, 18, 9, 16, 16, IDT_TOOLBAR_LIST_BPS);
 
-bool zxDlgListBps::onNotify(LPNMHDR nm) {
-	if(nm->idFrom == IDC_LIST_BP) {
-		switch(nm->code) {
-			case NM_CLICK:
-				itemSelected = (int)SendMessage(hWndList, LVM_GETNEXTITEM, -1, LVNI_FOCUSED);
-				updateItems();
-				break;
-		}
+	static int columnWidth[] = {20, 120, 70, 60, 60, 70};
+	static ssh_ws* columnNames[] = {L"#", L"Диапазон", L"Условие", L"Значение", L"Маска", L"Тип доступа"};
+
+	LVCOLUMN lvc;
+	memset(&lvc, 0, sizeof(LVCOLUMN));
+	lvc.mask = LVCF_FMT | LVCF_TEXT | LVCF_WIDTH;
+	lvc.fmt = LVCFMT_LEFT;
+	for(int i = 0; i < 6; i++) {
+		lvc.cx = columnWidth[i];
+		lvc.pszText = columnNames[i];
+		SendMessage(hWndList, LVM_INSERTCOLUMN, i, (LPARAM)&lvc);
 	}
-	return false;
+	setItems();
 }
 
 void zxDlgListBps::updateItems() {
-	if(toolbar) {
-		HWND hTB = toolbar->getHWND();
+	if(hWndToolbar) {
 		auto bps = theApp.debug->bps;
 		bool is = (itemSelected != -1);
-		SendMessage(hTB, TB_SETSTATE, IDM_CHANGE, (is << 2));
-		SendMessage(hTB, TB_SETSTATE, IDM_REMOVE, (is << 2));
+		SendMessage(hWndToolbar, TB_SETSTATE, IDM_CHANGE, (is << 2));
+		SendMessage(hWndToolbar, TB_SETSTATE, IDM_REMOVE, (is << 2));
 
 		auto count = (int)SendMessage(hWndList, LVM_GETITEMCOUNT, 0, 0) - 1;
 		bool is2 = is & (itemSelected < count);
 
-		SendMessage(hTB, TB_SETSTATE, IDM_DOWN, (is2 << 2));
+		SendMessage(hWndToolbar, TB_SETSTATE, IDM_DOWN, (is2 << 2));
 		is2 = is & (itemSelected > 0);
-		SendMessage(hTB, TB_SETSTATE, IDM_UP, (is2 << 2));
+		SendMessage(hWndToolbar, TB_SETSTATE, IDM_UP, (is2 << 2));
 	}
-}
-
-void zxDlgListBps::postCreate() {
-	if(!toolbar) toolbar = new zxToolbar(this, IDB_TOOLBAR_DEBUGGER, tbb, 18, 9, 16, 16, 2001);
-	for(int i = 0; i < 5; i++) SendMessage(hWndList, LVM_INSERTCOLUMN, i, (LPARAM)&columns[i]);
-	setItems();
 }
 
 void zxDlgListBps::setItems() {
@@ -152,7 +144,7 @@ void zxDlgListBps::setItems() {
 	lvi.cchTextMax = 256;
 
 	for(int i = 0; i < COUNT_BP; i++) {
-		auto bp = &theApp.debug->bps[i];
+		auto bp = &debug->bps[i];
 		if(!(bp->flags & FBP_ADDR)) continue;
 		lvi.iItem = i;
 

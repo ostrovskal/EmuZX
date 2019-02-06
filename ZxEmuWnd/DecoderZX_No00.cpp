@@ -11,13 +11,13 @@ void DecoderZX::funcN00_000() {
 		// NOP
 		case 0: break;
 		// EX AF, AF'
-		case 1: swapReg((ssh_w*)&regsZX[RA], (ssh_w*)&regsZX[RA_]); break;
+		case 1: swapReg((ssh_w*)&regsZX[RF], (ssh_w*)&regsZX[RF_]); break;
 		// DJNZ
-		case 2: (*_B)--; if(*_B) _PC += d; break;
+		case 2: (*_B)--; if(*_B) (*_PC) += d; break;
 		// JR
-		case 3: _PC += d; break;
+		case 3: (*_PC) += d; break;
 		// JR CCC
-		default: if(isFlag(ops & 3)) _PC += d;
+		default: if(isFlag(ops & 3)) (*_PC) += d;
 	}
 }
 
@@ -59,16 +59,16 @@ void DecoderZX::funcN00_111() {
 				a += (fn ? -96 : 96);
 				fc = 1;
 			} else fc = 0;
-			update_flags(FS | FZ | F5 | FH | F3 | FPV | FC, (a & 128) | GET_FZ(a) | (a & 0b00101000) | fh | GET_FP(a) | fc);
+			update_flags(FS | FZ | FH | FPV | FC, _FS(a) | _FZ(a) | fh | _FP(a) | fc);
 			break;
 		}
 		// CPL; --*1*-1-
-		case 5: a = ~a; update_flags(F5 | FH | F3 | FN, (a & 0b00101000) | 16 | 2); break;
+		case 5: a = ~a; update_flags(FH | FN, 18); break;
 		// SCF; --*0*-01
-		case 6:	update_flags(F5 | FH | F3 | FN | FC, (a & 0b00101000) | 1); break;
+		case 6:	update_flags(FH | FN | FC, 1); break;
 		// CCF; --***-0C H <-старый C
-		case 7: update_flags(F5 | FH | F3 | FN | FC, (a & 0b00101000) | (oldFc << 4) | (oldFc == 0)); break;
-		default: a = rotate(a, F5 | FH | F3 | FN | FC);
+		case 7: update_flags(FH | FN | FC, (oldFc << 4) | (oldFc == 0)); break;
+		default: a = rotate(a, FH | FN | FC);
 	}
 	*_A = a;
 }
@@ -81,7 +81,7 @@ void DecoderZX::ldRp() {
 		ssh_w valHL = *hl;
 		ssh_d val = valHL + *reg;
 		*hl = (ssh_w)val;
-		update_flags(F5 | FH | F3 | FN | FC, ((val >> 8) & 0b00101000) | calcFH(valHL >> 8, (*reg) >> 8, 0) | (val > 65535));
+		update_flags(FH | FN | FC, _FH(valHL >> 8, (*reg) >> 8, 0, 0) | (val > 65535));
 	} else {
 		// LD RP, NN
 		*reg = read_mem16PC();
@@ -96,12 +96,11 @@ void DecoderZX::incSSS() {
 	// SZ5H3VN-
 	ssh_b n = typeOps & 1;
 	ssh_b* reg = fromRON(ops);
-	ssh_b valReg = *reg;
-	ssh_b d = (n ? -1 : 1);
-	ssh_b val = valReg + d;
+	ssh_b op1 = *reg;
+	ssh_b op2 = (n ? -1 : 1);
+	ssh_b val = op1 + op2;
 	write_mem8(reg, val, ops);
-	update_flags(FS | FZ | F5 | FH | F3 | FPV | FN,
-		(val & 0b00101000) | (val & 128) | GET_FZ(val) | calcFH(valReg, d, n) | GET_FV(valReg, val) | GET_FN(n));
+	update_flags(FS | FZ | FH | FPV | FN, _FS(val) | _FZ(val) | _FH(op1, op2, 0, n) | _FV1(op1, op2, 0, n) | _FN(n));
 }
 
 void DecoderZX::ldSSS() {

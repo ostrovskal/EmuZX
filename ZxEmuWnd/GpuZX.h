@@ -1,12 +1,15 @@
 #pragma once
 
+#define SIZE_BORDER			32
+#define WIDTH_SCREEN		32 * 8
+#define HEIGHT_SCREEN		192
+
 class GpuZX {
 public:
 	GpuZX();
 	virtual ~GpuZX();
 	void execute();
 	bool saveScreen(ssh_cws path);
-	void write(ssh_b* address, ssh_b val);
 	void showScreen();
 protected:
 	void drawLine(ssh_d* addr, ssh_b val);

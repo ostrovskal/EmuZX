@@ -17,25 +17,13 @@ void DecoderZX::funcED01_000() {
 		case 0:
 			val = readPort(*_BC);
 			if(ops != 6) *fromRON(ops) = val;
-			update_flags(FS | FZ | F5 | FH | F3 | FPV | FN, (val & 128) | GET_FZ(val) | (val & 0b00101000) | GET_FP(val));
+			update_flags(FS | FZ |FH | FPV | FN, _FS(val) | _FZ(val) | _FP(val));
 			break;
 		//	*OUT[C], 0
 		//	OUT[C], SSS
 		case 1: writePort(*_BC, (ops == 6 ? 0 : *fromRON(ops))); break;
 		// ADC/SBC HL, RP; SZ***VNC
-		case 2: {
-			ssh_w reg = *fromRP_SP(ops);
-			ssh_w nn = *_HL;
-			ssh_b fn = (!(ops & 1)) << 1;
-			ssh_w d = reg + getFlag(FC);
-			ssh_d val = (fn ? nn - d : nn + d);
-			ssh_b fc = val > 65535;
-			ssh_b fz = (val == 0) << 6;
-			*_HL = (ssh_w)val;
-			val = val >> 8;
-			update_flags(FS | FZ | F5 | FH | F3 | FN | FC, (val & 128) | (val & 0b00101000) | fz | calcFH(nn >> 8, d >> 8, fn) | fn | fc);
-			break;
-		}
+		case 2: opsAccum2(); break;
 		// LD [NN], RP / LD RP, [nn]
 		case 3: {
 			ssh_w* reg = fromRP_SP(ops);
@@ -48,17 +36,21 @@ void DecoderZX::funcED01_000() {
 			a = *_A;
 			val = -a;
 			*_A = val;
-			update_flags(FS | FZ | F5 | FH | F3 | FPV | FN | FC,
-				(val & 128) | GET_FZ(val) | (val & 0b00101000) | calcFH(0, a, 1) | calcFV(val, a) | 2 | (a != 0));
+			update_flags(FS | FZ | FH | FPV | FN | FC, _FS(val) | _FZ(val) | _FH(0, a, 0, 1) | ((a >= 0x80) << 2) | 2 | (a != 0));
 			break;
 		// RETI; IFF1 <- IFF2; SP += 2; PC <- [SP - 2];	Возврат из INT
 		case 5:
 			*_IFF1 = *_IFF2;
-			_PC = read_mem16(*_SP);
+			(*_PC) = read_mem16(*_SP);
 			(*_SP) += 2;
 			break;
 		// IM X
-		case 6: *_IM = (ops & 3) - 1; break;
+		case 6: 
+			switch(ops) {
+				case 2: case 6: *_IM = 1; break;
+				case 3: case 7: *_IM = 2; break;
+				default: *_IM = 0;
+			}
 	}
 }
 
@@ -86,7 +78,7 @@ void DecoderZX::funcED01_111() {
 				*reg = (vreg << 4) | a;
 			}
 			ssh_b val = *_A = ((*_A & 240) | h);
-			update_flags(FS | FZ | F5 | FH | F3 | FPV | FN, (val & 128) | GET_FZ(val) | (val & 0b00101000) | GET_FP(val));
+			update_flags(FS | FZ | FH | FPV | FN, _FS(val) | _FZ(val) | _FP(val));
 			break;
 		}
 		default: nop(); break;

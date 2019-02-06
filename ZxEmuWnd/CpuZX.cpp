@@ -21,58 +21,54 @@ ssh_b memBanks[8 * 16384];
 ssh_b* limitROM = &memZX[16384];
 ssh_b* limitScreen = &memZX[23296];
 
-// счетчик комманд
-ssh_w _PC;
-
-ssh_w* _PC_EXIT_CALL;
-
 // адрес прерывани€
-ssh_b* _I;
+ssh_b* _I = nullptr;
 
 // ренегераци€
-ssh_b* _R;
+ssh_b* _R = nullptr;
 
 // режим прерываний
-ssh_b* _IM;
+ssh_b* _IM = nullptr;
 
 // триггеры
-ssh_b* _IFF1;
-ssh_b* _IFF2;
+ssh_b* _IFF1 = nullptr;
+ssh_b* _IFF2 = nullptr;
 
 // содержимое порта FE
-ssh_b* _PORT_FE;
-ssh_b* _PORT_FD;
+ssh_b* _PORT_FE = nullptr;
+ssh_b* _PORT_FD = nullptr;
 
 // ROM
-ssh_b* ptrROM;
-int szROM;
+ssh_b* ptrROM = nullptr;
+int szROM = 0;
 
 // RAM
-ssh_b* _RAM;
+ssh_b* _RAM = nullptr;
 
 // VID
-ssh_b* _VID;
-ssh_b* memScreen;
+ssh_b* _VID = nullptr;
+ssh_b* memScreen = nullptr;
 
 // ROM
-ssh_b* _ROM;
+ssh_b* _ROM = nullptr;
 
-// признак наличи€ прерывани€ INT
-ssh_b* _TRAP;
+ssh_b* _A = nullptr;
+ssh_b* _B = nullptr;
 
-ssh_b* _A;
-ssh_b* _B;
-
-ssh_w* _BC;
-ssh_w* _DE;
-ssh_w* _HL;
-ssh_w* _SP;
+ssh_w* _BC = nullptr;
+ssh_w* _DE = nullptr;
+ssh_w* _HL = nullptr;
+ssh_w* _SP = nullptr;
+ssh_w* _IX = nullptr;
+ssh_w* _IY = nullptr;
+ssh_w* _PC = nullptr;
+ssh_w* _PC_EXIT_CALL = nullptr;
 
 // скан строка
-ssh_b* _SCAN;
+ssh_b* _SCAN = nullptr;
 
 // статус
-volatile ssh_w _TSTATE;
+volatile ssh_w _TSTATE = 0;
 
 CpuZX::CpuZX() {
 	decoder = new DecoderZX();
@@ -94,30 +90,32 @@ void CpuZX::signalRESET() {
 	_B = &regsZX[RB];
 	_R = &regsZX[RR];
 	_I = &regsZX[RI];
-	_IM= &regsZX[RIM];
+	_IM= &regsZX[IM];
 
-	_IFF1 = &regsZX[RIFF1];
-	_IFF2 = &regsZX[RIFF2];
-	_PORT_FE = &regsZX[RFE];
-	_PORT_FD = &regsZX[RFD];
+	_IFF1 = &regsZX[IFF1];
+	_IFF2 = &regsZX[IFF2];
+	_PORT_FE = &regsZX[FE];
+	_PORT_FD = &regsZX[FD];
 	_RAM = &regsZX[RAM];
 	_ROM = &regsZX[ROM];
 	_VID = &regsZX[VID];
 	_SCAN = &regsZX[SCAN];
-	_TRAP = &regsZX[RTRAP];
 
 	_BC = (ssh_w*)&regsZX[RC];
 	_DE = (ssh_w*)&regsZX[RE];
 	_HL = (ssh_w*)&regsZX[RL];
 	_SP = (ssh_w*)&regsZX[RSPL];
-	_PC_EXIT_CALL = (ssh_w*)&regsZX[RPC_EXIT_CALL1];
+	_PC = (ssh_w*)&regsZX[RPCL];
+	_IX = (ssh_w*)&regsZX[RXL];
+	_IY = (ssh_w*)&regsZX[RYL];
+	_PC_EXIT_CALL = (ssh_w*)&regsZX[PC_EXIT_CALL1];
 
-	*_R = *_I = *_IM = *_TRAP = 0;
+	*_R = *_I = *_IM = 0;
 	*_IFF1 = *_IFF2 = 0;
 	*_PORT_FE = 224;
 	*_PORT_FD = 192;
 	*_RAM = *_ROM = *_VID = *_SCAN = 0;
-	_PC = 0;
+	*_PC = *_BC = *_DE = *_HL = *_IX = *_IY = 0;
 
 	SAFE_DELETE(ptrROM); szROM = 0;
 
@@ -149,8 +147,9 @@ void CpuZX::signalRESET() {
 }
 
 void CpuZX::signalINT() {
-	if(*_IFF1 && *_TRAP) {
-		*_TRAP = *_IFF1 = *_IFF2 = 0;
+	if(_IFF1 && *_IFF1 && (_TSTATE & ZX_TRAP)) {
+		modifyTSTATE(0, ZX_TRAP);
+		*_IFF1 = *_IFF2 = 0;
 		switch(*_IM) {
 			case 0: 
 				// вызываем системный монитор (debug window)
@@ -177,7 +176,7 @@ void CpuZX::execute(bool run_debugger) {
 	if((_TSTATE & ZX_EXEC) || run_debugger) {
 		modifyTSTATE(ZX_INT, 0);
 		if((_TSTATE & ZX_DEBUG) && !run_debugger) {
-			if(theApp.debug->checkBPS(_PC, false)) return;
+			if(theApp.debug->checkBPS(*_PC, false)) return;
 		}
 		// выполнение операции
 		decoder->execOps(0, 0);
@@ -200,7 +199,6 @@ bool CpuZX::saveStateZX(const StringZX& path) {
 
 			if(_write(_hf, &model, 1) != 1) throw(0);
 			if(_write(_hf, (ssh_w*)&_TSTATE, 2) != 2) throw(0);
-			if(_write(_hf, &_PC, 2) != 2) throw(0);
 			if(_write(_hf, &regsZX, sizeof(regsZX)) != sizeof(regsZX)) throw(0);
 			if(_write(_hf, memZX, 65536) != 65536) throw(0);
 			if(_write(_hf, memBanks, 16384 * 8) != 16384 * 8) throw(0);
@@ -232,7 +230,6 @@ bool CpuZX::loadStateZX(const StringZX& path) {
 			auto l = _filelength(_hf);
 			if(_read(_hf, &model, 1) != 1) throw(0);
 			if(_read(_hf, (ssh_w*)&_TSTATE, 2) != 2) throw(0);
-			if(_read(_hf, &_PC, 2) != 2) throw(0);
 
 			theApp.getOpt(OPT_MEM_MODEL)->dval = model;
 			
@@ -240,7 +237,7 @@ bool CpuZX::loadStateZX(const StringZX& path) {
 			if(_read(_hf, memZX, 65536) != 65536) throw(0);
 			if(_read(_hf, memBanks, 16384 * 8) != 16384 * 8) throw(0);
 
-			l -= (5 + sizeof(regsZX) + 16384 * 12);
+			l -= (3 + sizeof(regsZX) + 16384 * 12);
 			if(_read(_hf, tmpBuf, l) != l) throw(0);
 			theApp.opts.nameLoadProg = tmpBuf;
 		}

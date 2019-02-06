@@ -2,80 +2,45 @@
 #pragma once
 
 struct SSH_MSGMAP;
-class zxToolbar;
+struct SSH_MSGMAP_ENTRY;
 class zxWnd {
 	friend LRESULT CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 public:
 	zxWnd();
-	virtual ~zxWnd() { detach(); }
+	virtual ~zxWnd();
 	void attach(HWND hWnd);
 	void detach();
 	static zxWnd* fromHWND(HWND hWnd);
 	HWND getHWND() const { return hWnd; }
-	virtual HWND create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, int x, int y, int cx, int cy, zxWnd* wndParent, UINT nID, UINT nMenu);
-	void showWindow(bool show) const { ShowWindow(hWnd, show); }
-	void updateWindow() const { UpdateWindow(hWnd); }
-	void enableWindow(bool enable) { EnableWindow(hWnd, enable); }
-	int MsgBox(ssh_cws text, ssh_cws caption, int flags) { return MessageBox(hWnd, text, caption, flags); }
-	bool isWindowVisible() const { return IsWindowVisible(hWnd); }
-	LRESULT SendMsg(UINT msg, WPARAM wParam, LPARAM lParam) const { return SendMessage(hWnd, msg, wParam, lParam); }
 	LONG getStyles() const { return GetWindowLong(hWnd, GWL_STYLE); }
 	operator const HWND() { return hWnd; }
+	virtual HWND create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, int x, int y, int cx, int cy, zxWnd* wndParent, UINT nID, UINT nMenu);
+	HWND makeToolbar(WORD IDB, TBBUTTON* tbb, int cBitmaps, int cButtons, int cxButton, int cyButton, UINT nID);
 protected:
+	virtual BOOL onWndMsg(UINT message, WPARAM wParam, LPARAM lParam, LRESULT* pResult);
 	virtual INT_PTR wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	virtual bool onCommand(int wmId, int param, LPARAM lParam) { return false; }
-	virtual bool onClose() { return true; }
-	virtual bool onCreate(LPCREATESTRUCT cs) { return true; }
-	virtual bool onSize(WPARAM type, int nWidth, int nHeight) { return false; }
-	virtual bool onKey(int nVirtKey, LPARAM keyData, bool pressed) { return false; }
-	virtual bool onNotify(LPNMHDR nm) { return false; }
-	virtual void onIdle() {}
-	virtual void onDestroy() {}
-	virtual bool onBackgrnd() { return true; }
-	virtual bool onDrawItem(UINT idCtl, LPDRAWITEMSTRUCT lpdis) { return false; }
-	virtual bool onScroll(UINT code, UINT pos, HWND hWnd, int type) { return false; }
-	virtual bool onMouseWheel(int vkKey, int x, int y, int delta) { return false; }
-	virtual bool onMouseButtonDown(int vkKey, int x, int y, bool left) { return false; }
-	virtual bool onMouseButtonUp(int vkKey, int x, int y, bool left) { return false; }
-	virtual bool onMouseMove(int vkKey, int x, int y) { return false; }
-	virtual bool onMouseButtonDblClk(int vkKey, int x, int y, bool left) { return false; }
-	virtual bool onPaint() { return false; }
-	virtual int onCalcSize(bool isParams, LPARAM lParam) { return 0; }
-	virtual void onFont(HFONT hFont, bool redraw) { }
+	virtual int onInitDialog(HWND hWnd) { return 1; }
 	virtual bool preCreate() { return true; }
 	virtual void postCreate() {  }
-
+	const SSH_MSGMAP_ENTRY* findMessageEntry(const SSH_MSGMAP_ENTRY* lpEntry, UINT nMsg, UINT nCode, UINT nID);
 	ssh_cws registerClass(ssh_cws name, int idMenu, WNDPROC proc);
 	zxWnd* parent;
-	HWND hWnd;
+	HWND hWnd, hWndToolbar;
 	UINT wndID;
-
-	zxToolbar* toolbar;
-
-	static const SSH_MSGMAP* PASCAL GetThisMessageMap() { return nullptr; }
-	virtual const SSH_MSGMAP* GetMessageMap() const { return nullptr; }
-
-};
-
-class zxToolbar : public zxWnd {
-public:
-	zxToolbar(zxWnd* parent, WORD IDB, TBBUTTON* tbb, int cBitmaps, int cButtons, int cxButton, int cyButton, UINT nID);
-	virtual ~zxToolbar() { DeleteObject(hBmp); }
-protected:
-	virtual bool onBackgrnd() { return false; }
+	UINT wmId;
 	HBITMAP hBmp;
+
+	static const SSH_MSGMAP* PASCAL GetThisMessageMap();
+	virtual const SSH_MSGMAP* GetMessageMap() const;
 };
 
 class zxDialog : public zxWnd {
 public:
 	zxDialog() : zxWnd(), nResult(0) {}
-	virtual ~zxDialog();
-	int create(WORD IDD, zxWnd* wndParent, bool modal);
+	virtual ~zxDialog() { }
+	int create(WORD IDD, WORD IDA, zxWnd* wndParent, bool modal);
 protected:
-	virtual INT_PTR wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) override;
-	virtual void onInitDialog(HWND hWnd, LPARAM lParam) {}
-	virtual INT_PTR onCtlColorStatic(HDC hDC, HWND hWnd) { return 0; }
-	virtual bool onClose() { if(!zxWnd::onClose()) return 0; nResult = IDCANCEL; return false; }
-	virtual bool onBackgrnd() { return false; }
+	virtual bool onOK() { return true; }
+	virtual bool onCancel() { return true; }
 	int nResult;
 };
