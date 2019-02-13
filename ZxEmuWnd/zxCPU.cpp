@@ -1,88 +1,96 @@
 
 #include "stdafx.h"
-#include "DecoderZX.h"
-#include "GpuZX.h"
+#include "zxBus.h"
+#include "zxCPU.h"
+#include "zxGPU.h"
 #include "zxDebugger.h"
 
-extern funcDecoder table_opsN00_XXX[];
-extern funcDecoder table_opsN11_XXX[];
-extern funcDecoder table_opsED01_XXX[];
-extern funcDecoder table_opsED10_XXX[];
+extern funcCPU table_opsN00_XXX[];
+extern funcCPU table_opsN11_XXX[];
+extern funcCPU table_opsED01_XXX[];
+extern funcCPU table_opsED10_XXX[];
 
 ssh_b flags_cond[4] = {FZ, FC, FPV, FS};
-ssh_b cnvPrefAF[] = {RC, RB, RE, RD, RL, RH, RF, RA, RC, RB, RE, RD, RXL, RXH, RF, RA, RC, RB, RE, RD, RYL, RYH, RF, RA};
-ssh_b cnvPrefSP[] = {RC, RB, RE, RD, RL, RH, RSPL, RSPH, RC, RB, RE, RD, RXL, RXH, RSPL, RSPH, RC, RB, RE, RD, RYL, RYH, RSPL, RSPH};
-ssh_b cnvPrefRON[] = {RB, RC, RD, RE, RH, RL, RF, RA, RB, RC, RD, RE, RXH, RXL, RF, RA, RB, RC, RD, RE, RYH, RYL, RF, RA};
-
-// пишем в память 8 битное значение
-void DecoderZX::write_mem8(ssh_b* address, ssh_b val, ssh_w ron) {
-	if(_TSTATE & ZX_DEBUG) debug->checkBPS((ssh_w)(address - memZX), true);
-	if(address < limitROM) { if(_TSTATE & ZX_WRITE_ROM) *address = val; }
-	else *address = val;
+ssh_d cnvPrefAF[] = {RC, RB, RE, RD, RL, RH, RF, RA, RC, RB, RE, RD, RXL, RXH, RF, RA, RC, RB, RE, RD, RYL, RYH, RF, RA};
+ssh_d cnvPrefSP[] = {RC, RB, RE, RD, RL, RH, RSPL, RSPH, RC, RB, RE, RD, RXL, RXH, RSPL, RSPH, RC, RB, RE, RD, RYL, RYH, RSPL, RSPH};
+ssh_d cnvPrefRON[] = {RB, RC, RD, RE, RH, RL, RF, RA, RB, RC, RD, RE, RXH, RXL, RF, RA, RB, RC, RD, RE, RYH, RYL, RF, RA};
+ 
+void zxCPU::noni() {
+	modifyTSTATE(0, ZX_INT); 
 }
 
-// пишем в память 16 битное значение
-void DecoderZX::write_mem16(ssh_w address, ssh_w val) {
-	ssh_b* mem = &memZX[address];
-	if(_TSTATE & ZX_DEBUG) debug->checkBPS(address, true);
-	if(address < 16384) { if(_TSTATE & ZX_WRITE_ROM) *(ssh_w*)mem = val; }
-	else *(ssh_w*)mem = val;
-}
-
-ssh_b DecoderZX::readPort(ssh_w address) {
-	if((address % 256) == 31) {
-		return portsZX[31];
+ssh_b readPort(ssh_b lport, ssh_b hport) {
+	switch(lport) {
+		case 0xfd: return 0;
+		case 0x1f: return *_KEMPSTON;
+		case 0xfe: {
+			ssh_b ret = 255;
+			for(int i = 0; i < 8; i++) {
+				if(hport & (1 << i)) continue;
+				ret &= _KEYS[i];
+			}
+			return ret;
+		}
 	}
-	return portsZX[address];
+	return 255;
 }
 
-void DecoderZX::writePort(ssh_w address, ssh_b val) {
-	if(address == 0x7ffd) {
+void writePort(ssh_b lport, ssh_b hport, ssh_b val) {
+	switch(lport) {
+		// 0, 1, 2 - бордер
+		// 3 MIC - при записи/загрузке
+		// 4 - SOUND
+		case 0xfe:
+			*_PORT_FE &= 224;
+			*_PORT_FE |= (val & 31);
+			break;
 		// 1, 2, 4 - страница 0-7
 		// 8 - экран 5/7
 		// 16 - ПЗУ 0 - 128К 1 - 48К
 		// 32 - блокировка
-		*_PORT_FD &= 224;
-		if(!((*_PORT_FD) & 32)) {
-			*_PORT_FD |= (val & 63);
+		case 0xfd:
+			if(hport != 0x7f) break;
+			if(*_LOCK_FD) break;
+			*_LOCK_FD |= val & 32;
 			// ROM
-			int rom = ((val & 16) >> 4);
-			if(rom != (*_ROM)) {
-				memcpy(&memZX, ptrROM + (rom * 16384), 16384);
-				*_ROM = rom;
-			}
+			theApp->bus.swapPage(((val & 16) >> 4), zxBus::SWAP_ROM);
 			// SCREEN
-			*_VID = ((val & 8) ? 7 : 5);
-			//memScreen = &memBanks[(*_VID) * 16384];
+			theApp->bus.swapPage(((val & 8) ? 7 : 5), zxBus::SWAP_VRAM);
 			// PAGE
-			int page = val & 7;
-			if(page != *_RAM) {
-				memcpy(&memBanks[(*_RAM) * 16384], &memZX[0xc000], 16384);
-				memcpy(&memZX[0xc000], &memBanks[page * 16384], 16384);
-				*_RAM = page;
-			}
-		}
-	} else {
-		if((address % 256) == 0xfe) {
-			// 0, 1, 2 - бордер
-			// 3 MIC - при записи/загрузке
-			// 4 - SOUND
-			*_PORT_FE &= 224;
-			*_PORT_FE |= (val & 31);
-		} else {
-			portsZX[address] = val;
-		}
+			theApp->bus.swapPage(val & 7, zxBus::SWAP_RAM);
+			break;
+		case 0x1f:
+			*_KEMPSTON = val;
+			break;
 	}
 }
 
-void DecoderZX::execCALL(ssh_w address) {
+// пишем в память 8 битное значение
+void zxCPU::write_mem8(ssh_b* address, ssh_b val) {
+	if(address < &memZX[65536]) {
+		if((*_TSTATE) & ZX_DEBUG) theApp->debug->checkBPS((ssh_w)(address - memZX), true);
+		if(address < &memZX[16384]) return;
+	}
+	*address = val;
+}
+
+// пишем в память 16 битное значение
+void zxCPU::write_mem16(ssh_b* address, ssh_w val) {
+	if(address < &memZX[65536]) {
+		if((*_TSTATE) & ZX_DEBUG) theApp->debug->checkBPS((ssh_w)(address - memZX), true);
+		if(address < &memZX[16384]) return;
+	}
+	*(ssh_w*)address = val;
+}
+
+void zxCPU::execCALL(ssh_w address) {
 	*_PC_EXIT_CALL = (*_PC);
 	(*_SP) -= 2;
 	write_mem16(*_SP, (*_PC));
 	(*_PC) = address;
 }
 
-ssh_b DecoderZX::rotate(ssh_b v, ssh_b mask) {
+ssh_b zxCPU::rotate(ssh_b v, ssh_b mask) {
 	// --503-0C | SZ503P0C
 	ssh_b fl = getFlag(FC);
 	v = asm_ssh_rotate(v, ops, &fl);
@@ -114,7 +122,7 @@ ssh_b DecoderZX::rotate(ssh_b v, ssh_b mask) {
 	*/
 }
 
-void DecoderZX::opsAccum2() {
+void zxCPU::opsAccum2() {
 	ssh_b fl = getFlag(FC);
 	*_HL = asm_ssh_accum2(*_HL, *fromRP_SP(ops), (!(ops & 1)) << 1, &fl);
 	update_flags(FS | FZ | FH | FPV | FN | FC, fl);
@@ -141,7 +149,7 @@ void DecoderZX::opsAccum2() {
 	*/
 }
 
-void DecoderZX::opsAccum(ssh_b d) {
+void zxCPU::opsAccum(ssh_b d) {
 	ssh_b fl = getFlag(FC);
 	ssh_b ret = asm_ssh_accum(*_A, d, ops, &fl);
 	if(ops != 7) *_A = ret;
@@ -200,56 +208,56 @@ void DecoderZX::opsAccum(ssh_b d) {
 	*/
 }
 
-void DecoderZX::ops00_NO() {
+void zxCPU::opsNN00() {
 	(this->*table_opsN00_XXX[typeOps])();
 }
 
-void DecoderZX::ops01_NO() {
+void zxCPU::opsNN01() {
 	if(typeOps == ops && ops == 6) {
 		// halt
-	if(!(_TSTATE & ZX_TRAP)) (*_PC)--;
+	if(!((*_TSTATE) & ZX_TRAP)) (*_PC)--;
 	} else {
 		if(typeOps == 6) {
 			// LD DDD, [HL/IX]
-			regsZX[cnvPrefRON[ops]] = *fromRON(typeOps);
+			memZX[cnvPrefRON[ops]] = *fromPrefRON(typeOps);
 		} else if(ops == 6) {
 			// LD [HL/IX], SSS
-			write_mem8(fromRON(ops), regsZX[cnvPrefRON[typeOps]], ops);
+			write_mem8(fromPrefRON(ops), memZX[cnvPrefRON[typeOps]]);
 		} else {
 			// LD DDD, SSS
-			write_mem8(fromRON(ops), *fromRON(typeOps), ops);
+			write_mem8(fromPrefRON(ops), *fromPrefRON(typeOps));
 		}
 	}
 }
 
-void DecoderZX::ops10_NO() {
-	opsAccum(*fromRON(typeOps));
+void zxCPU::opsNN10() {
+	opsAccum(*fromPrefRON(typeOps));
 }
 
-void DecoderZX::ops11_NO() {
+void zxCPU::opsNN11() {
 	(this->*table_opsN11_XXX[typeOps])();
 }
 	
-void DecoderZX::ops01_ED() {
+void zxCPU::opsED01() {
 	(this->*table_opsED01_XXX[typeOps])();
 }
 
-void DecoderZX::opsXX_ED() {
+void zxCPU::opsEDXX() {
 	noni();
 }
 
-funcDecoder table_ops[] = {
-	&DecoderZX::ops00_NO, &DecoderZX::ops00_CB, &DecoderZX::opsXX_ED,
-	&DecoderZX::ops01_NO, &DecoderZX::ops01_CB, &DecoderZX::ops01_ED,
-	&DecoderZX::ops10_NO, &DecoderZX::ops10_CB, &DecoderZX::ops10_ED,
-	&DecoderZX::ops11_NO, &DecoderZX::ops11_CB, &DecoderZX::opsXX_ED
+funcCPU table_ops[] = {
+	&zxCPU::opsNN00, &zxCPU::opsCB00, &zxCPU::opsEDXX,
+	&zxCPU::opsNN01, &zxCPU::opsCB01, &zxCPU::opsED01,
+	&zxCPU::opsNN10, &zxCPU::opsCB10, &zxCPU::opsED10,
+	&zxCPU::opsNN11, &zxCPU::opsCB11, &zxCPU::opsEDXX
 };
 
-void DecoderZX::execOps(int prefix1, int prefix2) {
+void zxCPU::execOps(int prefix1, int prefix2) {
 	incrementR();
 	// читаем операцию
 	ssh_b group = readOps();
 	prefix = (prefix1 << 3);
-	if(prefix2 == 1 && prefix) { fromRON(6); group = readOps(); }
+	if(prefix2 == 1 && prefix) { fromPrefRON(6); group = readOps(); }
 	(this->*table_ops[group * 3 + prefix2])();
 }

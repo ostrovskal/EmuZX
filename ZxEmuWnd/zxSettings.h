@@ -5,6 +5,8 @@
 
 #define MODEL_48K		0
 #define MODEL_128K		1
+#define MODEL_SCORPION	2
+#define MODEL_PENTAGON	3
 
 #define PP_NONE			0
 #define PP_MIXED		1
@@ -68,31 +70,31 @@ struct ZX_OPTION {
 	ssh_b type;
 	ssh_cws name;
 	DWORD dval;
-	StringZX sval;
+	zxString sval;
 };
 
-class SettingsZX {
+class zxSettings {
 public:
-	SettingsZX();
-	virtual ~SettingsZX() { options = nullptr; }
+	zxSettings();
+	virtual ~zxSettings() { options = nullptr; }
 	
 	// загрузить установки
-	void load(const StringZX& path);
+	void load(const zxString& path);
 
 	// сохранить установки
-	void save(const StringZX& path);
+	void save(const zxString& path);
 
 	// получить опцию по ИД
 	ZX_OPTION* get(int idx) { return &options[idx]; }
 
 	// папка приложения
-	StringZX mainDir;
+	zxString mainDir;
 
 	// имя последней загруженной программы(игры)
-	StringZX nameLoadProg;
+	zxString nameLoadProg;
 protected:
 	// прочитать строку из настроек
-	bool readLine(FILE* hh, StringZX& name, StringZX& value);
+	bool readLine(FILE* hh, zxString& name, zxString& value);
 		
 	// массив опций
 	ZX_OPTION* options;

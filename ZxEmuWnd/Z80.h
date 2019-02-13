@@ -105,5 +105,5 @@ struct HEAD3_Z80 {
 };
 #pragma pack(pop)
 
-bool loadZ80(const StringZX& path);
-bool saveZ80(const StringZX& path);
+bool loadZ80(const zxString& path);
+bool saveZ80(const zxString& path);

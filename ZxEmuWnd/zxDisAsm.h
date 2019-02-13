@@ -156,7 +156,7 @@
 extern ssh_b prefAF[];
 extern ssh_b prefSP[];
 extern ssh_b prefRON[];
-extern ssh_b offsRegs[];
+extern ssh_d offsRegs[];
 
 class zxDisAsm {
 public:
@@ -176,10 +176,10 @@ public:
 	ssh_w move(ssh_w pc, int count);
 
 	// формирование строки кода комманды
-	StringZX makeCode(ssh_w address, int length, ssh_b dec) const;
+	zxString makeCode(ssh_w address, int length, ssh_b dec) const;
 	
 	// формирование комманды
-	StringZX makeCommand(ssh_d num, int flags);
+	zxString makeCommand(ssh_d num, int flags);
 
 	// вернуть адрес операнда комманды передачи управления(CALL, JP, JR)/загрузки или взятия адреса(LD A/RP, NN/LD A/RP,[NN]/ LD [NN], A/RP)
 	void getCmdOperand(ssh_d num, bool pc, bool call, bool ret, int* addr1, int* addr2);
@@ -221,7 +221,7 @@ protected:
 
 	inline ssh_b fromRP_SP(ssh_b rp) { return prefSP[prefix + (rp & 6)]; }
 
-	inline ssh_b fromHL() { return C_PHL + prefix; }
+	inline ssh_b fromHL() { return C_PHL + (prefix >> 3); }
 
 	inline ssh_b fromRP_AF(ssh_b rp) { return prefAF[prefix + (rp & 6)]; }
 
@@ -229,20 +229,20 @@ protected:
 
 	inline ssh_w read16() { auto v = *(ssh_w*)(memZX + _pc); _pc += 2; return v; }
 
-	inline ssh_w addrReg(ssh_b reg) { return *(ssh_w*)(regsZX + offsRegs[reg - 10]); }
+	inline ssh_w addrReg(ssh_b reg) { return *(ssh_w*)(memZX + offsRegs[reg - 10]); }
 
-	inline void put16(ssh_w nn) { DA_PUT(nn & 255); DA_PUT(nn >> 8); }
+	inline void put16(ssh_w nn) { _DA(nn & 255); _DA(nn >> 8); }
 
 	// B C D E H L (HL) A
-	inline void fromRON1(ssh_b ron) { DA_PUT(prefRON[ron]); }
+	inline void fromRON(ssh_b ron) { _DA(prefRON[ron]); }
 	
-	// (HL/IX+d/IY+d)/B C D E H/IXH/IYH L/XL/YL
-	void fromRON(ssh_b ron) {
+	// (HL/IX+d/IY+d)/B C D E H/XH/YH L/XL/YL
+	void fromPrefRON(ssh_b ron) {
 		if(ron == 6) {
 			auto r = fromHL();
-			DA_PUT(r);
-			if(prefix) { n = read8(); DA_PUT(C_D); DA_PUT(n); DA_PUT(C_ADDR); auto addr = addrReg(r); put16((addr + (char)n) & 0xffff); }
-		} else DA_PUT(prefRON[prefix + ron]);
+			_DA(r);
+			if(prefix) { n = read8(); _DA(C_D); _DA(n); _DA(C_ADDR); auto addr = addrReg(r); put16((addr + (char)n) & 0xffff); }
+		} else _DA(prefRON[prefix + ron]);
 	}
 
 	ssh_b prefix;

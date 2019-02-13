@@ -35,7 +35,8 @@ ssh_cws namesCode[] = {	L"B", L"C", L"D", L"E", L"H", L"XH", L"YH", L"L", L"XL",
 						L", ", L"", L"0", L"(C)", L"(nn)", L"(n)", L"d", L"n", L"nn", L"addr", L"paddr", L"bit" };
 
 
-ssh_b offsRegs[] = {RL, RXL, RYL, 0, 0, RC, RE, RL, 0, 0, RXL, RYL, 0, 0, 0, RC, RE, RC };
+ssh_d offsRegs[] = {RL, RXL, RYL, 0, 0, RC, RE, RL, 0, 0, RXL, RYL, 0, 0, 0, RC, RE, RC };
+
 static ssh_b name_flags[8] = { C_NZ, C_Z, C_NC, C_C, C_PO, C_PE, C_P, C_M };
 static ssh_b prefRON[] = {	C_RB, C_RC, C_RD, C_RE, C_RH, C_RL, C_PHL, C_RA,
 							C_RB, C_RC, C_RD, C_RE, C_RXH, C_RXL, C_PIX, C_RA,
@@ -50,197 +51,204 @@ static ssh_b prefSP[] = {	C_RBC, C_RBC, C_RDE, C_RDE, C_RHL, C_RHL, C_RSP, C_RSP
 
 void zxDisAsm::opsCB() {
 	if(groupOps == 0) {
-		DA_PUT(C_ROT_RLC + codeOps);
+		_DA(C_ROT_RLC + codeOps);
 	} else {
-		DA_PUT(C_BIT + groupOps - 1); DA_PUT(C_BT); DA_PUT(codeOps); DA_PUT(C_COMMA);
+		_DA(C_BIT + groupOps - 1); _DA(C_BT); _DA(codeOps); _DA(C_COMMA);
 	}
 	if(prefix) {
 		_pc -= 2;
-		fromRON(6);
+		fromPrefRON(6);
 		_pc++;
 		if(typeOps == 6) return;
-		DA_PUT(C_COMMA);
+		_DA(C_COMMA);
 	}
-	fromRON1(typeOps);
+	fromRON(typeOps);
 }
 
 void zxDisAsm::ops00() {
 	ssh_b r;
 	switch(typeOps) {
 		case 0:
-			DA_PUT(codeOps > 2 ? C_JR : codeOps + C_NOP);
+			_DA(codeOps > 2 ? C_JR : codeOps + C_NOP);
 			if(codeOps > 1) {
-				if(codeOps > 3) { DA_PUT(C_NZ + (codeOps & 3)); DA_PUT(C_COMMA); }
-				DA_PUT(C_NN); put16((_pc + 1) + (char)read8());
+				if(codeOps > 3) { _DA(C_NZ + (codeOps & 3)); _DA(C_COMMA); }
+				_DA(C_NN); put16((_pc + 1) + (char)read8());
 			}
 			break;
 		case 1:
 			r = fromRP_SP(codeOps);
 			if(codeOps & 1) {
 				// ADD HL, RP
-				DA_PUT(C_ADD); DA_PUT(fromRP_SP(4)); DA_PUT(C_COMMA); DA_PUT(r);
+				_DA(C_ADD); _DA(fromRP_SP(4)); _DA(C_COMMA); _DA(r);
 			} else {
 				// LD RP, NN
-				DA_PUT(C_LD); DA_PUT(r); DA_PUT(C_COMMA); DA_PUT(C_NN); put16(read16());
+				_DA(C_LD); _DA(r); _DA(C_COMMA); _DA(C_NN); put16(read16());
 			}
 			break;
 		case 2: {
-			DA_PUT(C_LD);
+			_DA(C_LD);
 			bool is = (codeOps & 1);
 			if(codeOps < 4) {
 				// LD (BC/DE), A / LD A, (BC/DE)
 				r = C_PBC + (fromRP_AF(codeOps) - C_RBC);
-				DA_PUT(is ? C_RA : r); DA_PUT(C_COMMA); DA_PUT(is ? r : C_RA);
+				_DA(is ? C_RA : r); _DA(C_COMMA); _DA(is ? r : C_RA);
 			} else {
 				// LD A/HL/IX/IY, [nn] / LD [nn], HL/IX/IY/A
 				nn = read16(); 
 				r = (codeOps & 2) ? C_RA : fromRP_AF(4); 
 				bool is = (codeOps & 1);
-				DA_PUT(is ? r : C_PNN); if(!is) put16(nn); DA_PUT(C_COMMA); DA_PUT(is ? C_PNN : r); if(is) put16(nn);
+				_DA(is ? r : C_PNN); if(!is) put16(nn); _DA(C_COMMA); _DA(is ? C_PNN : r); if(is) put16(nn);
 			}
 			break;
 		}
 		// INC/DEC rp
-		case 3: DA_PUT(C_INC + (codeOps & 1)); DA_PUT(fromRP_SP(codeOps)); break;
+		case 3: _DA(C_INC + (codeOps & 1)); _DA(fromRP_SP(codeOps)); break;
 		// INC/DEC r
-		case 4: case 5: DA_PUT(C_INC + (typeOps & 1)); fromRON(codeOps); break;
+		case 4: case 5: _DA(C_INC + (typeOps & 1)); fromPrefRON(codeOps); break;
 		// LD r, n
-		case 6: DA_PUT(C_LD); fromRON(codeOps); DA_PUT(C_COMMA); DA_PUT(C_N); DA_PUT(read8()); break;
-		case 7:	DA_PUT(C_RLCA + codeOps); break;
+		case 6: _DA(C_LD); fromPrefRON(codeOps); _DA(C_COMMA); _DA(C_N); _DA(read8()); break;
+		case 7:	_DA(C_RLCA + codeOps); break;
 	}
 }
 
 void zxDisAsm::ops01() {
 	if(typeOps == codeOps && codeOps == 6) {
-		DA_PUT(C_HALT);
+		_DA(C_HALT);
 	} else {
-		DA_PUT(C_LD);
+		_DA(C_LD);
 		if(typeOps == 6) {
 			// LD DDD, [HL/IX]
-			fromRON1(codeOps); DA_PUT(C_COMMA); fromRON(typeOps);
+			fromRON(codeOps); _DA(C_COMMA); fromPrefRON(typeOps);
 		} else {
 			// LD [HL/IX], SSS
-			fromRON(codeOps); DA_PUT(C_COMMA); if(codeOps == 6) fromRON1(typeOps); else fromRON(typeOps);
+			fromPrefRON(codeOps); _DA(C_COMMA); if(codeOps == 6) fromRON(typeOps); else fromPrefRON(typeOps);
 		}
 	}
 }
 
 void zxDisAsm::ops10() {
 	// ADD/ADC/SUB/SBC/AND/XOR/OP/CP r
-	DA_PUT(C_ADD + codeOps); fromRON(typeOps);
+	_DA(C_ADD + codeOps); fromPrefRON(typeOps);
 }
 
 void zxDisAsm::ops11() {
 	switch(typeOps) {
 		// RET CCC
-		case 0: DA_PUT(C_RETF); DA_PUT(C_NZ + codeOps); break;
+		case 0: _DA(C_RETF); _DA(C_NZ + codeOps); break;
 		case 1:
 			switch(codeOps) {
 				// RET
-				case 1: DA_PUT(C_RET); break;
+				case 1: _DA(C_RET); break;
 				// EXX
-				case 3: DA_PUT(C_EXX); break;
+				case 3: _DA(C_EXX); break;
 				// JP HL/IX/IY
-				case 5: DA_PUT(C_JP); DA_PUT(fromRP_AF(4)); break;
+				case 5: _DA(C_JP); _DA(fromRP_AF(4)); break;
 				// LD SP, HL/IX/IY
-				case 7: DA_PUT(C_LD); DA_PUT(C_COMMA); DA_PUT(fromRP_AF(4)); break;
+				case 7: _DA(C_LD); _DA(C_COMMA); _DA(fromRP_AF(4)); break;
 				// POP RP
-				default: DA_PUT(C_POP); DA_PUT(fromRP_AF(codeOps)); break;
+				default: _DA(C_POP); _DA(fromRP_AF(codeOps)); break;
 			}
 			break;
 		// JP CCC, nn
-		case 2: DA_PUT(C_JP); DA_PUT(C_NZ + codeOps); DA_PUT(C_COMMA); DA_PUT(C_NN); put16(read16()); break;
+		case 2: _DA(C_JP); _DA(C_NZ + codeOps); _DA(C_COMMA); _DA(C_NN); put16(read16()); break;
 		case 3:
 			switch(codeOps) {
 				// JP nn
-				case 0: DA_PUT(C_JP); DA_PUT(C_NN); put16(read16()); break;
+				case 0: _DA(C_JP); _DA(C_NN); put16(read16()); break;
 				// prefix CB
 				case 1: execute(0, PREFIX_CB); break;
 				// OUT n, A
-				case 2: DA_PUT(C_OUT); DA_PUT(C_PN); DA_PUT(read8()); DA_PUT(C_COMMA); DA_PUT(C_RA); break;
+				case 2: _DA(C_OUT); _DA(C_PN); _DA(read8()); _DA(C_COMMA); _DA(C_RA); break;
 				// IN A, n
-				case 3: DA_PUT(C_IN); DA_PUT(C_RA); DA_PUT(C_COMMA); DA_PUT(C_PN); DA_PUT(read8()); break;
+				case 3: _DA(C_IN); _DA(C_RA); _DA(C_COMMA); _DA(C_PN); _DA(read8()); break;
 				// EX (SP), HL/IX/IY
-				case 4: DA_PUT(C_EX_SP); DA_PUT(fromRP_AF(4)); break;
+				case 4: _DA(C_EX_SP); _DA(fromRP_AF(4)); break;
 				// EX DE, HL
-				case 5: DA_PUT(C_EX_DE); break;
+				case 5: _DA(C_EX_DE); break;
 				// DI/EI
-				case 6: case 7: DA_PUT(C_DI + (codeOps - 6)); break;
+				case 6: case 7: _DA(C_DI + (codeOps - 6)); break;
 			}
 			break;
 		// CALL CCC, nn
-		case 4: DA_PUT(C_CALL); DA_PUT(C_NZ + codeOps); DA_PUT(C_COMMA); DA_PUT(C_NN); put16(read16()); break;
+		case 4: _DA(C_CALL); _DA(C_NZ + codeOps); _DA(C_COMMA); _DA(C_NN); put16(read16()); break;
 		case 5:
 			switch(codeOps) {
 				// CALL nn
-				case 1: DA_PUT(C_CALL); DA_PUT(C_NN); put16(read16()); break;
+				case 1: _DA(C_CALL); _DA(C_NN); put16(read16()); break;
 					// prefix DD/FD
 				case 3: case 7:
 					n = memZX[_pc];
-					if(n == 0xDD || n == 0xFD || n == 0xED) DA_PUT(C_IX_NONI + prefix);
+					if(n == 0xDD || n == 0xFD || n == 0xED) _DA(C_IX_NONI + prefix);
 					else execute(((codeOps & 4) >> 2) + 1, (n == 0xCB ? PREFIX_CB : 0));
 					break;
 				// prefix ED
 				case 5: execute(0, PREFIX_ED); break;
 				// PUSH RP
-				default: DA_PUT(C_PUSH); DA_PUT(fromRP_AF(codeOps)); break;
+				default: _DA(C_PUSH); _DA(fromRP_AF(codeOps)); break;
 			}
 			break;
 		// ADD/ADC/SUB/SBC/AND/XOR/OP/CP n
-		case 6: DA_PUT(C_ADD + codeOps); DA_PUT(C_N); DA_PUT(read8()); break;
+		case 6: _DA(C_ADD + codeOps); _DA(C_N); _DA(read8()); break;
 		// RST n
-		case 7: DA_PUT(C_RST); DA_PUT(C_N); DA_PUT(codeOps * 8); break;
+		case 7: _DA(C_RST); _DA(C_N); _DA(codeOps * 8); break;
 	}
 }
 
 void zxDisAsm::opsED01() {
 	switch(typeOps) {
 		// IN F/r, (C)
-		case 0: DA_PUT(C_IN); if(codeOps == 6) DA_PUT(C_RF); else fromRON1(codeOps); DA_PUT(C_COMMA); DA_PUT(C_PRC); break;
+		case 0: _DA(C_IN); if(codeOps == 6) _DA(C_RF); else fromRON(codeOps); _DA(C_COMMA); _DA(C_PRC); break;
 		// OUT (C), 0/r
-		case 1: DA_PUT(C_OUT); DA_PUT(C_PRC); DA_PUT(C_COMMA); if(codeOps == 6) DA_PUT(C_0); else fromRON1(codeOps); break;
+		case 1: _DA(C_OUT); _DA(C_PRC); _DA(C_COMMA); if(codeOps == 6) _DA(C_0); else fromRON(codeOps); break;
 		// ADC/SBC HL, RP
-		case 2: DA_PUT((codeOps & 1) ? C_ADC : C_SBC); DA_PUT(C_RHL); DA_PUT(C_COMMA); DA_PUT(fromRP_SP(codeOps)); break;
+		case 2: _DA((codeOps & 1) ? C_ADC : C_SBC); _DA(C_RHL); _DA(C_COMMA); _DA(fromRP_SP(codeOps)); break;
 		// LD [nn], RP / LD RP, [nn]
 		case 3: {
 			nn = read16();
 			auto r = fromRP_SP(codeOps);
 			bool is = (codeOps & 1);
-			DA_PUT(C_LD); DA_PUT(is ? r : C_PNN); if(!is) put16(nn);
-			DA_PUT(C_COMMA); DA_PUT(is ? C_PNN : r); if(is) put16(nn);
+			_DA(C_LD); _DA(is ? r : C_PNN); if(!is) put16(nn);
+			_DA(C_COMMA); _DA(is ? C_PNN : r); if(is) put16(nn);
 			break;
 		}
 		// NEG
-		case 4: DA_PUT(C_NEG); break;
+		case 4: _DA(C_NEG); break;
 		// RETI
-		case 5: DA_PUT(C_RETI); break;
+		case 5: _DA(C_RETI); break;
 		// IM N
-		case 6: DA_PUT(C_IM); DA_PUT(C_N); DA_PUT(codeOps & 3); break;
+		case 6: 
+			_DA(C_IM); _DA(C_N); 
+			switch(codeOps) {
+				case 2: case 6: _DA(1); break;
+				case 3: case 7: _DA(2); break;
+				default: _DA(0);
+			}
+			break;
 		case 7:
 			switch(codeOps) {
 				// LD R/I, A
-				case 0: case 1: DA_PUT(C_LD); DA_PUT(codeOps ? C_RR : C_RI); DA_PUT(C_COMMA); DA_PUT(C_RA); break;
+				case 0: case 1: _DA(C_LD); _DA(codeOps ? C_RR : C_RI); _DA(C_COMMA); _DA(C_RA); break;
 				// LD A, R/I
-				case 2: case 3: DA_PUT(C_LD); DA_PUT(C_RA); DA_PUT(C_COMMA); DA_PUT((codeOps & 1) ? C_RR : C_RI);  break;
+				case 2: case 3: _DA(C_LD); _DA(C_RA); _DA(C_COMMA); _DA((codeOps & 1) ? C_RR : C_RI);  break;
 				// RRD/RLD
-				case 4: case 5: DA_PUT(C_RRD + (codeOps - 4)); break;
+				case 4: case 5: _DA(C_RRD + (codeOps - 4)); break;
 				// NOP
-				default: DA_PUT(C_NOP);
+				default: _DA(C_NOP);
 			}
 			break;
 	}
 }
 
 void zxDisAsm::opsED10() {
-	if(codeOps < 4) { DA_PUT(C_ED_NONI); _pc--; }
+	if(codeOps < 4) { _DA(C_ED_NONI); _pc--; }
 	else {
 		n = (codeOps & 1) ? C_LDD : C_LDI;
-		DA_PUT(n + ((codeOps & 2) ? 8 : 0));
+		_DA(n + ((codeOps & 2) ? 8 : 0));
 	}
 }
 
 void zxDisAsm::opsEDXX() {
-	DA_PUT(C_ED_NONI);
+	_DA(C_ED_NONI);
 }
 
 funcDA table_ops[] = {
@@ -291,11 +299,11 @@ bool zxDisAsm::save(ssh_cws path, ssh_b dec) {
 			result = true;
 			for(ssh_d i = 0; i < cmdCount; i++) {
 				auto address = adrs[i];
-				StringZX adr(fromNum(address, radix[dec + 10]));
-				StringZX code(makeCode(address, adrs[i + 1] - address, dec));
-				StringZX cmd(makeCommand(i, (dec & 1) | DA_FADDR));
+				zxString adr(fromNum(address, radix[dec + 10]));
+				zxString code(makeCode(address, adrs[i + 1] - address, dec));
+				zxString cmd(makeCommand(i, (dec & 1) | DA_FADDR));
 				ssh_cws tabs = (code.length() >= 8) ? L"\t\t" : L"\t\t\t";
-				StringZX str(adr + L'\t' + code + tabs + cmd + L"\r\n");
+				zxString str(adr + L'\t' + code + tabs + cmd + L"\r\n");
 				int sz = (int)str.length() * 2;
 				if(_write(_hf, str.buffer(), sz) != sz) throw(0);
 			}
@@ -307,24 +315,24 @@ bool zxDisAsm::save(ssh_cws path, ssh_b dec) {
 	return result;
 }
 
-StringZX zxDisAsm::makeCommand(ssh_d num, int flags) {
-	StringZX command;
+zxString zxDisAsm::makeCommand(ssh_d num, int flags) {
+	zxString command;
 	if(adrs && cmds && num < cmdCount) {
 		auto address = adrs[num];
 		ssh_b dec = (flags & DA_FDEC);
 
 		if((flags & DA_FADDR)) {
-			command = StringZX::fmt(radix[dec + 10], address);
+			command = zxString::fmt(radix[dec + 10], address);
 			static ZX_BREAK_POINT bp;
 			static ssh_cws type_bp[] = {L"\t", L"*\t", L"+\t", L"*+\t"};
-			int isPC = theApp.debug->check(address, bp, FBP_PC);
-			int isMEM = theApp.debug->check(address, bp, FBP_MEM);
+			int isPC = theApp->debug->check(address, bp, FBP_PC);
+			int isMEM = theApp->debug->check(address, bp, FBP_MEM);
 			if(isPC || isMEM) {
 				command += type_bp[isPC | (isMEM << 1)];
 			} else command += L'\t';
 		}
 		if((flags & DA_FCODE) == DA_FCODE) {
-			StringZX code(makeCode(address, adrs[num + 1] - address, dec));
+			zxString code(makeCode(address, adrs[num + 1] - address, dec));
 			ssh_u l = code.length();
 			ssh_cws tabs = (l >= 8 ? L"\t" : L"\t\t");
 			command += code + tabs;
@@ -354,8 +362,8 @@ StringZX zxDisAsm::makeCommand(ssh_d num, int flags) {
 	return command;
 }
 
-StringZX zxDisAsm::makeCode(ssh_w address, int length, ssh_b dec) const {
-	StringZX code;
+zxString zxDisAsm::makeCode(ssh_w address, int length, ssh_b dec) const {
+	zxString code;
 	for(int i = 0; i < length; i++) {
 		code += fromNum(memZX[address++], radix[dec + ((i != (length - 1)) * 2)]);
 	}
@@ -377,9 +385,9 @@ ssh_w zxDisAsm::move(ssh_w pc, int count) {
 }
 
 void zxDisAsm::getCmdOperand(ssh_d num, bool isPC, bool isCall, bool isRet, int* addr1, int* addr2) {
+	*addr1 = *addr2 = -1;
 	if(adrs && num < cmdCount) {
 		_pc = adrs[num];
-		*addr1 = *addr2 = -1;
 		auto b = memZX[_pc];
 		if(b == 0xdd || b == 0xfd || b == 0xed) _pc++;
 		if(isPC) {
@@ -402,7 +410,7 @@ void zxDisAsm::getCmdOperand(ssh_d num, bool isPC, bool isCall, bool isRet, int*
 				if(is) {
 					if(typeOps == 7) {
 						// rst
-						*addr1 = *(ssh_w*)(memZX + (codeOps << 3));
+						*addr1 = codeOps << 3;
 						*addr2 = _pc;
 					}
 					else if((typeOps == 1 && codeOps == 1) || typeOps == 0) {
@@ -411,7 +419,7 @@ void zxDisAsm::getCmdOperand(ssh_d num, bool isPC, bool isCall, bool isRet, int*
 						*addr2 = _pc;
 					} else if(typeOps == 1 && codeOps == 5) {
 						// jp hl/ix/iy
-						ssh_w* reg = (b == 0xdd ? (ssh_w*)&regsZX[RXL] : (b == 0xfd ? (ssh_w*)&regsZX[RYL] : _HL));
+						ssh_w* reg = (b == 0xdd ? _IX : (b == 0xfd ? _IY : _HL));
 						*addr1 = *addr2 = *reg;
 					} else {
 						*addr1 = *(ssh_w*)(memZX + _pc);

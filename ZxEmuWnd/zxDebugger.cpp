@@ -3,9 +3,9 @@
 #include "zxDebugger.h"
 #include "zxDisAsm.h"
 #include "zxAssembler.h"
-#include "CpuZX.h"
-#include "DecoderZX.h"
-#include "SettingsZX.h"
+#include "zxCPU.h"
+#include "zxBus.h"
+#include "zxSettings.h"
 #include "zxDlgListBps.h"
 #include "zxDlgAddBp.h"
 #include <math.h>
@@ -16,9 +16,9 @@ struct ZX_REG_TMP {
 };
 
 static ZX_REG_TMP regs[] = {
-	{(ssh_w*)&regsZX[RC + 8], L"BC'"},{(ssh_w*)&regsZX[RE + 8], L"DE'"},{(ssh_w*)&regsZX[RL + 8], L"HL'"},
-	{(ssh_w*)&regsZX[RC], L"BC"},{(ssh_w*)&regsZX[RE], L"DE"},{(ssh_w*)&regsZX[RL], L"HL"},
-	{(ssh_w*)&regsZX[RSPL], L"SP"},{(ssh_w*)&regsZX[RPCL], L"PC"},{(ssh_w*)&regsZX[RXL], L"IX"},{(ssh_w*)&regsZX[RYL], L"IY"}
+	{(ssh_w*)&memZX[RC_], L"BC'"},{(ssh_w*)&memZX[RE_], L"DE'"},{(ssh_w*)&memZX[RL_], L"HL'"},
+	{(ssh_w*)&memZX[RC], L"BC"},{(ssh_w*)&memZX[RE], L"DE"},{(ssh_w*)&memZX[RL], L"HL"},
+	{(ssh_w*)&memZX[RSPL], L"SP"},{(ssh_w*)&memZX[RPCL], L"PC"},{(ssh_w*)&memZX[RXL], L"IX"},{(ssh_w*)&memZX[RYL], L"IY"}
 };
 
 BEGIN_MSG_MAP(zxDebugger, zxDialog)
@@ -49,55 +49,55 @@ BEGIN_MSG_MAP(zxDebugger, zxDialog)
 END_MSG_MAP()
 
 TBBUTTON tbb[] = {
-	{0, IDM_PREV_BREAKPOINT, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Previous Breakpoint\tCtr+F9"},
-	{1, IDM_QUICK_BREAKPOINT, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"Установить/Удалить точку останова\tF9"},
-	{2, IDM_NEXT_BREAKPOINT, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Next Breakpoint\tShift+F9"},
-	{3, IDM_LIST_BREAKPOINTS, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Список точек останова\tF8"},
+	{0, IDM_PREV_BREAKPOINT, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Previous Breakpoint\\F6"},
+	{1, IDM_QUICK_BREAKPOINT, TBSTATE_ENABLED, BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"Установить/Удалить точку останова\\F9"},
+	{2, IDM_NEXT_BREAKPOINT, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Next Breakpoint\\F7"},
+	{3, IDM_LIST_BREAKPOINTS, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Список точек останова\\F8"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
-	{4, IDM_STEP_INTO, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Шаг с заходом\tF10"},
-	{5, IDM_STEP_OVER, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Шаг с обходом\tF11"},
+	{5, IDM_STEP_OVER, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Шаг с обходом\\F10"},
+	{4, IDM_STEP_INTO, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Шаг с заходом\\F11"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
-	{6, IDM_PAUSE, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Приостановить\tF4"},
-	{7, IDM_RUN, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Запустить\tF5"},
+	{6, IDM_PAUSE, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Приостановить\\F4"},
+	{7, IDM_RUN, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Запустить\\F5"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
-	{8, IDM_PC_UNDO, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Undo\tCtrl+Z"},
-	{9, IDM_PC_REDO, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Redo\tCtrl+Y"},
+	{8, IDM_PC_UNDO, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Undo\\Ctrl+Z"},
+	{9, IDM_PC_REDO, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Redo\\Ctrl+Y"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
-	{10, IDM_HEX_DEC, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Hex/Dec"},
+	{10, IDM_HEX_DEC, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Hex/Dec\\F3"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
-	{11, IDM_OVER_PROC, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Шаг с выходом\tShift+F11"}
+	{11, IDM_OVER_PROC, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Шаг с выходом\\Shift+F11"}
 };
 
 ZX_DEBUGGER dlgElems[] = {
-	{L"BC", IDC_EDIT_BC, IDC_STATIC_BC, nullptr, (ssh_w*)&regsZX[RC], 0xffff},
-	{L"DE", IDC_EDIT_DE, IDC_STATIC_DE, nullptr, (ssh_w*)&regsZX[RE], 0xffff},
-	{L"HL", IDC_EDIT_HL, IDC_STATIC_HL, nullptr, (ssh_w*)&regsZX[RL], 0xffff},
-	{L"AF", IDC_EDIT_AF, IDC_STATIC_AF, nullptr, (ssh_w*)&regsZX[RF], 0xffff},
-	{L"BC'", IDC_EDIT_BC_, IDC_STATIC_BC_, nullptr, (ssh_w*)&regsZX[RC_], 0xffff},
-	{L"DE'", IDC_EDIT_DE_, IDC_STATIC_DE_, nullptr, (ssh_w*)&regsZX[RE_], 0xffff},
-	{L"HL'", IDC_EDIT_HL_, IDC_STATIC_HL_, nullptr, (ssh_w*)&regsZX[RL_], 0xffff},
-	{L"AF'", IDC_EDIT_AF_, IDC_STATIC_AF_, nullptr, (ssh_w*)&regsZX[RF_], 0xffff},
-	{L"SP", IDC_EDIT_SP, IDC_STATIC_SP, nullptr, (ssh_w*)&regsZX[RSPL], 0xffff},
-	{L"IX", IDC_EDIT_IX, IDC_STATIC_IX, nullptr, (ssh_w*)&regsZX[RXL], 0xffff},
-	{L"IY ", IDC_EDIT_IY, IDC_STATIC_IY, nullptr, (ssh_w*)&regsZX[RYL], 0xffff},
-	{L"PC", IDC_EDIT_PC, IDC_STATIC_PC, nullptr, (ssh_w*)&regsZX[RPCL], 0xffff},
-	{L"IFF1", IDC_EDIT_IFF1, IDC_STATIC_IFF1, &regsZX[IFF1], nullptr, 1},
-	{L"IFF2", IDC_EDIT_IFF2, IDC_STATIC_IFF2, &regsZX[IFF2], nullptr, 1},
-	{L"RAM", IDC_EDIT_RAM, IDC_STATIC_RAM, &regsZX[RAM], nullptr, 7},
-	{L"ROM", IDC_EDIT_ROM, IDC_STATIC_ROM, &regsZX[ROM], nullptr, 1},
-	{L"IM", IDC_EDIT_IM, IDC_STATIC_IM, &regsZX[IM], nullptr, 0x3},
-	{L"VID", IDC_EDIT_VID, IDC_STATIC_VID, &regsZX[VID], nullptr, 0x7},
-	{L"SCAN", IDC_EDIT_SCAN, IDC_STATIC_SCAN, &regsZX[SCAN], nullptr, 0xff},
-	{L" I ", IDC_EDIT_I, IDC_STATIC_I, &regsZX[RI], nullptr, 0xff},
-	{L" R ", IDC_EDIT_R, IDC_STATIC_R, &regsZX[RR], nullptr, 0xff},
-	{L" S ", IDC_EDIT_S, IDC_STATIC_S, &regsZX[RF], nullptr, FS, 7},
-	{L" Z ", IDC_EDIT_Z, IDC_STATIC_Z, &regsZX[RF], nullptr, FZ, 6},
-	{L" 5 ", IDC_EDIT_5, IDC_STATIC_5, &regsZX[RF], nullptr, 32, 5},
-	{L" H ", IDC_EDIT_H, IDC_STATIC_H, &regsZX[RF], nullptr, FH, 4},
-	{L" 3 ", IDC_EDIT_3, IDC_STATIC_3, &regsZX[RF], nullptr, 8,  3},
-	{L" P ", IDC_EDIT_P, IDC_STATIC_P, &regsZX[RF], nullptr, FPV,2},
-	{L" N ", IDC_EDIT_N, IDC_STATIC_N, &regsZX[RF], nullptr, FN, 1},
-	{L" C ", IDC_EDIT_C, IDC_STATIC_C, &regsZX[RF], nullptr, FC, 0}
+	{L"BC", IDC_EDIT_BC, IDC_STATIC_BC, nullptr, (ssh_w*)&memZX[RC], 0xffff},
+	{L"DE", IDC_EDIT_DE, IDC_STATIC_DE, nullptr, (ssh_w*)&memZX[RE], 0xffff},
+	{L"HL", IDC_EDIT_HL, IDC_STATIC_HL, nullptr, (ssh_w*)&memZX[RL], 0xffff},
+	{L"AF", IDC_EDIT_AF, IDC_STATIC_AF, nullptr, (ssh_w*)&memZX[RF], 0xffff},
+	{L"BC'", IDC_EDIT_BC_, IDC_STATIC_BC_, nullptr, (ssh_w*)&memZX[RC_], 0xffff},
+	{L"DE'", IDC_EDIT_DE_, IDC_STATIC_DE_, nullptr, (ssh_w*)&memZX[RE_], 0xffff},
+	{L"HL'", IDC_EDIT_HL_, IDC_STATIC_HL_, nullptr, (ssh_w*)&memZX[RL_], 0xffff},
+	{L"AF'", IDC_EDIT_AF_, IDC_STATIC_AF_, nullptr, (ssh_w*)&memZX[RF_], 0xffff},
+	{L"SP", IDC_EDIT_SP, IDC_STATIC_SP, nullptr, (ssh_w*)&memZX[RSPL], 0xffff},
+	{L"IX", IDC_EDIT_IX, IDC_STATIC_IX, nullptr, (ssh_w*)&memZX[RXL], 0xffff},
+	{L"IY ", IDC_EDIT_IY, IDC_STATIC_IY, nullptr, (ssh_w*)&memZX[RYL], 0xffff},
+	{L"PC", IDC_EDIT_PC, IDC_STATIC_PC, nullptr, (ssh_w*)&memZX[RPCL], 0xffff},
+	{L"IFF1", IDC_EDIT_IFF1, IDC_STATIC_IFF1, &memZX[IFF1], nullptr, 1},
+	{L"IFF2", IDC_EDIT_IFF2, IDC_STATIC_IFF2, &memZX[IFF2], nullptr, 1},
+	{L"RAM", IDC_EDIT_RAM, IDC_STATIC_RAM, &memZX[RAM], nullptr, 7},
+	{L"ROM", IDC_EDIT_ROM, IDC_STATIC_ROM, &memZX[ROM], nullptr, 1},
+	{L"IM", IDC_EDIT_IM, IDC_STATIC_IM, &memZX[IM], nullptr, 0x3},
+	{L"VID", IDC_EDIT_VID, IDC_STATIC_VID, &memZX[VID], nullptr, 0x7},
+	{L"SCAN", IDC_EDIT_SCAN, IDC_STATIC_SCAN, &memZX[SCAN], nullptr, 0xff},
+	{L" I ", IDC_EDIT_I, IDC_STATIC_I, &memZX[RI], nullptr, 0xff},
+	{L" R ", IDC_EDIT_R, IDC_STATIC_R, &memZX[RR], nullptr, 0xff},
+	{L" S ", IDC_EDIT_S, IDC_STATIC_S, &memZX[RF], nullptr, FS, 7},
+	{L" Z ", IDC_EDIT_Z, IDC_STATIC_Z, &memZX[RF], nullptr, FZ, 6},
+	{L" 5 ", IDC_EDIT_5, IDC_STATIC_5, &memZX[RF], nullptr, 32, 5},
+	{L" H ", IDC_EDIT_H, IDC_STATIC_H, &memZX[RF], nullptr, FH, 4},
+	{L" 3 ", IDC_EDIT_3, IDC_STATIC_3, &memZX[RF], nullptr, 8,  3},
+	{L" P ", IDC_EDIT_P, IDC_STATIC_P, &memZX[RF], nullptr, FPV,2},
+	{L" N ", IDC_EDIT_N, IDC_STATIC_N, &memZX[RF], nullptr, FN, 1},
+	{L" C ", IDC_EDIT_C, IDC_STATIC_C, &memZX[RF], nullptr, FC, 0}
 };
 
 BOOL zxDebugger::onEraseBkgnd(HDC hdc) {
@@ -129,40 +129,39 @@ void zxDebugger::onQuckBreakpoint() {
 	auto addr = da->getCmdAddress(sel);
 	if(addr != -1) {
 		quickBP(addr);
+		saveBPS();
 		InvalidateRect(hWndDA, nullptr, false);
 	}
 }
 
 void zxDebugger::onListBreakpoint() {
 	zxDlgListBps dlg;
-	dlg.create(IDD_DIALOG_LIST_BPS, IDA_ACCEL_LIST_BPS, this, true);
+	dlg.create(IDD_DIALOG_LIST_BPS, this, true);
 	InvalidateRect(hWndDA, nullptr, false);
 }
 
 void zxDebugger::onStepInto() {
 	int addr1, addr2;
 
-	int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
-	da->getCmdOperand(sel, true, true, true, &addr1, &addr2);
-	if(addr1 == -1) addr1 = addr2 = da->move((*_PC), 1);
+	da->getCmdOperand(da->indexFromAddress(*_PC), true, true, true, &addr1, &addr2);
+	if(addr1 == -1) addr1 = addr2 = da->move(*_PC, 1);
 	while(true) {
-		theApp.zilog->execute(true);
-		if((*_PC) == addr1 || (*_PC) == addr2) break;
+		theApp->bus.step(true);
+		if(*_PC == addr1 || *_PC == addr2) break;
 	}
-	updateRegisters((*_PC), U_REGS | U_PC | U_SP | U_SEL);
+	updateRegisters(*_PC, U_REGS | U_PC | U_SP | U_SEL);
 }
 
 void zxDebugger::onStepOver() {
 	int addr1, addr2;
 	
-	int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
-	da->getCmdOperand(sel, true, false, true, &addr1, &addr2);
-	if(addr1 == -1) addr1 = addr2 = da->move((*_PC), 1);
+	da->getCmdOperand(da->indexFromAddress(*_PC), true, false, true, &addr1, &addr2);
+	if(addr1 == -1) addr1 = addr2 = da->move(*_PC, 1);
 	while(true) {
-		theApp.zilog->execute(true);
-		if((*_PC) == addr1 || (*_PC) == addr2) break;
+		theApp->bus.step(true);
+		if(*_PC == addr1 || *_PC == addr2) break;
 	}
-	updateRegisters((*_PC), U_REGS | U_PC | U_SP | U_SEL);
+	updateRegisters(*_PC, U_REGS | U_PC | U_SP | U_SEL);
 }
 
 void zxDebugger::onPause() {
@@ -170,7 +169,7 @@ void zxDebugger::onPause() {
 }
 
 void zxDebugger::onRun() {
-	theApp.zilog->execute(true);
+	theApp->bus.step(true);
 	setProgrammPause(false, false);
 }
 
@@ -194,8 +193,8 @@ void zxDebugger::onHexDec() {
 
 void zxDebugger::onOverProc() {
 	auto exit_pc = *_PC_EXIT_CALL;
-	while((*_PC) != exit_pc) theApp.zilog->execute(true);
-	updateRegisters((*_PC), U_REGS | U_PC | U_SP | U_SEL);
+	while(*_PC != exit_pc) theApp->bus.step(true);
+	updateRegisters(*_PC, U_REGS | U_PC | U_SP | U_SEL);
 }
 
 void zxDebugger::onSetPC() {
@@ -243,7 +242,7 @@ void zxDebugger::onDblkClkListDA() {
 	else {
 		da->getCmdOperand(sel, false, false, false, &addr1, &addr2);
 		if(addr1 != -1) {
-			int dec = theApp.getOpt(OPT_DECIMAL)->dval;
+			int dec = theApp->getOpt(OPT_DECIMAL)->dval;
 			fromNum(addr1, radix[dec + 22]);
 			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS_DATA), tmpBuf);
 			_dt = addr1; SendMessage(hWndDT, LB_SETTOPINDEX, _dt / 16, 0);
@@ -266,7 +265,7 @@ void zxDebugger::onScrollListDA() {
 
 void zxDebugger::onSelChangeListDA() {
 	int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
-	SetWindowText(GetDlgItem(hWnd, IDC_EDIT_CURRENT_COMMAND), da->makeCommand(sel, theApp.getOpt(OPT_DECIMAL)->dval));
+	SetWindowText(GetDlgItem(hWnd, IDC_EDIT_CURRENT_COMMAND), da->makeCommand(sel, theApp->getOpt(OPT_DECIMAL)->dval));
 }
 
 void zxDebugger::onChangeEditRegs() {
@@ -289,9 +288,8 @@ void zxDebugger::onChangeEditRegs() {
 }
 
 void zxDebugger::onClose() {
-	modifyTSTATE(ZX_EXEC, ZX_DEBUG);
-	theApp.changeExecute(false);
-	theApp.changeWndDebugger(true);
+	modifyTSTATE(0, ZX_DEBUG);
+	theApp->changeWndDebugger(true);
 }
 
 void zxDebugger::postCreate() {
@@ -312,7 +310,7 @@ void zxDebugger::postCreate() {
 
 	SendMessage(hWndSP, WM_SETFONT, WPARAM(hFont), TRUE);
 	SendMessage(hWndSP, LB_SETITEMHEIGHT, 0, 16);
-	SendMessage(hWndSP, LB_SETCOUNT, 32768, 0);
+	SendMessage(hWndSP, LB_SETCOUNT, 32769, 0);
 
 	SendMessage(hWndDT, WM_SETFONT, WPARAM(hFont), TRUE);
 	SendMessage(hWndDT, LB_SETITEMHEIGHT, 0, 16);
@@ -321,9 +319,9 @@ void zxDebugger::postCreate() {
 }
 
 void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
-	StringZX txt;
+	zxString txt;
 
-	auto dec = theApp.getOpt(OPT_DECIMAL)->dval;
+	auto dec = theApp->getOpt(OPT_DECIMAL)->dval;
 	auto item = dis->itemID;
 	if(id == IDC_LIST_DA) {
 		auto top = SendMessage(hWndDA, LB_GETTOPINDEX, 0, 0);
@@ -332,21 +330,21 @@ void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
 		// stack
 		auto idx = item * 2;
 		auto val = *(ssh_w*)(memZX + idx);
-		StringZX chars;
+		zxString chars;
 		for(int i = 0; i < 4; i++) {
 			ssh_w v = (ssh_w)memZX[val + i];
 			if(v < 32) v = 32;
 			chars += (ssh_ws)v;
 		}
 		auto sp = ((idx == (*_SP)) ? L"SP " : L"   ");
-		txt = StringZX::fmt(dec ? L"%s%05d %05d %s" : L"%s%04X %04X %s", sp, idx, val, chars.buffer());
+		txt = zxString::fmt(dec ? L"%s%05d %05d %s" : L"%s%04X %04X %s", sp, idx, val, chars.buffer());
 	} else if(id == IDC_LIST_DT) {
 		// адресс 16 значений текстовое представление
 		auto idx = (_dt % 16) + (item * 16);
 		if(idx > 65535) return;
-		StringZX vals(fromNum(idx, radix[dec + 22]));
+		zxString vals(fromNum(idx, radix[dec + 22]));
 		vals += L"  ";
-		StringZX chars;
+		zxString chars;
 		for(int i = 0; i < 16; i++) {
 			if(idx > 65535) break;
 			ssh_w v = (ssh_w)memZX[idx++];
@@ -355,7 +353,7 @@ void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
 			if(v < 32) v = 32;
 			chars += (ssh_ws)v;
 		}
-		txt = StringZX::fmt(L"%s %s", vals.buffer(), chars.buffer());
+		txt = zxString::fmt(L"%s %s", vals.buffer(), chars.buffer());
 	}
 	auto isStat = (dis->itemState & ODS_SELECTED) != 0;
 	HDC hdc = dis->hDC;
@@ -384,7 +382,7 @@ bool zxDebugger::preCreate() {
 	// прочитать точки останова из установок
 	int count = 0;
 	for(int i = OPT_BPS0; i <= OPT_BPS9; i++) {
-		auto opt = theApp.getOpt(i);
+		auto opt = theApp->getOpt(i);
 		if(opt->sval.is_empty()) continue;
 		auto vals = opt->sval.split(L",", count);
 		if(count == 5) {
@@ -405,21 +403,19 @@ void zxDebugger::show(bool visible) {
 		ShowWindow(hWnd, true);
 		UpdateWindow(hWnd);
 		updateHexDec(false);
-		setProgrammPause(true, false);
+		modifyTSTATE(ZX_DEBUG, 0);
+		setProgrammPause(!((*_TSTATE) & ZX_EXEC), false);
 		updateUndoRedo(false);
 	} else {
 		if(IsWindowVisible(hWnd)) {
 			ShowWindow(hWnd, false);
-			modifyTSTATE(ZX_EXEC, ZX_DEBUG);
-			theApp.changeExecute(false);
-			// записать точки останова в установки
-			saveBPS();
+			modifyTSTATE(0, ZX_DEBUG);
 		}
 	}
 }
 
 void zxDebugger::updateRegisters(int newPC, int flags) {
-	bool decimal = theApp.getOpt(OPT_DECIMAL)->dval;
+	bool decimal = theApp->getOpt(OPT_DECIMAL)->dval;
 	HWND h;
 	RECT rect;
 	if(flags & U_REGS) {
@@ -434,8 +430,11 @@ void zxDebugger::updateRegisters(int newPC, int flags) {
 			GetClientRect(h, &rect);
 			DrawText(hdc, zx.text, -1, &rect, DT_SINGLELINE | DT_CENTER);
 			ReleaseDC(h, hdc);
+			if(zx.idText == IDC_STATIC_I) {
+				val = val;
+			}
 			zx.val = val;
-			auto fmt = (zx.msk < 255 ? L"%d" : (zx.regb ? radix[decimal] : radix[decimal + 22]));
+			auto fmt = (zx.msk < 255 ? L"%d" : (zx.regb ? radix[decimal + 16] : radix[decimal + 22]));
 			SetWindowText(zx.hWndMain, fromNum(val, fmt));
 		}
 		InvalidateRect(hWnd, nullptr, false);
@@ -458,7 +457,7 @@ void zxDebugger::updateRegisters(int newPC, int flags) {
 void zxDebugger::updateStack(int sp) {
 	sp -= 10;
 	if(sp < 0) sp = 0;
-	else if((sp + 20) > 65535) sp = 655508;
+	else if((sp + 20) > 65535) sp = 65510;
 	_sp = sp / 2;
 	SendMessage(hWndSP, LB_SETTOPINDEX, _sp, 0);
 	SendMessage(hWndSP, LB_SETCURSEL, (*_SP) / 2, 0);
@@ -490,7 +489,7 @@ void zxDebugger::updateUndoRedo(bool set) {
 }
 
 void zxDebugger::updateHexDec(bool change) {
-	auto opt = theApp.getOpt(OPT_DECIMAL);
+	auto opt = theApp->getOpt(OPT_DECIMAL);
 	if(change) {
 		opt->dval = !opt->dval;
 		updateRegisters(_pc, U_PC | U_SP | U_REGS);
@@ -525,20 +524,19 @@ void zxDebugger::setProgrammPause(bool pause, bool activate) {
 		int state1 = pause << 2;
 		int state2 = (!pause) << 2;
 
+		theApp->changeExecute(!pause, false);
+
+		updateUndoRedo(false);
+		updatePrevNextBP();
+
+		if(pause || _pc == -1) updateRegisters(*_PC, U_PC | U_REGS | U_STORY | U_SEL | U_SP | U_TOP);
+		if(activate) SetActiveWindow(hWnd);
+
 		SendMessage(hWndToolbar, TB_SETSTATE, IDM_PAUSE, state2);
 		SendMessage(hWndToolbar, TB_SETSTATE, IDM_STEP_OVER, state1);
 		SendMessage(hWndToolbar, TB_SETSTATE, IDM_STEP_INTO, state1);
 		SendMessage(hWndToolbar, TB_SETSTATE, IDM_RUN, state1);
 		SendMessage(hWndToolbar, TB_SETSTATE, IDM_OVER_PROC, state1);
-
-		updateUndoRedo(false);
-		updatePrevNextBP();
-
-		modifyTSTATE(pause ? ZX_DEBUG : ZX_EXEC, pause ? ZX_EXEC : 0);
-		if(pause) updateRegisters((*_PC), U_PC | U_REGS | U_STORY | U_SEL | U_SP | U_TOP);
-		theApp.changeExecute(false);
-
-		if(activate) SetActiveWindow(hWnd);
 	}
 }
 
@@ -590,7 +588,7 @@ void zxDebugger::saveBPS() {
 	// записать точки останова в установки
 	for(int i = OPT_BPS0; i <= OPT_BPS9; i++) {
 		auto bp = &bps[i - OPT_BPS0];
-		theApp.getOpt(i)->sval = StringZX::fmt(L"%d,%d,%d,%d,%d", bp->address1, bp->address2, bp->value, bp->mask, bp->flags);
+		theApp->getOpt(i)->sval = zxString::fmt(L"%d,%d,%d,%d,%d", bp->address1, bp->address2, bp->value, bp->mask, bp->flags);
 	}
 }
 

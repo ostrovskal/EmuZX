@@ -18,6 +18,8 @@ struct ZX_DEBUGGER {
 
 class zxAssembler;
 class zxDisAsm;
+class zxBus;
+
 class zxDebugger : public zxDialog {
 	friend class zxDlgListBps;
 public:
@@ -30,7 +32,9 @@ public:
 		U_TOP	= 32
 	};
 	zxDebugger() : zxDialog(), hWndDA(nullptr), hWndSP(nullptr), da(nullptr), hFont(nullptr), countVisibleItems(0),
-					_pc(-1), _sp(-1), _lastPC(-1), _dt(0), curIndexBP(-1), curStoryPC(-1), limitStoryPC(0) { }
+					_pc(-1), _sp(-1), _lastPC(-1), _dt(0), curIndexBP(-1), curStoryPC(-1), limitStoryPC(0) { 
+		hAccel = LoadAccelerators(hInst, MAKEINTRESOURCE(IDA_ACCEL_DEBUGGER));
+	}
 	virtual ~zxDebugger();
 	bool checkBPS(ssh_w address, bool mem);
 	void show(bool visible);

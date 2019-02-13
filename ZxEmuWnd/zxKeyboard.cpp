@@ -61,47 +61,47 @@ ZX_KEY_EX keysExShift[] = {
 
 static ZX_KEY keys[] = {
 	{IDC_BUTTON_CAPS_LOCK},
-	{IDC_BUTTON_K1, L"1", L"1", L"1", L"blue", L"DEF FN", L"!", L"edit", 0xf7, 0x1, '1'},
-	{IDC_BUTTON_K2, L"2", L"2", L"2", L"red", L"FN", L"@", L"caps lock", 0xf7, 0x2, '2'},
-	{IDC_BUTTON_K3, L"3", L"3", L"3", L"magenta", L"LINE", L"#", L"tr video", 0xf7, 0x4, '3'},
-	{IDC_BUTTON_K4, L"4", L"4", L"4", L"green", L"OPEN", L"$", L"inv video", 0xf7, 0x8, '4'},
-	{IDC_BUTTON_K5, L"5", L"5", L"5", L"cyan", L"CLOSE", L"%", L"left", 0xf7, 0x10, '5'},
-	{IDC_BUTTON_K6, L"6", L"6", L"6", L"yellow", L"MOVE", L"&&", L"down", 0xef, 0x10, '6'},
-	{IDC_BUTTON_K7, L"7", L"7", L"7", L"white", L"ERASE", L"'", L"right", 0xef, 0x8, '7'},
-	{IDC_BUTTON_K8, L"8", L"8", L"8", L"", L"POINT", L"(", L"up", 0xef, 0x4, '8'},
-	{IDC_BUTTON_K9, L"9", L"9", L"9", L"bright", L"CAT", L")", L"graphics", 0xef, 0x2, '9'},
-	{IDC_BUTTON_K0, L"0", L"0", L"0", L"black", L"FORMAT", L"_", L"delete", 0xef, 0x1, '0'},
-	{IDC_BUTTON_KQ, L"PLOT", L"q", L"Q", L"SIN", L"ASN", L"<=", L"Q", 0xfb, 0x1, 'Q'},
-	{IDC_BUTTON_KW, L"DRAW", L"w", L"W", L"COS", L"ACS", L"<>", L"W", 0xfb, 0x2, 'W'},
-	{IDC_BUTTON_KE, L"REM", L"e", L"E", L"TAN", L"ATN", L">=", L"E", 0xfb, 0x4, 'E'},
-	{IDC_BUTTON_KR, L"RUN", L"r", L"R", L"INT", L"VERIFY", L"<", L"R", 0xfb, 0x8, 'R'},
-	{IDC_BUTTON_KT, L"RAND", L"t", L"T", L"RND", L"MERGE", L">", L"T", 0xfb, 0x10, 'T'},
-	{IDC_BUTTON_KY, L"RETURN", L"y", L"Y", L"STR$", L"[", L"AND", L"Y", 0xdf, 0x10, 'Y'},
-	{IDC_BUTTON_KU, L"IF", L"u", L"U", L"CHR$", L"]", L"OR", L"U", 0xdf, 0x8, 'U'},
-	{IDC_BUTTON_KI, L"INPUT", L"i", L"I", L"CODE", L"IN", L"AT", L"I", 0xdf, 0x4, 'I'},
-	{IDC_BUTTON_KO, L"POKE", L"o", L"O", L"PEEK", L"OUT", L";", L"O", 0xdf, 0x2, 'O'},
-	{IDC_BUTTON_KP, L"PRINT", L"p", L"P", L"TAB", L"@", L"\"", L"P", 0xdf, 0x1, 'P'},
-	{IDC_BUTTON_KA, L"NEW", L"a", L"A", L"READ", L"~", L"STOP", L"A", 0xfd, 0x1, 'A'},
-	{IDC_BUTTON_KS, L"SAVE", L"s", L"S", L"RESTORE", L"|", L"NOT", L"S", 0xfd, 0x2, 'S'},
-	{IDC_BUTTON_KD, L"DIM", L"d", L"D", L"DATE", L"\\", L"STEP", L"D", 0xfd, 0x4, 'D'},
-	{IDC_BUTTON_KF, L"FOR", L"f", L"F", L"SGN", L"{", L"TO", L"F", 0xfd, 0x8, 'F'},
-	{IDC_BUTTON_KG, L"GOTO", L"g", L"G", L"ABS", L"}", L"THEN", L"G", 0xfd, 0x10, 'G'},
-	{IDC_BUTTON_KH, L"GOSUB", L"h", L"H", L"SQR", L"CIRCLE", L"!", L"H", 0xbf, 0x10, 'H'},
-	{IDC_BUTTON_KJ, L"LOAD", L"j", L"J", L"VAL", L"VAL$", L"-", L"J", 0xbf, 0x8, 'J'},
-	{IDC_BUTTON_KK, L"LIST", L"k", L"K", L"LEN", L"SCRN$", L"+", L"K", 0xbf, 0x4, 'K'},
-	{IDC_BUTTON_KL, L"LET", L"l", L"L", L"USR", L"ATTR", L"=", L"L", 0xbf, 0x2, 'L'},
-	{IDC_BUTTON_ENTER, L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", 0xbf, 0x1, VK_RETURN},
-	{IDC_BUTTON_ENTER1, L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", 0xbf, 0x1, VK_RETURN},
-	{IDC_BUTTON_CAPS_SHIFT, L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", 0xfe, 0x1, VK_CONTROL},
-	{IDC_BUTTON_KZ, L"COPY", L"z", L"Z", L"LN", L"BEEP", L":", L"Z", 0xfe, 0x2, 'Z'},
-	{IDC_BUTTON_KX, L"CLEAR", L"x", L"X", L"EXP", L"INK", L"FUNT", L"X", 0xfe, 0x4, 'X'},
-	{IDC_BUTTON_KC, L"CONT", L"c", L"C", L"LPRINT", L"PAPER", L"?", L"C", 0xfe, 0x8, 'C'},
-	{IDC_BUTTON_KV, L"CLS", L"v", L"V", L"LLIST", L"FLUSH", L"/", L"V", 0xfe, 0x10, 'V'},
-	{IDC_BUTTON_KB, L"BORDER", L"b", L"B", L"BIN", L"BRIGHT", L"*", L"B", 0x7f, 0x10, 'B'},
-	{IDC_BUTTON_KN, L"NEXT", L"n", L"N", L"INKEYS$", L"OVER", L",", L"N", 0x7f, 0x8, 'N'},
-	{IDC_BUTTON_KM, L"PAUSE", L"m", L"M", L"PI", L"INVERSE", L".", L"M", 0x7f, 0x4, 'M'},
-	{IDC_BUTTON_SYMBOL_SHIFT, L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", 0x7f, 0x2, VK_SHIFT},
-	{IDC_BUTTON_SPACE, L"", L"", L"", L"", L"", L"", L"", 0x7f, 0x1, VK_SPACE},
+	{IDC_BUTTON_K1, L"1", L"1", L"1", L"blue", L"DEF FN", L"!", L"edit", 3, 0x1, '1'},
+	{IDC_BUTTON_K2, L"2", L"2", L"2", L"red", L"FN", L"@", L"caps lock", 3, 0x2, '2'},
+	{IDC_BUTTON_K3, L"3", L"3", L"3", L"magenta", L"LINE", L"#", L"tr video", 3, 0x4, '3'},
+	{IDC_BUTTON_K4, L"4", L"4", L"4", L"green", L"OPEN", L"$", L"inv video", 3, 0x8, '4'},
+	{IDC_BUTTON_K5, L"5", L"5", L"5", L"cyan", L"CLOSE", L"%", L"left", 3, 0x10, '5'},
+	{IDC_BUTTON_K6, L"6", L"6", L"6", L"yellow", L"MOVE", L"&&", L"down", 4, 0x10, '6'},
+	{IDC_BUTTON_K7, L"7", L"7", L"7", L"white", L"ERASE", L"'", L"right", 4, 0x8, '7'},
+	{IDC_BUTTON_K8, L"8", L"8", L"8", L"", L"POINT", L"(", L"up", 4, 0x4, '8'},
+	{IDC_BUTTON_K9, L"9", L"9", L"9", L"bright", L"CAT", L")", L"graphics", 4, 0x2, '9'},
+	{IDC_BUTTON_K0, L"0", L"0", L"0", L"black", L"FORMAT", L"_", L"delete", 4, 0x1, '0'},
+	{IDC_BUTTON_KQ, L"PLOT", L"q", L"Q", L"SIN", L"ASN", L"<=", L"Q", 2, 0x1, 'Q'},
+	{IDC_BUTTON_KW, L"DRAW", L"w", L"W", L"COS", L"ACS", L"<>", L"W", 2, 0x2, 'W'},
+	{IDC_BUTTON_KE, L"REM", L"e", L"E", L"TAN", L"ATN", L">=", L"E", 2, 0x4, 'E'},
+	{IDC_BUTTON_KR, L"RUN", L"r", L"R", L"INT", L"VERIFY", L"<", L"R", 2, 0x8, 'R'},
+	{IDC_BUTTON_KT, L"RAND", L"t", L"T", L"RND", L"MERGE", L">", L"T", 2, 0x10, 'T'},
+	{IDC_BUTTON_KY, L"RETURN", L"y", L"Y", L"STR$", L"[", L"AND", L"Y", 5, 0x10, 'Y'},
+	{IDC_BUTTON_KU, L"IF", L"u", L"U", L"CHR$", L"]", L"OR", L"U", 5, 0x8, 'U'},
+	{IDC_BUTTON_KI, L"INPUT", L"i", L"I", L"CODE", L"IN", L"AT", L"I", 5, 0x4, 'I'},
+	{IDC_BUTTON_KO, L"POKE", L"o", L"O", L"PEEK", L"OUT", L";", L"O", 5, 0x2, 'O'},
+	{IDC_BUTTON_KP, L"PRINT", L"p", L"P", L"TAB", L"@", L"\"", L"P", 5, 0x1, 'P'},
+	{IDC_BUTTON_KA, L"NEW", L"a", L"A", L"READ", L"~", L"STOP", L"A", 1, 0x1, 'A'},
+	{IDC_BUTTON_KS, L"SAVE", L"s", L"S", L"RESTORE", L"|", L"NOT", L"S", 1, 0x2, 'S'},
+	{IDC_BUTTON_KD, L"DIM", L"d", L"D", L"DATE", L"\\", L"STEP", L"D", 1, 0x4, 'D'},
+	{IDC_BUTTON_KF, L"FOR", L"f", L"F", L"SGN", L"{", L"TO", L"F", 1, 0x8, 'F'},
+	{IDC_BUTTON_KG, L"GOTO", L"g", L"G", L"ABS", L"}", L"THEN", L"G", 1, 0x10, 'G'},
+	{IDC_BUTTON_KH, L"GOSUB", L"h", L"H", L"SQR", L"CIRCLE", L"!", L"H", 6, 0x10, 'H'},
+	{IDC_BUTTON_KJ, L"LOAD", L"j", L"J", L"VAL", L"VAL$", L"-", L"J", 6, 0x8, 'J'},
+	{IDC_BUTTON_KK, L"LIST", L"k", L"K", L"LEN", L"SCRN$", L"+", L"K", 6, 0x4, 'K'},
+	{IDC_BUTTON_KL, L"LET", L"l", L"L", L"USR", L"ATTR", L"=", L"L", 6, 0x2, 'L'},
+	{IDC_BUTTON_ENTER, L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", 6, 0x1, VK_RETURN},
+	{IDC_BUTTON_ENTER1, L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", 6, 0x1, VK_RETURN},
+	{IDC_BUTTON_CAPS_SHIFT, L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", 0, 0x1, VK_CONTROL},
+	{IDC_BUTTON_KZ, L"COPY", L"z", L"Z", L"LN", L"BEEP", L":", L"Z", 0, 0x2, 'Z'},
+	{IDC_BUTTON_KX, L"CLEAR", L"x", L"X", L"EXP", L"INK", L"FUNT", L"X", 0, 0x4, 'X'},
+	{IDC_BUTTON_KC, L"CONT", L"c", L"C", L"LPRINT", L"PAPER", L"?", L"C", 0, 0x8, 'C'},
+	{IDC_BUTTON_KV, L"CLS", L"v", L"V", L"LLIST", L"FLUSH", L"/", L"V", 0, 0x10, 'V'},
+	{IDC_BUTTON_KB, L"BORDER", L"b", L"B", L"BIN", L"BRIGHT", L"*", L"B", 7, 0x10, 'B'},
+	{IDC_BUTTON_KN, L"NEXT", L"n", L"N", L"INKEYS$", L"OVER", L",", L"N", 7, 0x8, 'N'},
+	{IDC_BUTTON_KM, L"PAUSE", L"m", L"M", L"PI", L"INVERSE", L".", L"M", 7, 0x4, 'M'},
+	{IDC_BUTTON_SYMBOL_SHIFT, L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", 7, 0x2, VK_SHIFT},
+	{IDC_BUTTON_SPACE, L"", L"", L"", L"", L"", L"", L"", 7, 0x1, VK_SPACE},
 };
 
 void zxKeyboard::postCreate() {
@@ -148,13 +148,10 @@ void zxKeyboard::processKeys() {
 	}
 	for(auto& k : keys) {
 		ssh_b bit = k.bit;
-		ssh_b* port = &portsZX[((k.port << 8) | 0xfe)];
 		if(vkKeys[k.vk_code] & 0x80) {
-			portsZX[0xfe] &= ~bit;
-			*port &= ~bit;
+			_KEYS[k.port] &= ~bit;
 		} else {
-			portsZX[0xfe] |= bit;
-			*port |= bit;
+			_KEYS[k.port] |= bit;
 		}
 	}
 	// проверить режим клавиатуры
@@ -195,9 +192,7 @@ void zxKeyboard::highlightKey(ssh_cws name, ZX_KEY* k, int isVirt) {
 	RECT rect;
 	bool is = (isVirt & 1);
 	if(isVirt & 0x80) {
-		int p = ((k->port << 8) | 0xfe);
-		auto v = portsZX[p];
-		is = !(v & k->bit);
+		is = !(_KEYS[k->port] & k->bit);
 	}
 	auto h = k->hWndKey;
 	auto hdc = GetDC(h);
@@ -211,7 +206,7 @@ void zxKeyboard::highlightKey(ssh_cws name, ZX_KEY* k, int isVirt) {
 }
 
 void zxKeyboard::processJoystick() {
-	auto pad = theApp.gamepad;
+	auto pad = theApp->gamepad;
 	pad->update();
 	if(pad->is_connected(0)) {
 		pad->remap(0, zxGamepad::crossUp);

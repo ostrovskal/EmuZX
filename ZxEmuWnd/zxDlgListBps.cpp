@@ -7,10 +7,10 @@
 static TBBUTTON tbb[] = {
 	{13, IDM_NEW, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Добавить\\Ctr+N"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
-	{14, IDM_CHANGE, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Редактировать\\Shift+C"},
+	{14, IDM_CHANGE, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Редактировать\\Ctrl+E"},
 	{12, IDM_REMOVE, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Удалить\\Del"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
-	{15, IDM_SAVE, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Сохранить\\Del"},
+	{15, IDM_SAVE, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Сохранить\\Ctrl+S"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
 	{17, IDM_UP, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Выше\\Up"},
 	{16, IDM_DOWN, 0, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Ниже\\Down"},
@@ -26,7 +26,7 @@ END_MSG_MAP()
 
 void zxDlgListBps::onUpDown() {
 	ZX_BREAK_POINT tmp;
-	auto bps = theApp.debug->bps;
+	auto bps = theApp->debug->bps;
 	memcpy(&tmp, &bps[itemSelected], sizeof(ZX_BREAK_POINT));
 	int nItemSelected = (itemSelected + (wmId == IDM_UP ? -1 : 1));
 	memcpy(&bps[itemSelected], &bps[nItemSelected], sizeof(ZX_BREAK_POINT));
@@ -46,36 +46,41 @@ void zxDlgListBps::onNewEdit() {
 		bpItem = &bps[itemSelected];
 		add.edit(bpItem);
 	}
-	if(add.create(IDD_DIALOG_ADD_BP, 0, this, true) == IDOK) {
-		// проверка на пересечение
+	if(add.create(IDD_DIALOG_ADD_BP, this, true) == IDOK) {
 		auto _bp = &add.result;
-		if(wmId == IDM_CHANGE) {
-			memcpy(bpItem, _bp, sizeof(ZX_BREAK_POINT));
-		} else {
-			for(int i = 0; i < COUNT_BP; i++) {
-				auto bp = &bps[i];
-				if(!(bp->flags & FBP_ADDR)) {
-					// установка
+		// проверка на пересечение
+		for(int i = 0; i < COUNT_BP; i++) {
+			auto bp = &bps[i];
+			if(!(bp->flags & FBP_ADDR)) {
+				// установка
+				if(bpItem) {
+					memcpy(bpItem, _bp, sizeof(ZX_BREAK_POINT));
+				} else {
 					memcpy(bp, _bp, sizeof(ZX_BREAK_POINT));
-					break;
 				}
-				if((_bp->flags & FBP_ACCESS) != (bp->flags & FBP_ACCESS)) continue;
-				bool is1 = (_bp->address1 <= bp->address1) && (_bp->address2 >= bp->address1);
-				bool is2 = (_bp->address1 <= bp->address2) && (_bp->address2 >= bp->address2);
-				if(is1 || is2) {
-					bool dec = theApp.getOpt(OPT_DECIMAL)->dval;
-					StringZX s1(fromNum(_bp->address1, radix[dec + 10]));
-					StringZX s2(fromNum(_bp->address2, radix[dec + 10]));
-					StringZX d1(fromNum(bp->address1, radix[dec + 10]));
-					StringZX d2(fromNum(bp->address2, radix[dec + 10]));
-					MessageBox(hWnd, StringZX::fmt(L"Перекрытие точек останова с <%i : %s - %s, %s - %s>!", i + 1, s1, s2, d1, d2), L"Ошибка", MB_ICONERROR);
-					break;
-				}
+				break;
+			}
+			if((_bp->flags & FBP_ACCESS) != (bp->flags & FBP_ACCESS) || bp == bpItem) continue;
+			bool is1 = (_bp->address1 <= bp->address1) && (_bp->address2 >= bp->address1);
+			bool is2 = (_bp->address1 <= bp->address2) && (_bp->address2 >= bp->address2);
+			if(is1 || is2) {
+				bool dec = theApp->getOpt(OPT_DECIMAL)->dval;
+				zxString s1(fromNum(_bp->address1, radix[dec + 22]));
+				zxString s2(fromNum(_bp->address2, radix[dec + 22]));
+				zxString d1(fromNum(bp->address1, radix[dec + 22]));
+				zxString d2(fromNum(bp->address2, radix[dec + 22]));
+				MessageBox(hWnd, zxString::fmt(L"Перекрытие точек останова <%s - %s>/<%s - %s>!", s1, s2, d1, d2), L"Ошибка", MB_ICONERROR);
+				break;
 			}
 		}
 		// обновление
 		setItems();
 	}
+}
+
+void zxDlgListBps::onOK() {
+	debug->saveBPS();
+	zxDialog::onOK();
 }
 
 void zxDlgListBps::onRemove() {
@@ -95,7 +100,7 @@ void zxDlgListBps::onClickList(LPNMHDR nm, LRESULT* pResult) {
 }
 
 void zxDlgListBps::postCreate() {
-	debug = theApp.debug;
+	debug = theApp->debug;
 	hWndList = GetDlgItem(hWnd, IDC_LIST_BP);
 	ListView_SetExtendedListViewStyleEx(hWndList, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
 	if(!hWndToolbar) makeToolbar(IDB_TOOLBAR_DEBUGGER, tbb, 18, 9, 16, 16, IDT_TOOLBAR_LIST_BPS);
@@ -117,7 +122,7 @@ void zxDlgListBps::postCreate() {
 
 void zxDlgListBps::updateItems() {
 	if(hWndToolbar) {
-		auto bps = theApp.debug->bps;
+		auto bps = theApp->debug->bps;
 		bool is = (itemSelected != -1);
 		SendMessage(hWndToolbar, TB_SETSTATE, IDM_CHANGE, (is << 2));
 		SendMessage(hWndToolbar, TB_SETSTATE, IDM_REMOVE, (is << 2));
@@ -134,7 +139,7 @@ void zxDlgListBps::updateItems() {
 void zxDlgListBps::setItems() {
 	LVITEM lvi;
 
-	auto dec = theApp.getOpt(OPT_DECIMAL)->dval;
+	auto dec = theApp->getOpt(OPT_DECIMAL)->dval;
 
 	ListView_DeleteAllItems(hWndList);
 	itemSelected = -1;
@@ -154,7 +159,7 @@ void zxDlgListBps::setItems() {
 
 		lvi.iSubItem = 1;
 	
-		auto txt = StringZX::fmt(L"%s - %s", StringZX(fromNum(bp->address1, radix[dec + 22])), StringZX(fromNum(bp->address2, radix[dec + 22])));
+		auto txt = zxString::fmt(L"%s - %s", zxString(fromNum(bp->address1, radix[dec + 22])), zxString(fromNum(bp->address2, radix[dec + 22])));
 		lvi.pszText = txt.buffer();
 		SendMessage(hWndList, LVM_SETITEM, 1, (LPARAM)&lvi);
 

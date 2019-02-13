@@ -163,58 +163,58 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="CpuZX.h" />
-    <ClInclude Include="DecoderZX.h" />
+    <ClInclude Include="zxCPU.h" />
     <ClInclude Include="zxAssembler.h" />
+    <ClInclude Include="zxBus.h" />
     <ClInclude Include="zxDlgAddBp.h" />
     <ClInclude Include="zxDlgSettings.h" />
     <ClInclude Include="zxGamePad.h" />
     <ClInclude Include="zxListBox.h" />
     <ClInclude Include="zxMsgMap.h" />
     <ClInclude Include="zxWnd.h" />
-    <ClInclude Include="GpuZX.h" />
+    <ClInclude Include="zxGPU.h" />
     <ClInclude Include="Resource.h" />
-    <ClInclude Include="SettingsZX.h" />
-    <ClInclude Include="SoundZX.h" />
+    <ClInclude Include="zxSettings.h" />
+    <ClInclude Include="zxSND.h" />
     <ClInclude Include="stdafx.h" />
-    <ClInclude Include="StringZX.h" />
+    <ClInclude Include="zxString.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Z80.h" />
     <ClInclude Include="zxDebugger.h" />
     <ClInclude Include="zxDisAsm.h" />
     <ClInclude Include="zxDlgListBps.h" />
-    <ClInclude Include="zxEmulation.h" />
+    <ClInclude Include="zxFrame.h" />
     <ClInclude Include="zxKeyboard.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CpuZX.cpp" />
-    <ClCompile Include="DecoderZX.cpp" />
-    <ClCompile Include="DecoderZX_CBXX.cpp" />
-    <ClCompile Include="DecoderZX_ED01.cpp" />
-    <ClCompile Include="DecoderZX_ED10.cpp" />
-    <ClCompile Include="DecoderZX_No00.cpp" />
-    <ClCompile Include="DecoderZX_No11.cpp" />
+    <ClCompile Include="zxBus.cpp" />
+    <ClCompile Include="zxCPU.cpp" />
+    <ClCompile Include="zxCpuCBXX.cpp" />
+    <ClCompile Include="zxCpuED01.cpp" />
+    <ClCompile Include="zxCpuED10.cpp" />
+    <ClCompile Include="zxCpuNN00.cpp" />
+    <ClCompile Include="zxCpuNN11.cpp" />
     <ClCompile Include="zxAssembler.cpp" />
     <ClCompile Include="zxDlgAddBp.cpp" />
     <ClCompile Include="zxDlgSettings.cpp" />
     <ClCompile Include="zxGamePad.cpp" />
     <ClCompile Include="zxListBox.cpp" />
     <ClCompile Include="zxWnd.cpp" />
-    <ClCompile Include="GpuZX.cpp" />
-    <ClCompile Include="SettingsZX.cpp" />
-    <ClCompile Include="SoundZX.cpp" />
+    <ClCompile Include="zxGPU.cpp" />
+    <ClCompile Include="zxSettings.cpp" />
+    <ClCompile Include="zxSND.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="StringZX.cpp" />
+    <ClCompile Include="zxString.cpp" />
     <ClCompile Include="Z80.cpp" />
     <ClCompile Include="zxDebugger.cpp" />
     <ClCompile Include="zxDisAsm.cpp" />
     <ClCompile Include="zxDlgListBps.cpp" />
-    <ClCompile Include="zxEmulation.cpp" />
+    <ClCompile Include="zxFrame.cpp" />
     <ClCompile Include="zxKeyboard.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -232,6 +232,10 @@
   </ItemGroup>
   <ItemGroup>
     <MASM Include="asm_ssh_common.asm" />
+    <MASM Include="asm_ssh_zx_cpu.asm">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </MASM>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

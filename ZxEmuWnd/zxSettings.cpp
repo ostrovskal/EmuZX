@@ -1,11 +1,11 @@
 
 #include "stdafx.h"
-#include "SettingsZX.h"
+#include "zxSettings.h"
 #include "zxDebugger.h"
 
 extern zxDebugger* debug;
 
-ssh_cws nameROMs[] = {L"48K", L"128K"};
+ssh_cws nameROMs[] = {L"48K", L"128K", L"SCORPION", L"PENTAGON"};
 ssh_cws namePPs[] = {L"None", L"Mixed", L"Bilinear"};
 
 ZX_OPTION opt[] = {
@@ -19,17 +19,17 @@ ZX_OPTION opt[] = {
 	{OPTT_STRING, L"mru7"},
 	{OPTT_STRING, L"mru8"},
 	{OPTT_STRING, L"mru9"},
-	{OPTT_STRING, L"bps0", 0, L"-1,-1,-1,0"},
-	{OPTT_STRING, L"bps1", 0, L"-1,-1,-1,0"},
-	{OPTT_STRING, L"bps2", 0, L"-1,-1,-1,0"},
-	{OPTT_STRING, L"bps3", 0, L"-1,-1,-1,0"},
-	{OPTT_STRING, L"bps4", 0, L"-1,-1,-1,0"},
-	{OPTT_STRING, L"bps5", 0, L"-1,-1,-1,0"},
-	{OPTT_STRING, L"bps6", 0, L"-1,-1,-1,0"},
-	{OPTT_STRING, L"bps7", 0, L"-1,-1,-1,0"},
-	{OPTT_STRING, L"bps8", 0, L"-1,-1,-1,0"},
-	{OPTT_STRING, L"bps9", 0, L"-1,-1,-1,0"},
-	{OPTT_STRING, L"path", 0, L"-1,-1,-1,0"},
+	{OPTT_STRING, L"bps0", 0, L"0,0,0,0,0"},
+	{OPTT_STRING, L"bps1", 0, L"0,0,0,0,0"},
+	{OPTT_STRING, L"bps2", 0, L"0,0,0,0,0"},
+	{OPTT_STRING, L"bps3", 0, L"0,0,0,0,0"},
+	{OPTT_STRING, L"bps4", 0, L"0,0,0,0,0"},
+	{OPTT_STRING, L"bps5", 0, L"0,0,0,0,0"},
+	{OPTT_STRING, L"bps6", 0, L"0,0,0,0,0"},
+	{OPTT_STRING, L"bps7", 0, L"0,0,0,0,0"},
+	{OPTT_STRING, L"bps8", 0, L"0,0,0,0,0"},
+	{OPTT_STRING, L"bps9", 0, L"0,0,0,0,0"},
+	{OPTT_STRING, L"path", 0, L"0,0,0,0,0"},
 
 	{OPTT_BOOL, L"soundEnable", 0},
 	{OPTT_BOOL, L"debuggerEnable", 0},
@@ -45,14 +45,14 @@ ZX_OPTION opt[] = {
 	{OPTT_DWORD, L"soundFrequency", 44100},
 	{OPTT_DWORD, L"memoryModel", MODEL_48K},
 	{OPTT_DWORD, L"postProcess", PP_BILINEAR},
-	{OPTT_DWORD, L"aspectRatio", AR_AS_IS},
+	{OPTT_DWORD, L"aspectRatio", AR_2X},
 
 	{OPTT_STRING, L"keyboardWndPos", 0},
 	{OPTT_STRING, L"debuggerdWndPos", 0},
 	{OPTT_STRING, L"mainWndPos", 0}
 };
 
-SettingsZX::SettingsZX() {
+zxSettings::zxSettings() {
 	::GetModuleFileName(hInst,	mainDir.reserved(MAX_PATH), MAX_PATH);
 	mainDir.releaseReserved();
 	mainDir = mainDir.left(mainDir.find_rev(L'\\') + 1);
@@ -60,8 +60,8 @@ SettingsZX::SettingsZX() {
 	get(OPT_CUR_PATH)->sval = mainDir;
 }
 
-bool SettingsZX::readLine(FILE* hh, StringZX& name, StringZX& value) {
-	StringZX tmp(L'\0', 256);
+bool zxSettings::readLine(FILE* hh, zxString& name, zxString& value) {
+	zxString tmp(L'\0', 256);
 	if(!fgetws(tmp.buffer(), 255, hh)) return false;
 	auto l = wcslen(tmp.buffer()) - 1;
 	if(tmp[l] == L'\n') tmp.set(l, L'\0');
@@ -70,8 +70,8 @@ bool SettingsZX::readLine(FILE* hh, StringZX& name, StringZX& value) {
 	return true;
 }
 
-void SettingsZX::load(const StringZX& path) {
-	StringZX name, value;
+void zxSettings::load(const zxString& path) {
+	zxString name, value;
 
 	_wfopen_s(&hf, path, L"rt,ccs=UTF-16LE");
 	if(hf) {
@@ -97,7 +97,7 @@ void SettingsZX::load(const StringZX& path) {
 	}
 }
 
-void SettingsZX::save(const StringZX& path) {
+void zxSettings::save(const zxString& path) {
 	_wfopen_s(&hf, path, L"wt,ccs=UTF-16LE");
 	if(hf) {
 		for(auto& o : opt) {

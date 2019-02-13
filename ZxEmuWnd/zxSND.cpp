@@ -1,7 +1,7 @@
 
 #include "stdafx.h"
-#include "SoundZX.h"
-#include "CpuZX.h"
+#include "zxSND.h"
+#include "zxCPU.h"
 
 int play_index = 0;
 int cur_index = 0;
@@ -11,9 +11,9 @@ ssh_u old_tm = 0;
 
 ssh_w buffer[16384];
 
-void SoundZX::execute(ssh_u new_tm) {
+void zxSND::execute(ssh_u new_tm) {
 	ssh_u tm = (new_tm - old_tm);
-//	if((_TSTATE & ZX_SOUND) == 0) {
+//	if(((*_TSTATE) & ZX_SOUND) == 0) {
 //		if(tm > 32768) {
 //			cur_signal = -1;
 //			old_tm = new_tm;
@@ -67,14 +67,14 @@ void SoundZX::execute(ssh_u new_tm) {
 	}
 }
 
-bool SoundZX::init(int freq) {
+bool zxSND::init(int freq) {
 	return false;
 	DSBUFFERDESC dsbd;
 	memset(buffer, 0, sizeof(buffer));
 
 	try {
 		if(FAILED(DirectSoundCreate(NULL, &dSnd, NULL))) throw(0);
-		if(FAILED(dSnd->SetCooperativeLevel(theApp, DSSCL_NORMAL))) throw(0);
+		if(FAILED(dSnd->SetCooperativeLevel(theApp->getHWND(), DSSCL_NORMAL))) throw(0);
 
 		fmtWave.cbSize = sizeof(WAVEFORMATEX);
 		fmtWave.wFormatTag = 1;
@@ -106,6 +106,6 @@ bool SoundZX::init(int freq) {
 }
 
 
-void SoundZX::uninit() {
+void zxSND::uninit() {
 
 }

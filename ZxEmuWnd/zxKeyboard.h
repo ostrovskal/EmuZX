@@ -48,7 +48,7 @@ public:
 	void processJoystick();
 	ssh_b vkKeys[256];
 protected:
-	ssh_msg void onClose() { theApp.changeWndKeyboard(true); }
+	ssh_msg void onClose() { theApp->changeWndKeyboard(true); }
 	virtual bool preCreate() override;
 	virtual void postCreate() override;
 	void highlightKey(ssh_cws name, ZX_KEY* k, int isVirt);

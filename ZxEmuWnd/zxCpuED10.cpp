@@ -1,12 +1,13 @@
 
 #include "stdafx.h"
-#include "DecoderZX.h"
+#include "zxCPU.h"
 
-void DecoderZX::ops10_ED() {
-	if(ops < 4) opsXX_ED();
+void zxCPU::opsED10() {
+	if(ops < 4) opsEDXX();
 	else {
 		ssh_w dir = ((ops & 1) ? -1 : 1);
 		ssh_b a = *_A, bt, fz, d;
+		ssh_b c = memZX[RC];
 		ssh_b rep = (ops & 2);
 		bool is;
 		switch(typeOps) {
@@ -35,7 +36,7 @@ void DecoderZX::ops10_ED() {
 			// INI [HL] <- IN[BC]; SZ5*3***
 			case 2: 
 				do {
-					write_mem8((*_HL), portsZX[*_BC]);
+					write_mem8(*_HL, readPort(c, *_B));
 					(*_HL) += dir; (*_B)--;
 					is = ((*_B) == 0);
 				} while(rep && !is);
@@ -44,13 +45,13 @@ void DecoderZX::ops10_ED() {
 			// OUTI OUT[BC] <- [HL]; SZ5*3***
 			case 3: 
 				do {
-					portsZX[*_BC] = read_mem8(*_HL);
+					writePort(c, *_B, read_mem8(*_HL));
 					(*_HL) += dir; (*_B)--;
 					is = ((*_B) == 0);
 				} while(rep && !is);
 				update_flags(FS | FZ | FH | FPV | FN, 2 | _FZ(is));
 				break;
-			default: opsXX_ED();
+			default: opsEDXX();
 		}
 	}
 }

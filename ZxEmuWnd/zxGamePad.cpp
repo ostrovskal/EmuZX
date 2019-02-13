@@ -71,7 +71,7 @@ BOOL zxGamepad::create(const DIDEVICEINSTANCE* pdidInstance) {
 			if(IsEqualGUID(pdidInstance->guidInstance, joyCfg.guidInstance)) {
 				if(SUCCEEDED(pDI->CreateDevice(pdidInstance->guidInstance, &joys[joyIndex], nullptr))) {
 					if(FAILED(joys[joyIndex]->SetDataFormat(&c_dfDIJoystick2))) throw(3);
-					if(FAILED(joys[joyIndex]->SetCooperativeLevel(theApp.getHWND(), DISCL_EXCLUSIVE | DISCL_FOREGROUND))) throw(4);
+					if(FAILED(joys[joyIndex]->SetCooperativeLevel(theApp->getHWND(), DISCL_EXCLUSIVE | DISCL_FOREGROUND))) throw(4);
 					if(FAILED(joys[joyIndex]->EnumObjects(EnumObjs, this, DIDFT_ALL))) throw(5);
 					connected[joyIndex] = true;
 					joyIndex++;
@@ -187,16 +187,13 @@ void zxGamepad::remap(ssh_d idx, Buttons but) {
 	auto m = &map[idx][but];
 	auto bit = m->bit;
 	auto is = is_pressed(idx, but);
-	ssh_w port = 31;
 	if(modes[idx] == Mode::KEMPSTON) {
-		auto val = portsZX[port];
+		auto val = *_KEMPSTON;
 		if(is) val |= bit; else val &= ~bit;
-		portsZX[port] = val;
+		*_KEMPSTON = val;
 	} else {
-		port = (m->port << 8 | 0xfe);
-		auto val = portsZX[port];
+		auto val = _KEYS[m->port];
 		if(is) val &= ~bit; else val |= bit;
-		portsZX[port] = val;
-		portsZX[0xfe] = val;
+		_KEYS[m->port] = val;
 	}
 }

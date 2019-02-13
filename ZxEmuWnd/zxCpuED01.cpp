@@ -1,27 +1,27 @@
 
 #include "stdafx.h"
-#include "DecoderZX.h"
+#include "zxCPU.h"
 
 // PV <- IFF2; SZ503*0-; Известная ошибка : если в момент выполнения команды получено прерывание, то в PV вместо 1 ошибочно попадает 0. Есть программы, которые строят на этом защиту от эмуляции.
 
-funcDecoder table_opsED01_XXX[] = {
-	&DecoderZX::funcED01_000, &DecoderZX::funcED01_000, &DecoderZX::funcED01_000, &DecoderZX::funcED01_000, &DecoderZX::funcED01_000,
-	&DecoderZX::funcED01_000, &DecoderZX::funcED01_000, &DecoderZX::funcED01_111
+funcCPU table_opsED01_XXX[] = {
+	&zxCPU::funcED01_000, &zxCPU::funcED01_000, &zxCPU::funcED01_000, &zxCPU::funcED01_000, &zxCPU::funcED01_000,
+	&zxCPU::funcED01_000, &zxCPU::funcED01_000, &zxCPU::funcED01_111
 };
 
-void DecoderZX::funcED01_000() {
+void zxCPU::funcED01_000() {
 	ssh_b val, a;
 	switch(typeOps) {
 		// *IN F, [C]; SZ503P0-
 		// IN DDD, [C]; SZ503P0-
 		case 0:
-			val = readPort(*_BC);
-			if(ops != 6) *fromRON(ops) = val;
+			val = readPort(memZX[RC], *_B);
+			if(ops != 6) *fromPrefRON(ops) = val;
 			update_flags(FS | FZ |FH | FPV | FN, _FS(val) | _FZ(val) | _FP(val));
 			break;
 		//	*OUT[C], 0
 		//	OUT[C], SSS
-		case 1: writePort(*_BC, (ops == 6 ? 0 : *fromRON(ops))); break;
+		case 1: writePort(memZX[RC], *_B, (ops == 6 ? 0 : *fromPrefRON(ops))); break;
 		// ADC/SBC HL, RP; SZ***VNC
 		case 2: opsAccum2(); break;
 		// LD [NN], RP / LD RP, [nn]
@@ -54,7 +54,7 @@ void DecoderZX::funcED01_000() {
 	}
 }
 
-void DecoderZX::funcED01_111() {
+void zxCPU::funcED01_111() {
 		switch(ops) {
 		// LD I, A
 		case 0: *_I = *_A; break;
@@ -66,7 +66,7 @@ void DecoderZX::funcED01_111() {
 		case 3: flagsIR(*_A = *_R); break;
 		// RRD/RLD; SZ503P0-
 		case 4: case 5: {
-			ssh_b* reg = fromRON1(6);
+			ssh_b* reg = fromRON(6);
 			ssh_b vreg = *reg;
 			ssh_b a = *_A & 15;
 			ssh_b h;

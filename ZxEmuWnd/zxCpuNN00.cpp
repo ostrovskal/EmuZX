@@ -1,17 +1,17 @@
 #include "stdafx.h"
-#include "DecoderZX.h"
+#include "zxCPU.h"
 
-funcDecoder table_opsN00_XXX[] = {
-	&DecoderZX::funcN00_000, &DecoderZX::ldRp, &DecoderZX::funcN00_010, &DecoderZX::incRp, &DecoderZX::incSSS, &DecoderZX::incSSS, &DecoderZX::ldSSS, &DecoderZX::funcN00_111
+funcCPU table_opsN00_XXX[] = {
+	&zxCPU::funcN00_000, &zxCPU::ldRp, &zxCPU::funcN00_010, &zxCPU::incRp, &zxCPU::incSSS, &zxCPU::incSSS, &zxCPU::ldSSS, &zxCPU::funcN00_111
 };
 
-void DecoderZX::funcN00_000() {
+void zxCPU::funcN00_000() {
 	int d = (ops > 1 ? (char)read_mem8PC() : 0);
 	switch(ops) {
 		// NOP
 		case 0: break;
 		// EX AF, AF'
-		case 1: swapReg((ssh_w*)&regsZX[RF], (ssh_w*)&regsZX[RF_]); break;
+		case 1: swapReg(_AF, _AF + 4); break;
 		// DJNZ
 		case 2: (*_B)--; if(*_B) (*_PC) += d; break;
 		// JR
@@ -21,7 +21,7 @@ void DecoderZX::funcN00_000() {
 	}
 }
 
-void DecoderZX::funcN00_010() {
+void zxCPU::funcN00_010() {
 	if(ops < 4) {
 		// LD (BC/DE), A | LD A, (BC/DE)
 		ssh_w reg = *fromRP_AF(ops);
@@ -39,7 +39,7 @@ void DecoderZX::funcN00_010() {
 	}
 }
 
-void DecoderZX::funcN00_111() {
+void zxCPU::funcN00_111() {
 	ssh_b a = *_A;
 	ssh_b oldFc = getFlag(FC);
 	switch(ops) {
@@ -73,7 +73,7 @@ void DecoderZX::funcN00_111() {
 	*_A = a;
 }
 
-void DecoderZX::ldRp() {
+void zxCPU::ldRp() {
 	ssh_w* reg = fromRP_SP(ops);
 	if(ops & 1) {
 		// ADD HL, RP; --***-0C	F5,H,F3 берутся по результатам сложения старших байтов
@@ -88,22 +88,22 @@ void DecoderZX::ldRp() {
 	}
 }
 
-void DecoderZX::incRp() { 
+void zxCPU::incRp() { 
 	*fromRP_SP(ops) += ((ops & 1) ? -1 : 1);
 }
 
-void DecoderZX::incSSS() {
+void zxCPU::incSSS() {
 	// SZ5H3VN-
 	ssh_b n = typeOps & 1;
-	ssh_b* reg = fromRON(ops);
+	ssh_b* reg = fromPrefRON(ops);
 	ssh_b op1 = *reg;
 	ssh_b op2 = (n ? -1 : 1);
 	ssh_b val = op1 + op2;
-	write_mem8(reg, val, ops);
+	write_mem8(reg, val);
 	update_flags(FS | FZ | FH | FPV | FN, _FS(val) | _FZ(val) | _FH(op1, op2, 0, n) | _FV1(op1, op2, 0, n) | _FN(n));
 }
 
-void DecoderZX::ldSSS() {
-	ssh_b* reg = fromRON(ops);
-	write_mem8(reg, read_mem8PC(), ops);
+void zxCPU::ldSSS() {
+	ssh_b* reg = fromPrefRON(ops);
+	write_mem8(reg, read_mem8PC());
 }

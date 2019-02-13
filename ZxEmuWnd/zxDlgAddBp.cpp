@@ -5,9 +5,9 @@
 ssh_cws cond_bp[] = {L"==", L"<>", L"<", L">", L"<=", L">="};
 
 BEGIN_MSG_MAP(zxDlgAddBp, zxDialog)
-	ON_NOTIFY(EN_CHANGE, IDC_EDIT_ADDRESS1, onNotifyAddr1)
-	ON_NOTIFY(EN_CHANGE, IDC_EDIT_ADDRESS2, onNotifyAddr2)
-	ON_NOTIFY(CBN_SELCHANGE, IDC_COMBO_ACCESS, onNotifyAccess)
+	ON_CONTROL(EN_CHANGE, IDC_EDIT_ADDRESS1, onNotifyAddr1)
+	ON_CONTROL(EN_CHANGE, IDC_EDIT_ADDRESS2, onNotifyAddr2)
+	ON_CONTROL(CBN_SELCHANGE, IDC_COMBO_ACCESS, onNotifyAccess)
 END_MSG_MAP()
 
 void zxDlgAddBp::postCreate() {
@@ -20,10 +20,10 @@ void zxDlgAddBp::postCreate() {
 	SendMessage(h, CB_ADDSTRING, 0, (LPARAM)L"Запись в память");
 
 	if(_bp) {
-		auto dec = theApp.getOpt(OPT_DECIMAL)->dval;
+		auto dec = theApp->getOpt(OPT_DECIMAL)->dval;
 		SendMessage(h, CB_SETCURSEL, ((_bp->flags & FBP_ACCESS) >> 1), 0);
-		if(_bp->flags & FBP_ADDR) SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS1), fromNum(_bp->address1, radix[dec + 10]));
-		if(_bp->flags & FBP_ADDR) SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS2), fromNum(_bp->address2, radix[dec + 10]));
+		if(_bp->flags & FBP_ADDR) SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS1), fromNum(_bp->address1, radix[dec + 22]));
+		if(_bp->flags & FBP_ADDR) SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS2), fromNum(_bp->address2, radix[dec + 22]));
 		if(_bp->flags & FBP_VAL) {
 			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_VALUE), fromNum(_bp->value, radix[dec + 16]));
 			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_MASK), fromNum(_bp->mask, radix[dec + 16]));
@@ -43,7 +43,7 @@ int zxDlgAddBp::getValue(HWND hWnd, int flag) {
 	return *(int*)asm_ssh_wton(tmpBuf, (ssh_u)Radix::_dec);
 }
 
-bool zxDlgAddBp::onOK() {
+void zxDlgAddBp::onOK() {
 	result.address1 = getValue(GetDlgItem(hWnd, IDC_EDIT_ADDRESS1), FBP_ADDR);
 	result.address2 = getValue(GetDlgItem(hWnd, IDC_EDIT_ADDRESS2), FBP_ADDR);
 	auto f = (int)SendMessage(GetDlgItem(hWnd, IDC_COMBO_ACCESS), CB_GETCURSEL, 0, 0);
@@ -55,11 +55,11 @@ bool zxDlgAddBp::onOK() {
 		(f == 1 && result.flags & FBP_VAL && result.value > 255) ||
 	   (f == 1 && result.flags & FBP_MASK && result.mask > 255)) {
 		MessageBox(hWnd, L"Слишком большие величины. Недопустимо заданы адреса/значение/маска !", L"Ошибка", MB_ICONERROR);
-		return false;
+		return;
 	}
 	if(result.address1 > result.address2) {
 		MessageBox(hWnd, L"Начальный адрес диапазона должен быть меньше последнего!", L"Ошибка", MB_ICONERROR);
-		return false;
+		return;
 	}
 	result.flags |= ((f == -1) ? 0 : 1 << f);
 	if(f == 1) {
@@ -68,24 +68,24 @@ bool zxDlgAddBp::onOK() {
 	} else {
 		result.flags &= ~(FBP_VAL | FBP_MASK);
 	}
-	return true;
+	zxDialog::onOK();
 }
 
-void zxDlgAddBp::onNotifyAddr1(LPNMHDR nm, LRESULT* pResult) {
+void zxDlgAddBp::onNotifyAddr1() {
 	auto l = GetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS1), tmpBuf, 260);
 	if(isAddr2) {
 		owner = true;
 		SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS2), tmpBuf);
-		owner = true;
+		owner = false;
 	}
 	EnableWindow(GetDlgItem(hWnd, IDOK), l > 0);
 }
 
-void zxDlgAddBp::onNotifyAddr2(LPNMHDR nm, LRESULT* pResult) {
+void zxDlgAddBp::onNotifyAddr2() {
 	isAddr2 = owner;
 }
 
-void zxDlgAddBp::onNotifyAccess(LPNMHDR nm, LRESULT* pResult) {
+void zxDlgAddBp::onNotifyAccess() {
 	updateAccess();
 }
 

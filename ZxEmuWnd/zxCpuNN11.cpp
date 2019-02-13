@@ -1,12 +1,12 @@
 #include "stdafx.h"
-#include "DecoderZX.h"
+#include "zxCPU.h"
 
-funcDecoder table_opsN11_XXX[] = {
-	&DecoderZX::funcN11_000, &DecoderZX::funcN11_001, &DecoderZX::funcN11_000, &DecoderZX::funcN11_011, &DecoderZX::funcN11_000,
-	&DecoderZX::funcN11_101, &DecoderZX::funcN11_000, &DecoderZX::funcN11_000
+funcCPU table_opsN11_XXX[] = {
+	&zxCPU::funcN11_000, &zxCPU::funcN11_001, &zxCPU::funcN11_000, &zxCPU::funcN11_011, &zxCPU::funcN11_000,
+	&zxCPU::funcN11_101, &zxCPU::funcN11_000, &zxCPU::funcN11_000
 };
 
-void DecoderZX::funcN11_000() {
+void zxCPU::funcN11_000() {
 	ssh_w nn = 0;
 	if(typeOps < 6) {
 		if(typeOps > 0) nn = read_mem16PC();
@@ -31,7 +31,7 @@ void DecoderZX::funcN11_000() {
 	}
 }
 
-void DecoderZX::funcN11_001() {
+void zxCPU::funcN11_001() {
 	ssh_w reg;
 	if(ops == 5 || ops == 7) {
 		reg = *fromRP_AF(4);
@@ -52,7 +52,7 @@ void DecoderZX::funcN11_001() {
 	}
 }
 
-void DecoderZX::funcN11_101() {
+void zxCPU::funcN11_101() {
 	switch(ops) {
 		// CALL nn
 		case 1: execCALL(read_mem16PC()); break;
@@ -70,7 +70,7 @@ void DecoderZX::funcN11_101() {
 	}
 }
 
-void DecoderZX::funcN11_011() {
+void zxCPU::funcN11_011() {
 	ssh_b a = *_A;
 	switch(ops) {
 		// JP nn
@@ -78,9 +78,9 @@ void DecoderZX::funcN11_011() {
 		// prefix CB
 		case 1: execOps(0, PREFIX_CB); break;
 		// OUT(d), A
-		case 2: writePort((a << 8 | read_mem8PC()), a); break;
+		case 2: writePort(read_mem8PC(), a, a); break;
 		// IN A, (d)
-		case 3: *_A = readPort((a << 8) | (read_mem8PC())); break;
+		case 3: *_A = readPort(read_mem8PC(), a); break;
 		// EX (SP), HL
 		case 4: {
 			ssh_w* reg = fromRP_SP(4);

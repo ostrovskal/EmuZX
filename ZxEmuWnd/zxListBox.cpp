@@ -38,8 +38,12 @@ INT_PTR zxListBox::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 		case LB_SETTOPINDEX: {
 			int oldTop = topIndex;
 			topIndex = (int)wParam;
-			if(topIndex >= countItems) topIndex = countItems - countVisibleItems;
-			if(topIndex < 0) topIndex = 0;
+			if(topIndex >= countItems) {
+				topIndex = countItems - countVisibleItems;
+			}
+			if(topIndex < 0) {
+				topIndex = 0;
+			}
 			if(oldTop != topIndex) changeScroll(topIndex, countItems, countVisibleItems);
 			break;
 		}
@@ -142,7 +146,8 @@ void zxListBox::onVScroll(UINT code, UINT p, HWND hWndScroll) {
 		}
 		topIndex = pos;
 		si.nPos = pos;
-		auto ret = SetScrollPos(hWnd, SB_VERT, pos, true);
+		si.nTrackPos = pos;
+		SetScrollPos(hWnd, SB_VERT, pos, true);
 		sendNotify(LBN_VSCROLL);
 	}
 }
