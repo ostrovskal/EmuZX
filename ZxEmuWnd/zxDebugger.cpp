@@ -8,7 +8,6 @@
 #include "zxSettings.h"
 #include "zxDlgListBps.h"
 #include "zxDlgAddBp.h"
-#include <math.h>
 
 struct ZX_REG_TMP {
 	ssh_w* ptr;

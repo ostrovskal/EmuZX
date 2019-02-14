@@ -163,6 +163,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="zxBlipBuffer.h" />
     <ClInclude Include="zxCPU.h" />
     <ClInclude Include="zxAssembler.h" />
     <ClInclude Include="zxBus.h" />
@@ -187,6 +188,7 @@
     <ClInclude Include="zxKeyboard.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="zxBlipBuffer.cpp" />
     <ClCompile Include="zxBus.cpp" />
     <ClCompile Include="zxCPU.cpp" />
     <ClCompile Include="zxCpuCBXX.cpp" />

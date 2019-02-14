@@ -38,6 +38,18 @@ protected:
 	virtual const SSH_MSGMAP* GetMessageMap() const;
 };
 
+struct _AFX_OCC_DIALOG_INFO {
+	DLGTEMPLATE* m_pNewTemplate;
+	DLGITEMTEMPLATE** m_ppOleDlgItems;
+
+	unsigned m_cItems;
+	struct ItemInfo {
+		unsigned nId;
+		BOOL bAutoRadioButton;
+	};
+	ItemInfo *m_pItemInfo;
+};
+
 class zxDialog : public zxWnd {
 public:
 	zxDialog() : zxWnd(), nResult(0) {}
@@ -48,6 +60,10 @@ protected:
 	virtual void endDialog(int code) { nResult = code; EndDialog(hWnd, code); }
 	virtual void onOK() { endDialog(IDOK); }
 	virtual void onCancel() { endDialog(IDCANCEL); }
+	BOOL CreateDlgIndirect(LPCDLGTEMPLATE lpDialogTemplate, zxWnd* pParentWnd, HINSTANCE hInst);
+	const DLGTEMPLATE* preCreateDialog(_AFX_OCC_DIALOG_INFO* pDlgInfo, const DLGTEMPLATE* pOrigTemplate);
+	DLGTEMPLATE* splitDialogTemplate(const DLGTEMPLATE* pTemplate, DLGITEMTEMPLATE** ppOleDlgItems);
+	void postCreateDialog(_AFX_OCC_DIALOG_INFO* pDlgInfo);
 	int nResult;
 	static const SSH_MSGMAP* PASCAL GetThisMessageMap();
 	virtual const SSH_MSGMAP* GetMessageMap() const;

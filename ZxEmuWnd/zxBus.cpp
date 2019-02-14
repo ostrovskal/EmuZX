@@ -185,10 +185,11 @@ bool zxBus::saveState(int hf) {
 }
 
 void zxBus::signalRESET() {
-	memset(&memZX, 0, 65536);
+	memset(memZX, 0, 65536);
+	memset(memRAM, 0, bankRAM * 16384);
 	memset(&memZX[RC_], 0, 8);
 	memset(_KEYS, 255, 8);
-	*_IFF1 = *_IFF2 = *_IM = *_SCAN = *_LOCK_FD = *_PORT_FE = 0;
+	*_IFF1 = *_IFF2 = *_IM = *_LOCK_FD = *_PORT_FE = 0;
 	*_AF = *_BC = *_DE = *_HL = *_IX = *_IY = *_PC = 0;
 	*_R = *_I = 0;
 	*_SP = 65534;

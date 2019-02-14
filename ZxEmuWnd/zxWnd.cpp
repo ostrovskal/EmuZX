@@ -539,6 +539,7 @@ HWND zxWnd::makeToolbar(WORD IDB, TBBUTTON* tbb, int cBitmaps, int cButtons, int
 	return hWndToolbar;
 }
 
+/*
 int zxDialog::create(WORD IDD, zxWnd* wndParent, bool modal) {
 	if(!preCreate()) return IDCANCEL;
 	HookWindowCreate(this);
@@ -560,118 +561,49 @@ int zxDialog::create(WORD IDD, zxWnd* wndParent, bool modal) {
 	}
 	return IDOK;
 }
+*/
 
-/*
-INT_PTR zxDialog::DoModal() {
-	LPCDLGTEMPLATE lpDialogTemplate = m_lpDialogTemplate;
-	HGLOBAL hDialogTemplate = m_hDialogTemplate;
-	if(m_lpszTemplateName != NULL) {
-//		hInst = ::FindResourceHandle(m_lpszTemplateName, RT_DIALOG);
-		HRSRC hResource = ::FindResource(hInst, m_lpszTemplateName, RT_DIALOG);
-		hDialogTemplate = LoadResource(hInst, hResource);
-	}
-	if(hDialogTemplate != NULL)
-		lpDialogTemplate = (LPCDLGTEMPLATE)LockResource(hDialogTemplate);
-
-	if(lpDialogTemplate == NULL)
-		return -1;
-
-	// disable parent (before creating dialog)
-	HWND hWndParent = PreModal();
-	AfxUnhookWindowCreate();
-	BOOL bEnableParent = FALSE;
-	BOOL bEnableMainWnd = FALSE;
-	if(hWndParent && hWndParent != ::GetDesktopWindow() && ::IsWindowEnabled(hWndParent)) {
-		::EnableWindow(hWndParent, FALSE);
-		bEnableParent = TRUE;
-		pMainWnd = AfxGetMainWnd();
-		if(pMainWnd && pMainWnd->IsFrameWnd() && pMainWnd->IsWindowEnabled()) {
-			//
-			// We are hosted by non-MFC container
-			// 
-			pMainWnd->EnableWindow(FALSE);
-			bEnableMainWnd = TRUE;
+int zxDialog::create(WORD IDD, zxWnd* wndParent, bool modal) {
+	if(!preCreate()) return IDCANCEL;
+	LPCDLGTEMPLATE lpDialogTemplate = NULL;
+	auto hResource = ::FindResource(hInst, MAKEINTRESOURCE(IDD), RT_DIALOG);
+	auto hDialogTemplate = LoadResource(hInst, hResource);
+	if(hDialogTemplate != NULL) lpDialogTemplate = (LPCDLGTEMPLATE)LockResource(hDialogTemplate);
+	if(lpDialogTemplate == NULL) return -1;
+	if(!CreateDlgIndirect(lpDialogTemplate, wndParent, hInst)) return -1;
+	parent = wndParent;
+	postCreate();
+	if(modal) {
+		ShowWindow(hWnd, true);
+		UpdateWindow(hWnd);
+		nResult = 0;
+		MSG msg;
+		while(!nResult) {
+			do {
+				if(!SshMsgPump(&msg, true)) break;
+			} while(::PeekMessage(&msg, NULL, NULL, NULL, PM_NOREMOVE));
 		}
+		return nResult;
 	}
-
-	TRY
-	{
-		// create modeless dialog
-		AfxHookWindowCreate(this);
-	if(!CreateRunDlgIndirect(lpDialogTemplate, CWnd::FromHandle(hWndParent), hInst) && !m_bClosedByEndDialog) {
-		// If the resource handle is a resource-only DLL, the dialog may fail to launch. Use the
-		// module instance handle as the fallback dialog creator instance handle if necessary.
-		CreateRunDlgIndirect(lpDialogTemplate, CWnd::FromHandle(hWndParent), AfxGetInstanceHandle());
-	}
-
-	m_bClosedByEndDialog = FALSE;
-	}
-		CATCH_ALL(e) {
-		TRACE(traceAppMsg, 0, "Warning: dialog creation failed.\n");
-		DELETE_EXCEPTION(e);
-		m_nModalResult = -1;
-	}
-	END_CATCH_ALL
-
-		if(bEnableMainWnd)
-			pMainWnd->EnableWindow(TRUE);
-	if(bEnableParent)
-		::EnableWindow(hWndParent, TRUE);
-	if(hWndParent != NULL && ::GetActiveWindow() == m_hWnd)
-		::SetActiveWindow(hWndParent);
-
-	// destroy modal window
-	DestroyWindow();
-	PostModal();
-
-	// unlock/free resources as necessary
-	if(m_lpszTemplateName != NULL || m_hDialogTemplate != NULL)
-		UnlockResource(hDialogTemplate);
-	if(m_lpszTemplateName != NULL)
-		FreeResource(hDialogTemplate);
-
-	return m_nModalResult;
+	UnlockResource(hDialogTemplate);
+	FreeResource(hDialogTemplate);
+	return IDOK;
 }
 
-BOOL CWnd::CreateRunDlgIndirect(LPCDLGTEMPLATE lpDialogTemplate, CWnd* pParentWnd, HINSTANCE hInst) {
-	BOOL bRet = CreateDlgIndirect(lpDialogTemplate, pParentWnd, hInst);
-
-	if(bRet) {
-		if(m_nFlags & WF_CONTINUEMODAL) {
-			DWORD dwFlags = MLF_SHOWONIDLE;
-			if(GetStyle() & DS_NOIDLEMSG) dwFlags |= MLF_NOIDLEMSG;
-			VERIFY(RunModalLoop(dwFlags) == m_nModalResult);
-		}
-		if(m_hWnd != NULL) SetWindowPos(NULL, 0, 0, 0, 0, SWP_HIDEWINDOW | SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER);
-	}
-	return bRet;
-}
-
-BOOL CWnd::CreateDlgIndirect(LPCDLGTEMPLATE lpDialogTemplate, CWnd* pParentWnd, HINSTANCE hInst) {
+BOOL zxDialog::CreateDlgIndirect(LPCDLGTEMPLATE lpDialogTemplate, zxWnd* pParentWnd, HINSTANCE hInst) {
 
 	_AFX_OCC_DIALOG_INFO occDialogInfo;
 
 	HGLOBAL hTemplate = NULL;
 
 	HWND hWnd = NULL;
-	lpDialogTemplate = pOccManager->PreCreateDialog(&occDialogInfo, lpDialogTemplate);
-
+	lpDialogTemplate = preCreateDialog(&occDialogInfo, lpDialogTemplate);
 	if(lpDialogTemplate == NULL) return FALSE;
 
 	if(hTemplate != NULL) lpDialogTemplate = (DLGTEMPLATE*)GlobalLock(hTemplate);
-	m_nModalResult = -1;
-	m_nFlags |= WF_CONTINUEMODAL;
-	AfxHookWindowCreate(this);
-	hWnd = ::CreateDialogIndirect(hInst, lpDialogTemplate, pParentWnd->GetSafeHwnd(), AfxDlgProc);
-	pOccManager->PostCreateDialog(&occDialogInfo);
-	if(hWnd != NULL) SetOccDialogInfo(NULL);
-
-	if(!AfxUnhookWindowCreate())
-		PostNcDestroy();
-	if(hWnd != NULL && !(m_nFlags & WF_CONTINUEMODAL)) {
-		::DestroyWindow(hWnd);
-		hWnd = NULL;
-	}
+	HookWindowCreate(this);
+	hWnd = ::CreateDialogIndirect(hInst, lpDialogTemplate, pParentWnd->getHWND(), DlgProc);
+	postCreateDialog(&occDialogInfo);
 
 	if(hTemplate != NULL) {
 		GlobalUnlock(hTemplate);
@@ -683,10 +615,8 @@ BOOL CWnd::CreateDlgIndirect(LPCDLGTEMPLATE lpDialogTemplate, CWnd* pParentWnd, 
 
 const DLGTEMPLATE* zxDialog::preCreateDialog(_AFX_OCC_DIALOG_INFO* pDlgInfo, const DLGTEMPLATE* pOrigTemplate) {
 	pDlgInfo->m_ppOleDlgItems = (DLGITEMTEMPLATE**)calloc(sizeof(DLGITEMTEMPLATE*), (DlgTemplateItemCount(pOrigTemplate) + 1));
-	if(pDlgInfo->m_ppOleDlgItems == NULL)
-		return NULL;
 
-	DLGTEMPLATE* pNewTemplate = SplitDialogTemplate(pOrigTemplate, pDlgInfo->m_ppOleDlgItems);
+	DLGTEMPLATE* pNewTemplate = splitDialogTemplate(pOrigTemplate, pDlgInfo->m_ppOleDlgItems);
 	pDlgInfo->m_pNewTemplate = pNewTemplate;
 
 	DLGITEMTEMPLATE *pItem = findFirstDlgItem(pOrigTemplate);
@@ -701,7 +631,7 @@ const DLGTEMPLATE* zxDialog::preCreateDialog(_AFX_OCC_DIALOG_INFO* pDlgInfo, con
 	DWORD dwStyle;
 
 	for(iItem = 0; iItem < iItems; iItem++) {
-		pNextItem = fndNextDlgItem(pItem, bDialogEx);
+		pNextItem = findNextDlgItem(pItem, bDialogEx);
 		if(bDialogEx) {
 			DLGITEMTEMPLATEEX *pItemEx = (DLGITEMTEMPLATEEX *)pItem;
 			pDlgInfo->m_pItemInfo[iItem].nId = pItemEx->id;
@@ -719,7 +649,7 @@ const DLGTEMPLATE* zxDialog::preCreateDialog(_AFX_OCC_DIALOG_INFO* pDlgInfo, con
 	return (pNewTemplate != NULL) ? pNewTemplate : pOrigTemplate;
 }
 
-void zxDialog::PostCreateDialog(_AFX_OCC_DIALOG_INFO* pDlgInfo) {
+void zxDialog::postCreateDialog(_AFX_OCC_DIALOG_INFO* pDlgInfo) {
 	if(pDlgInfo->m_pNewTemplate != NULL) {
 		GlobalFree(pDlgInfo->m_pNewTemplate);
 		pDlgInfo->m_pNewTemplate = NULL;
@@ -737,7 +667,7 @@ void zxDialog::PostCreateDialog(_AFX_OCC_DIALOG_INFO* pDlgInfo) {
 }
 
 DLGTEMPLATE* zxDialog::splitDialogTemplate(const DLGTEMPLATE* pTemplate, DLGITEMTEMPLATE** ppOleDlgItems) {
-	DLGITEMTEMPLATE* pFirstItem = _AfxFindFirstDlgItem(pTemplate);
+	DLGITEMTEMPLATE* pFirstItem = findFirstDlgItem(pTemplate);
 	ULONG cbHeader = ULONG((BYTE*)pFirstItem - (BYTE*)pTemplate);
 	ULONG cbNewTemplate = cbHeader;
 
@@ -751,7 +681,7 @@ DLGTEMPLATE* zxDialog::splitDialogTemplate(const DLGTEMPLATE* pTemplate, DLGITEM
 	BOOL bHasOleControls = FALSE;
 
 	for(iItem = 0; iItem < nItems; iItem++) {
-		pNextItem = _AfxFindNextDlgItem(pItem, bDialogEx);
+		pNextItem = findNextDlgItem(pItem, bDialogEx);
 
 		pszClassName = bDialogEx ?
 			(LPWSTR)(((DLGITEMTEMPLATEEX*)pItem) + 1) :
@@ -771,7 +701,7 @@ DLGTEMPLATE* zxDialog::splitDialogTemplate(const DLGTEMPLATE* pTemplate, DLGITEM
 	}
 	BYTE* pNew = (BYTE*)GlobalAlloc(GMEM_FIXED, cbNewTemplate);
 	DLGTEMPLATE* pNewTemplate = (DLGTEMPLATE*)pNew;
-	Checked::memcpy_s(pNew, cbNewTemplate, pTemplate, cbHeader);
+	memcpy_s(pNew, cbNewTemplate, pTemplate, cbHeader);
 	pNew += cbHeader;
 	DlgTemplateItemCount(pNewTemplate) = 0;
 
@@ -779,14 +709,14 @@ DLGTEMPLATE* zxDialog::splitDialogTemplate(const DLGTEMPLATE* pTemplate, DLGITEM
 	pNextItem = pItem;
 
 	for(iItem = 0; iItem < nItems; iItem++) {
-		pNextItem = _AfxFindNextDlgItem(pItem, bDialogEx);
+		pNextItem = findNextDlgItem(pItem, bDialogEx);
 
 		pszClassName = bDialogEx ? (LPWSTR)(((DLGITEMTEMPLATEEX*)pItem) + 1) : (LPWSTR)(pItem + 1);
 		if(pszClassName[0] == L'{') {
 			ppOleDlgItems[iItem] = pItem;
 		} else {
 			ULONG cbItem = ULONG((BYTE*)pNextItem - (BYTE*)pItem);
-			Checked::memcpy_s(pNew, cbItem, pItem, cbItem);
+			memcpy_s(pNew, cbItem, pItem, cbItem);
 			pNew += cbItem;
 			++DlgTemplateItemCount(pNewTemplate);
 			ppOleDlgItems[iItem] = NULL;
@@ -796,5 +726,3 @@ DLGTEMPLATE* zxDialog::splitDialogTemplate(const DLGTEMPLATE* pTemplate, DLGITEM
 	ppOleDlgItems[nItems] = (DLGITEMTEMPLATE*)(-1);
 	return pNewTemplate;
 }
-
-*/
