@@ -143,7 +143,13 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 }
 
 static INT_PTR CALLBACK DlgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
-	return MainWndProc(hWnd, message, wParam, lParam);
+	if(message == WM_INITDIALOG) {
+		// special case for WM_INITDIALOG
+		zxDialog* dlg = (zxDialog*)zxWnd::fromHWND(hWnd);
+		if(dlg) return dlg->onInitDialog(hWnd); else return 1;
+	}
+	return 0;
+//	return MainWndProc(hWnd, message, wParam, lParam);
 }
 
 LRESULT CALLBACK cbtFilterHook(int code, WPARAM wParam, LPARAM lParam) {
@@ -153,7 +159,8 @@ LRESULT CALLBACK cbtFilterHook(int code, WPARAM wParam, LPARAM lParam) {
 		if(wndInit) {
 			HWND hWnd = (HWND)wParam;
 			wndInit->attach(hWnd);
-			SetWindowLongPtr(hWnd, GWLP_WNDPROC, (DWORD_PTR)MainWndProc);
+			auto oldWndProc = (WNDPROC)SetWindowLongPtr(hWnd, GWLP_WNDPROC, (DWORD_PTR)MainWndProc);
+			if(oldWndProc != MainWndProc) wndInit->pfnSuper = oldWndProc;
 			thState.wndInit = NULL;
 		}
 	}
@@ -180,10 +187,15 @@ const SSH_MSGMAP_ENTRY* zxWnd::findMessageEntry(const SSH_MSGMAP_ENTRY* lpEntry,
 INT_PTR zxWnd::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	LRESULT lResult = 0;
 	if(!onWndMsg(message, wParam, lParam, &lResult))
-		lResult = DefWindowProc(hWnd, message, wParam, lParam);
+		lResult = defWindowProc(message, wParam, lParam);
 	return lResult;
 }
 
+INT_PTR zxWnd::defWindowProc(UINT message, WPARAM wParam, LPARAM lParam) {
+	if(pfnSuper) return ::CallWindowProc(pfnSuper, hWnd, message, wParam, lParam);
+	return DefWindowProc(hWnd, message, wParam, lParam);
+
+}
 BOOL zxWnd::onWndMsg(UINT msg, WPARAM wParam, LPARAM lParam, LRESULT* pResult) {
 	const SSH_MSGMAP_ENTRY* lpEntry;
 	POINT pt;
@@ -209,10 +221,6 @@ BOOL zxWnd::onWndMsg(UINT msg, WPARAM wParam, LPARAM lParam, LRESULT* pResult) {
 		notify.pResult = &lResult;
 		notify.pNMHDR = pNMHDR;
 		pNotify = &notify;
-	} else if(msg == WM_INITDIALOG) {
-		onInitDialog(hWnd);
-		*pResult = TRUE;
-		return TRUE;
 	}
 
 	auto pMessageMap = GetMessageMap();
@@ -475,7 +483,7 @@ LReturnTrue:
 	return TRUE;
 }
 
-zxWnd::zxWnd() : wndID(0), hBmp(nullptr),  hWnd(nullptr), hWndToolbar(nullptr), parent(nullptr), hAccel(nullptr) {
+zxWnd::zxWnd() : wndID(0), pfnSuper(nullptr), hBmp(nullptr),  hWnd(nullptr), hWndToolbar(nullptr), parent(nullptr), hAccel(nullptr) {
 	if(!wndInit) {
 		memset(wnds, -1, sizeof(wnds));
 		wndInit = true;

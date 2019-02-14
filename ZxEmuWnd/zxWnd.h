@@ -6,6 +6,7 @@ struct SSH_MSGMAP_ENTRY;
 
 class zxWnd {
 	friend LRESULT CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+	friend LRESULT CALLBACK cbtFilterHook(int code, WPARAM wParam, LPARAM lParam);
 public:
 	zxWnd();
 	virtual ~zxWnd();
@@ -22,7 +23,7 @@ public:
 protected:
 	virtual BOOL onWndMsg(UINT message, WPARAM wParam, LPARAM lParam, LRESULT* pResult);
 	virtual INT_PTR wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-	virtual int onInitDialog(HWND hWnd) { return 1; }
+	virtual INT_PTR defWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 	virtual bool preCreate() { return true; }
 	virtual void postCreate() {  }
 	const SSH_MSGMAP_ENTRY* findMessageEntry(const SSH_MSGMAP_ENTRY* lpEntry, UINT nMsg, UINT nCode, UINT nID);
@@ -33,6 +34,7 @@ protected:
 	UINT wmId;
 	HBITMAP hBmp;
 	HACCEL hAccel;
+	WNDPROC pfnSuper;
 
 	static const SSH_MSGMAP* PASCAL GetThisMessageMap();
 	virtual const SSH_MSGMAP* GetMessageMap() const;
@@ -51,15 +53,18 @@ struct _AFX_OCC_DIALOG_INFO {
 };
 
 class zxDialog : public zxWnd {
+	friend static INT_PTR CALLBACK DlgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 public:
 	zxDialog() : zxWnd(), nResult(0) {}
 	virtual ~zxDialog() { }
 	int create(WORD IDD, zxWnd* wndParent, bool modal);
 	virtual bool dialogMessage(MSG* pMsg) const override { return IsDialogMessage(hWnd, pMsg); }
 protected:
+	BOOL onEraseBkgnd(HDC hdc);
 	virtual void endDialog(int code) { nResult = code; EndDialog(hWnd, code); }
 	virtual void onOK() { endDialog(IDOK); }
 	virtual void onCancel() { endDialog(IDCANCEL); }
+	virtual int onInitDialog(HWND hWnd) { return 1; }
 	BOOL CreateDlgIndirect(LPCDLGTEMPLATE lpDialogTemplate, zxWnd* pParentWnd, HINSTANCE hInst);
 	const DLGTEMPLATE* preCreateDialog(_AFX_OCC_DIALOG_INFO* pDlgInfo, const DLGTEMPLATE* pOrigTemplate);
 	DLGTEMPLATE* splitDialogTemplate(const DLGTEMPLATE* pTemplate, DLGITEMTEMPLATE** ppOleDlgItems);
