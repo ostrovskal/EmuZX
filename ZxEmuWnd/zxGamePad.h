@@ -4,21 +4,16 @@ class zxGamepad final {
 	friend BOOL CALLBACK EnumJoys(const DIDEVICEINSTANCE* pdidInstance, VOID* pContext);
 	friend BOOL CALLBACK EnumObjs(const DIDEVICEOBJECTINSTANCE* pdidoi, VOID* pContext);
 public:
-	struct Remapping {
-		ssh_b port;
-		ssh_b bit;
-	};
 	enum { COUNT_CONTROLLERS = 4 };
 	enum Buttons {
-		crossUp		= 0,// 31_8
-		crossRight,		// 31_1
-		crossDown,		// 31_4
-		crossLeft,		// 31_2
-		A, B, X, Y,		// 31_16 и т.д
-		but1, but2, but3, but4, but5, but6, but7, but8
-	};
-	enum Mode {
-		ANY = 0, KEMPSTON, SINCLAIR
+		povUp		= 0,// 31_8
+		povRight,		// 31_1
+		povDown,		// 31_4
+		povLeft,		// 31_2
+		but1, but2, but3, but4, but5, but6, but7, but8, but9, but10, but11, but12,
+		xAxisP, xAxisM, yAxisP, yAxisM, zAxisP, zAxisM,
+		xRotP, xRotM, yRotP, yRotM, zRotP, zRotM,
+		countButtons
 	};
 	enum Axis {
 		axisX = 0, axisY, axisZ
@@ -50,13 +45,17 @@ public:
 	void reset();
 	// инициализация
 	bool init(HWND hWnd);
-	// переключение в предустановленный режим (KEMPSTON, SINCLAIR)
-	void changeMode(ssh_d idx, Mode mode, Remapping* remapData, int count);
+	// переключение в предустановленный режим (KEMPSTON, SINCLAIR и т.д.)
+	void changeMode(ssh_d idx, int mode);
+	// вернуть оригинальную раскладку кнопок
+	ssh_b* getOrigMap(ssh_d idx) { return mapOrig[idx]; }
 	// ремапинг кнопок
-	void remap(ssh_d idx, Buttons but);
+	void remap(ssh_d idx);
 protected:
 	BOOL create(const DIDEVICEINSTANCE* pdidInstance);
 	BOOL enumObjs(const DIDEVICEOBJECTINSTANCE* pdidoi);
+	// обновление статуса кнопки
+	void updateKey(bool pressed, int k);
 	// освобождение ресурсов
 	void cleanup();
 	// статус 16-ти только что нажатых кнопок
@@ -73,10 +72,12 @@ protected:
 	bool removed[COUNT_CONTROLLERS];
 	// гранулярность крестовины
 	int granPOV[COUNT_CONTROLLERS];
-	// привязка кнопок в zx портам
-	Remapping map[COUNT_CONTROLLERS][16];
+	// оригинальная привязка кнопок к zx портам
+	ssh_b mapOrig[COUNT_CONTROLLERS][countButtons];
+	// текущая привязка кнопок к zx портам
+	ssh_b mapCurrent[COUNT_CONTROLLERS][countButtons];
 	// режим маппинга
-	Mode modes[COUNT_CONTROLLERS];
+	int modes[COUNT_CONTROLLERS];
 	// количество типов объектов
 	Types types[COUNT_CONTROLLERS][countTypes];
 	// джойстики

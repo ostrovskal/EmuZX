@@ -5,9 +5,6 @@
 #include "zxSettings.h"
 #include "zxKeyboard.h"
 
-ssh_d colours[] = {	0xff000000, 0xff2030c0, 0xffc04010, 0xffc040c0, 0xff40b010, 0xff50c0b0, 0xffe0c010, 0xffc0c0c0,
-					0xff000000, 0xff3040ff, 0xffff4030, 0xffff70f0, 0xff50e010, 0xff50e0ff, 0xffffe850, 0xffffffff};
-
 static ssh_d scan_offs[] = {
 	0, 256, 512, 768, 1024, 1280, 1536, 1792,
 	32, 288, 544, 800, 1056, 1312, 1568, 1824,
@@ -20,7 +17,7 @@ static ssh_d scan_offs[] = {
 };
 
 zxGPU::zxGPU() {
-	invert = 0;
+	blink = blinkMsk = blinkShift = 0;
 	hbmpMemPrimary = nullptr;
 	hdcMemPrimary = nullptr;
 	memoryPrimary = nullptr;
@@ -29,6 +26,16 @@ zxGPU::zxGPU() {
 zxGPU::~zxGPU() {
 	::DeleteObject(hbmpMemPrimary);
 	::DeleteObject(hdcMemPrimary);
+}
+
+void zxGPU::updateData() {
+	// цвета
+	for(int i = 0; i < 16; i++) colours[i] = theApp->getOpt(OPT_COLOR_BLACK + i)->dval;
+	// скорость мерцания
+	blinkShift = theApp->getOpt(OPT_PERIOD_BLINK)->dval;
+	blinkMsk = (1 << (blinkShift + 1)) - 1;
+	// создать канву
+	if(!hbmpMemPrimary) makeCanvas();
 }
 
 void zxGPU::makeCanvas() {
@@ -55,17 +62,11 @@ void zxGPU::showScreen() {
 		StretchBlt(hdc, r->left, r->top, r->right - r->left, r->bottom - r->top, hMem, 0, 0, WIDTH_SCREEN + SIZE_BORDER * 2, HEIGHT_SCREEN + SIZE_BORDER * 2, SRCCOPY);
 		SelectObject(hMem, h);
 		::DeleteObject(hdc);
-		zxString::fmt(L"SshZX (%s : %d) %s [%s]", (((*_TSTATE) & ZX_EXEC) ? L"execute" : L"pause"), (*_PC),
-					  nameROMs[theApp->getOpt(OPT_MEM_MODEL)->dval], theApp->opts.nameLoadProg.str());
-		SetWindowText(theApp->getHWND(), (LPCWSTR)tmpBuf);
 	}
-	invert++;
+	blink++;
 }
 
 void zxGPU::execute() {
-
-	if(!hbmpMemPrimary) makeCanvas();
-	
 	int y = *_SCAN;
 	ssh_d* dest = memoryPrimary;
 	dest += y * (WIDTH_SCREEN + SIZE_BORDER * 2);
@@ -93,8 +94,10 @@ void zxGPU::execute() {
 			dest += SIZE_BORDER;
 			for(int x = 0; x < 32; x++) {
 				decodeColor(*(src_cols + x));
-				drawLine(dest, *(src + x));
-				dest += 8;
+				auto val = *(src + x);
+				for(int bit = 128; bit > 0; bit >>= 1) {
+					*dest++ = ((val & bit) ? ink : paper);
+				}
 			}
 			dest += SIZE_BORDER;
 			if(!(yy & 7)) src_cols -= 32;
@@ -116,17 +119,11 @@ void zxGPU::execute() {
 }
 
 void zxGPU::decodeColor(ssh_b color) {
-	bool inv = ((color & 128) ? ((invert & 15) >> 3) == 0 : false);
+	bool inv = ((color & 128) ? ((blink & blinkMsk) >> blinkShift) == 0 : false);
 	ssh_d ink1 = colours[(color & 7) | (color & 64) >> 3];
 	ssh_d pap1 = colours[(color & 120) >> 3];
 	ink = (inv ? pap1 : ink1);
 	paper = (inv ? ink1 : pap1);
-}
-
-void zxGPU::drawLine(ssh_d* addr, ssh_b val) {
-	for(int bit = 128; bit > 0; bit >>= 1) {
-		*addr++ = ((val & bit) ? ink : paper);
-	}
 }
 
 bool zxGPU::saveScreen(ssh_cws path) {

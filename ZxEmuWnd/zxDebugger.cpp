@@ -23,7 +23,6 @@ static ZX_REG_TMP regs[] = {
 BEGIN_MSG_MAP(zxDebugger, zxDialog)
 	ON_WM_DRAWITEM()
 	ON_WM_CLOSE()
-	ON_WM_ERASEBKGND()
 	ON_COMMAND(IDM_PREV_BREAKPOINT, onPrevBreakpoint)
 	ON_COMMAND(IDM_NEXT_BREAKPOINT, onNextBreakpoint)
 	ON_COMMAND(IDM_QUICK_BREAKPOINT, onQuckBreakpoint)
@@ -99,10 +98,6 @@ ZX_DEBUGGER dlgElems[] = {
 	{L" C ", IDC_EDIT_C, IDC_STATIC_C, &memZX[RF], nullptr, FC, 0}
 };
 
-BOOL zxDebugger::onEraseBkgnd(HDC hdc) {
-	return FALSE;
-}
-
 void zxDebugger::onPrevBreakpoint() {
 	if(curIndexBP > 0) {
 		if(bps[curIndexBP - 1].flags & FBP_ADDR) {
@@ -135,7 +130,7 @@ void zxDebugger::onQuckBreakpoint() {
 
 void zxDebugger::onListBreakpoint() {
 	zxDlgListBps dlg;
-	dlg.create(IDD_DIALOG_LIST_BPS, this, true);
+	dlg.create(IDD_DIALOG_LIST_BPS, hWnd, true);
 	InvalidateRect(hWndDA, nullptr, false);
 }
 
@@ -288,13 +283,13 @@ void zxDebugger::onChangeEditRegs() {
 
 void zxDebugger::onClose() {
 	modifyTSTATE(0, ZX_DEBUG);
-	theApp->changeWndDebugger(true);
+	theApp->updateData(ST_DEBUGGER);
 }
 
 void zxDebugger::postCreate() {
-	hWndDA = zxDA.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 5, 33, 379, 515, this, IDC_LIST_DA, 0);
-	hWndSP = zxSP.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 390, 338, 171, 210, this, IDC_LIST_SP, 0);
-	hWndDT = zxDT.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 5, 575, 558, 131, this, IDC_LIST_DT, 0);
+	hWndDA = zxDA.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 5, 33, 379, 515, hWnd, IDC_LIST_DA, 0);
+	hWndSP = zxSP.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 390, 338, 171, 210, hWnd, IDC_LIST_SP, 0);
+	hWndDT = zxDT.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 5, 575, 558, 131, hWnd, IDC_LIST_DT, 0);
 
 	for(auto& zx : dlgElems) {
 		zx.hWndMain = GetDlgItem(hWnd, zx.idMain);
@@ -397,20 +392,16 @@ bool zxDebugger::preCreate() {
 }
 
 void zxDebugger::show(bool visible) {
-	if(visible) {
+	bool is = IsWindowVisible(hWnd);
+	ShowWindow(hWnd, visible);
+	if(!is && visible) {
 		if(!hWndToolbar) makeToolbar(IDB_TOOLBAR_DEBUGGER, tbb, 15, 17, 16, 16, IDT_TOOLBAR_DEBUGGER);
-		ShowWindow(hWnd, true);
 		UpdateWindow(hWnd);
 		updateHexDec(false);
-		modifyTSTATE(ZX_DEBUG, 0);
 		setProgrammPause(!((*_TSTATE) & ZX_EXEC), false);
 		updateUndoRedo(false);
-	} else {
-		if(IsWindowVisible(hWnd)) {
-			ShowWindow(hWnd, false);
-			modifyTSTATE(0, ZX_DEBUG);
-		}
 	}
+	modifyTSTATE(visible * ZX_DEBUG, (!visible) * ZX_DEBUG);
 }
 
 void zxDebugger::updateRegisters(int newPC, int flags) {
@@ -424,7 +415,7 @@ void zxDebugger::updateRegisters(int newPC, int flags) {
 			h = zx.hWndText;
 			auto hdc = GetDC(h);
 			SetTextColor(hdc, zx.change ? RGB(0, 255, 0) : RGB(0, 0, 0));
-			//SetBkMode(hdc, TRANSPARENT);
+			SetBkColor(hdc, GetSysColor(COLOR_BTNFACE));
 			SelectObject(hdc, hFont);
 			GetClientRect(h, &rect);
 			DrawText(hdc, zx.text, -1, &rect, DT_SINGLELINE | DT_CENTER);
@@ -523,7 +514,7 @@ void zxDebugger::setProgrammPause(bool pause, bool activate) {
 		int state1 = pause << 2;
 		int state2 = (!pause) << 2;
 
-		theApp->changeExecute(!pause, false);
+		theApp->updateData((!pause) * STS_EXECUTE | ST_EXECUTE);
 
 		updateUndoRedo(false);
 		updatePrevNextBP();

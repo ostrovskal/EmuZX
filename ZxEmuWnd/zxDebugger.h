@@ -68,7 +68,6 @@ protected:
 
 	ssh_msg void onClose();
 	ssh_msg void onDrawItem(int id, LPDRAWITEMSTRUCT dis);
-	ssh_msg BOOL onEraseBkgnd(HDC hdc);
 
 	virtual bool preCreate() override;
 	virtual void postCreate() override;

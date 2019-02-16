@@ -11,15 +11,15 @@ public:
 		SWAP_ROM, SWAP_RAM, SWAP_VRAM
 	};
 	
-	zxBus() : memROM(nullptr), bankROM(0), memRAM(nullptr), bankRAM(0), isSound(false) { 
+	zxBus() :	memROM(nullptr), bankROM(0), memRAM(nullptr), bankRAM(0), isSound(false), 
+				delayCPU(10), delayGPU(20), periodSND(1), periodBORDER(16), periodBLINK(15) { 
 	}
 	
 	virtual ~zxBus();
 
 	void step(bool run_debugger);
 	void swapPage(ssh_b page, TypeSwap type);
-	void changeTurbo(bool accel);
-	void changeSound();
+	void updateData();
 	int countMemBank(bool rom) const { return (rom ? bankROM : bankRAM); }
 	ssh_b* getMemBank(ssh_b page, bool rom);
 	bool loadState(int hf);
@@ -33,6 +33,7 @@ protected:
 	ssh_d execute();
 
 	ssh_d delayCPU, delayGPU;
+	ssh_d periodSND, periodBLINK, periodBORDER;
 
 	bool isSound;
 

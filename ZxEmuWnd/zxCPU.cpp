@@ -37,6 +37,11 @@ ssh_b readPort(ssh_b lport, ssh_b hport) {
 
 void writePort(ssh_b lport, ssh_b hport, ssh_b val) {
 	switch(lport) {
+		// covox
+		case 0xfb: break;
+		// specdrum
+		case 0xdf: break;
+
 		// 0, 1, 2 - бордер
 		// 3 MIC - при записи/загрузке
 		// 4 - SOUND

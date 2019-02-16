@@ -4,6 +4,8 @@
 #include "zxBlipBuffer.h"
 #include "zxCPU.h"
 
+static int sndFreq[3] = {22050, 44100, 48000};
+
 #define MAX_AUDIO_BUFFER		8192 * 5
 
 static DWORD nextpos;
@@ -16,7 +18,7 @@ void zxSND::execute(ssh_u new_tm) {
 	long count;
 	ayOverlay();
 	blipLeft->endFrame(10);// machine_current->timings.tstates_per_frame);
-	if(ayStereo != SOUND_STEREO_AY_NONE) {
+	if(ayStereo != AY_STEREO_NONE) {
 		blipRight->endFrame(10);// machine_current->timings.tstates_per_frame);
 		count = blipLeft->readSamples(samples, soundFramesiz, 1);
 		blipRight->readSamples(samples + 1, count, 1);
@@ -89,8 +91,7 @@ void zxSND::frame(short* data, int len) {
 	}
 }
 
-bool zxSND::init(int freq, int stereo, bool _8bit) {
-
+bool zxSND::dxinit() {
 	WAVEFORMATEX pcmwf;
 	DSBUFFERDESC dsbd;
 
@@ -103,16 +104,19 @@ bool zxSND::init(int freq, int stereo, bool _8bit) {
 
 		memset(&pcmwf, 0, sizeof(WAVEFORMATEX));
 		pcmwf.cbSize = 0;
-		if(_8bit) {
+		if(theApp->getOpt(OPT_SND_8BIT)->dval) {
 			pcmwf.wBitsPerSample = 8;
 			sixteenbit = 0;
 		} else {
 			pcmwf.wBitsPerSample = 16;
 			sixteenbit = 1;
 		}
-		pcmwf.nChannels = stereo ? 2 : 1;
+		ayStereo = theApp->getOpt(OPT_SND_AY_STEREO)->dval;
+		soundChannels = (ayStereo != AY_STEREO_NONE ? 2 : 1);
+
+		pcmwf.nChannels = soundChannels;
 		pcmwf.nBlockAlign = pcmwf.nChannels * (sixteenbit ? 2 : 1);
-		pcmwf.nSamplesPerSec = freq;
+		pcmwf.nSamplesPerSec = sndFreq[theApp->getOpt(OPT_SND_FREQUENCY)->dval];
 		pcmwf.nAvgBytesPerSec = pcmwf.nSamplesPerSec * pcmwf.nBlockAlign;
 		pcmwf.wFormatTag = WAVE_FORMAT_PCM;
 
@@ -138,12 +142,19 @@ void zxSND::uninit() {
 	if(sndBuf) {
 		IDirectSoundBuffer_Stop(sndBuf);
 		IDirectSoundBuffer_Release(sndBuf);
+		sndBuf = nullptr;
 	}
-	IDirectSound_Release(dSnd);
+	if(dSnd) {
+		IDirectSound_Release(dSnd);
+		dSnd = nullptr;
+	}
 	CoUninitialize();
 }
 
-double zxSND::getVolume(int volume) {
+double zxSND::getVolume(int type) {
+	static int opts[] = {OPT_SND_BEEPER_VOL, OPT_SND_AY_VOL, OPT_SND_COVOX_VOL, OPT_SND_SPECDRUM_VOL};
+
+	double volume = (double)theApp->getOpt(opts[type])->dval;
 	if(volume < 0) volume = 0;
 	else if(volume > 100) volume = 100;
 	return volume / 100.0;
@@ -166,9 +177,7 @@ zxSND::zxSND() : dSnd(nullptr), sndBuf(nullptr) {
 	ayRightC = nullptr;
 	samples = nullptr;
 	enabledEver = 0;
-	ayStereo = SOUND_STEREO_AY_NONE;
-
-	init();
+	ayStereo = AY_STEREO_NONE;
 }
 
 zxSND::~zxSND() {
@@ -200,11 +209,11 @@ bool zxSND::initBlip(zxBlipBuffer** buf, zxBlipSynth** syn) {
 	*syn = new zxBlipSynth();
 
 	(*buf)->setClockRate(getEffectiveProcessorSpeed());
-	if((*buf)->setSampleRate(22050, 1000)) {
+	if((*buf)->setSampleRate(sndFreq[theApp->getOpt(OPT_SND_FREQUENCY)->dval], 1000)) {
 		finish();
 		return false;
 	}
-	(*syn)->setVolume(getVolume(50));
+	(*syn)->setVolume(getVolume(SND_BEEPER));
 	(*syn)->setOutput(*buf);
 	(*buf)->setBassFreq(speaker_type[0].bass);
 	(*syn)->setTrebleEq(speaker_type[0].treble);
@@ -382,24 +391,25 @@ DWORD zxSND::getEffectiveProcessorSpeed() {
 	return 50;// machine_current->timings.processor_speed / 100 * settings_current.emulation_speed;
 }
 
-void zxSND::init() {
+bool zxSND::init() {
 	double treble;
 
-	if(init(22050, false, true)) return;
-	if(!initBlip(&blipLeft, &beepLeft)) return;
-	if(ayStereo != SOUND_STEREO_AY_NONE && !initBlip(&blipRight, &beepRight)) return;
+	if(!dxinit()) return false;
+	if(!initBlip(&blipLeft, &beepLeft)) return false;
+	if(ayStereo != AY_STEREO_NONE && !initBlip(&blipRight, &beepRight)) return false;
 	
 	treble = speaker_type[0].treble;
+
 	ayLeftA = new zxBlipSynth();
-	ayLeftA->setVolume(getVolume(50));
+	ayLeftA->setVolume(getVolume(SND_AY));
 	ayLeftA->setTrebleEq(treble);
 
 	ayLeftB = new zxBlipSynth();
-	ayLeftB->setVolume(getVolume(50));
+	ayLeftB->setVolume(getVolume(SND_AY));
 	ayLeftB->setTrebleEq(treble);
 
 	ayLeftC = new zxBlipSynth();
-	ayLeftC->setVolume(getVolume(50));
+	ayLeftC->setVolume(getVolume(SND_AY));
 	ayLeftC->setTrebleEq(treble);
 
 	specLeft = new zxBlipSynth();
@@ -407,7 +417,7 @@ void zxSND::init() {
 	specLeft->setTrebleEq(treble);
 
 	covoxLeft = new zxBlipSynth();
-	covoxLeft->setVolume(getVolume(50));
+	covoxLeft->setVolume(getVolume(SND_COVOX));
 	covoxLeft->setOutput(blipLeft);
 	covoxLeft->setTrebleEq(treble);
 
@@ -420,34 +430,34 @@ void zxSND::init() {
 	zxBlipSynth **ayRightMid = nullptr;
 	zxBlipSynth **ayRight = nullptr;
 
-	if(ayStereo != SOUND_STEREO_AY_NONE) {
-		if(ayStereo == SOUND_STEREO_AY_ACB) {
+	if(ayStereo != AY_STEREO_NONE) {
+		if(ayStereo == AY_STEREO_ACB) {
 			ayLeft = &ayLeftA;
 			ayLeftMid = &ayLeftC;
 			ayRightMid = &ayRightC;
 			ayRight = &ayLeftB;
-		} else/* if(ayStereo == SOUND_STEREO_AY_ABC)*/ {
+		} else {
 			ayLeft = &ayLeftA;
 			ayLeftMid = &ayLeftB;
 			ayRightMid = &ayRightB;
 			ayRight = &ayLeftC;
-		}
+		} 
 		(*ayLeft)->setOutput(blipLeft);
 		(*ayLeftMid)->setOutput(blipLeft);
 		(*ayRight)->setOutput(blipRight);
 
 		*ayRightMid = new zxBlipSynth();
-		(*ayRightMid)->setVolume(50);
+		(*ayRightMid)->setVolume(getVolume(SND_AY));
 		(*ayRightMid)->setOutput(blipRight);
 		(*ayRightMid)->setTrebleEq(treble);
 
 		specRight = new zxBlipSynth();
-		specRight->setVolume(50);
+		specRight->setVolume(getVolume(SND_SPECDRUM));
 		specRight->setOutput(blipRight);
 		specRight->setTrebleEq(treble);
 
 		covoxRight = new zxBlipSynth();
-		covoxRight->setVolume(50);
+		covoxRight->setVolume(getVolume(SND_COVOX));
 		covoxRight->setOutput(blipRight);
 		covoxRight->setTrebleEq(treble);
 
@@ -457,12 +467,12 @@ void zxSND::init() {
 		ayLeftC->setOutput(blipLeft);
 	}
 	enabled = enabledEver = 1;
-	soundChannels = (ayStereo != SOUND_STEREO_AY_NONE ? 2 : 1);
 	float hz = (float)10;// getEffectiveProcessorSpeed() / machine_current->timings.tstates_per_frame;
-	soundFramesiz = (int)((float)22050 / hz);
+	soundFramesiz = (int)((float)sndFreq[theApp->getOpt(OPT_SND_FREQUENCY)->dval] / hz);
 	soundFramesiz++;
 	samples = new short[soundFramesiz * soundChannels];
 	//movie_init_sound(22050, ayStereo);
+	return true;
 }
 
 void zxSND::ayWrite(int reg, int val, DWORD now) {
@@ -513,5 +523,5 @@ void zxSND::beeper(ssh_d at_tstates, int on) {
 	if(on == 1) on = 0;
 	val = beeper_ampl[on];
 	beepLeft->update(at_tstates, val);
-	if(ayStereo != SOUND_STEREO_AY_NONE) beepRight->update(at_tstates, val);
+	if(ayStereo != AY_STEREO_NONE) beepRight->update(at_tstates, val);
 }

@@ -174,9 +174,6 @@
     <Image Include="ZxEmuWnd.ico">
       <Filter>Файлы ресурсов</Filter>
     </Image>
-    <Image Include="bitmap1.bmp">
-      <Filter>Файлы ресурсов</Filter>
-    </Image>
     <Image Include="toolbar_common.bmp">
       <Filter>Файлы ресурсов</Filter>
     </Image>
@@ -196,5 +193,8 @@
     <MASM Include="asm_ssh_zx_cpu.asm">
       <Filter>Исходные файлы</Filter>
     </MASM>
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="ZxEmuWnd.exe.manifest" />
   </ItemGroup>
 </Project>

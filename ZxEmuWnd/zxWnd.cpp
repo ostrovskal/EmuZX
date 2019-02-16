@@ -5,40 +5,13 @@
 BEGIN_MSG_MAP(zxDialog, zxWnd)
 	ON_COMMAND(IDOK, onOK)
 	ON_COMMAND(IDCANCEL, onCancel)
+	ON_WM_CLOSE()
 END_MSG_MAP()
 
 struct THREAD_STATE {
 	HHOOK hHookOldCbtFilter;
 	zxWnd* wndInit;
 };
-
-#pragma pack(push, 1)
-
-typedef struct {
-	WORD dlgVer;
-	WORD signature;
-	DWORD helpID;
-	DWORD exStyle;
-	DWORD style;
-	WORD cDlgItems;
-	short x;
-	short y;
-	short cx;
-	short cy;
-} DLGTEMPLATEEX;
-
-typedef struct {
-	DWORD helpID;
-	DWORD exStyle;
-	DWORD style;
-	short x;
-	short y;
-	short cx;
-	short cy;
-	DWORD id;
-} DLGITEMTEMPLATEEX;
-
-#pragma pack(pop)
 
 static bool wndInit = false;
 static zxWnd* wnds[256];
@@ -52,55 +25,6 @@ const SSH_MSGMAP* PASCAL zxWnd::GetThisMessageMap() {
 	static const SSH_MSGMAP_ENTRY _messageEntries[] = { {0, 0, 0, 0, 0, (SSH_PMSG)0 } };
 	static const SSH_MSGMAP messageMap = { nullptr, &_messageEntries[0] };
 	return &messageMap; 
-}
-
-static inline BOOL IsDialogEx(const DLGTEMPLATE* pTemplate) {
-	return ((DLGTEMPLATEEX*)pTemplate)->signature == 0xFFFF;
-}
-
-static inline WORD& DlgTemplateItemCount(DLGTEMPLATE* pTemplate) {
-	if(IsDialogEx(pTemplate))
-		return reinterpret_cast<DLGTEMPLATEEX*>(pTemplate)->cDlgItems;
-	else
-		return pTemplate->cdit;
-}
-
-static inline const WORD& DlgTemplateItemCount(const DLGTEMPLATE* pTemplate) {
-	if(IsDialogEx(pTemplate))
-		return reinterpret_cast<const DLGTEMPLATEEX*>(pTemplate)->cDlgItems;
-	else
-		return pTemplate->cdit;
-}
-
-static DLGITEMTEMPLATE* findFirstDlgItem(const DLGTEMPLATE* pTemplate) {
-	DWORD dwStyle = pTemplate->style;
-	BOOL bDialogEx = IsDialogEx(pTemplate);
-
-	WORD* pw;
-	if(bDialogEx) {
-		pw = (WORD*)((DLGTEMPLATEEX*)pTemplate + 1);
-		dwStyle = ((DLGTEMPLATEEX*)pTemplate)->style;
-	} else {
-		pw = (WORD*)(pTemplate + 1);
-	}
-	if(*pw == (WORD)-1) pw += 2; else while(*pw++);
-	if(*pw == (WORD)-1) pw += 2; else while(*pw++);
-	while(*pw++);
-	if(dwStyle & DS_SETFONT) {
-		pw += bDialogEx ? 3 : 1;
-		while(*pw++);
-	}
-	return (DLGITEMTEMPLATE*)(((DWORD_PTR)pw + 3) & ~DWORD_PTR(3));
-}
-
-static DLGITEMTEMPLATE* findNextDlgItem(DLGITEMTEMPLATE* pItem, BOOL bDialogEx) {
-	WORD* pw;
-	if(bDialogEx) pw = (WORD*)((DLGITEMTEMPLATEEX*)pItem + 1); else pw = (WORD*)(pItem + 1);
-	if(*pw == (WORD)-1) pw += 2; else while(*pw++);
-	if(*pw == (WORD)-1) pw += 2; else while(*pw++);
-	WORD cbExtra = *pw++;
-	if(cbExtra != 0 && !bDialogEx) cbExtra -= 2;
-	return (DLGITEMTEMPLATE*)(((DWORD_PTR)pw + cbExtra + 3) & ~DWORD_PTR(3));
 }
 
 zxWnd* zxWnd::fromHWND(HWND hWnd) {
@@ -125,10 +49,9 @@ void zxWnd::attach(HWND hWnd) {
 }
 
 void zxWnd::detach() {
-	for(auto w : wnds) {
-		for(int i = 0; i < 256; i++) {
-			auto w = wnds[i];
-			if(w != this) continue;
+	for(int i = 0; i < 256; i++) {
+		auto w = wnds[i];
+		if(w == this) {
 			wnds[i] = (zxWnd*)-1;
 			w->hWnd = nullptr;
 			break;
@@ -483,7 +406,7 @@ LReturnTrue:
 	return TRUE;
 }
 
-zxWnd::zxWnd() : wndID(0), pfnSuper(nullptr), hBmp(nullptr),  hWnd(nullptr), hWndToolbar(nullptr), parent(nullptr), hAccel(nullptr) {
+zxWnd::zxWnd() : wndID(0), pfnSuper(nullptr), hBmp(nullptr),  hWnd(nullptr), hWndToolbar(nullptr), hWndParent(nullptr), hAccel(nullptr) {
 	if(!wndInit) {
 		memset(wnds, -1, sizeof(wnds));
 		wndInit = true;
@@ -522,16 +445,16 @@ ssh_cws zxWnd::registerClass(ssh_cws name, int idMenu, WNDPROC proc) {
 	return name;
 }
 
-HWND zxWnd::create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, int x, int y, int cx, int cy, zxWnd* wndParent, UINT nID, UINT nMenu) {
+HWND zxWnd::create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, int x, int y, int cx, int cy, HWND hParent, UINT nID, UINT nMenu) {
 	if(hWnd) return 0;
 	if(!preCreate()) return 0;
 	HookWindowCreate(this);
-	if(!(hWnd = CreateWindowW(registerClass(className, nMenu, MainWndProc), windowName, dwStyle, 
-							  x, y, cx, cy, (wndParent ? wndParent->hWnd : nullptr), nullptr, hInst, nullptr)))
+	HWND hPWnd(hParent ? hParent : theApp->getHWND());
+	if(!(hWnd = CreateWindowW(registerClass(className, nMenu, MainWndProc), windowName, dwStyle, x, y, cx, cy, hPWnd, nullptr, hInst, nullptr)))
 		return (HWND)0;
 	wndID = nID;
 	postCreate();
-	parent = wndParent;
+	hWndParent = hPWnd;
 	return hWnd;
 }
 
@@ -547,190 +470,34 @@ HWND zxWnd::makeToolbar(WORD IDB, TBBUTTON* tbb, int cBitmaps, int cButtons, int
 	return hWndToolbar;
 }
 
-/*
-int zxDialog::create(WORD IDD, zxWnd* wndParent, bool modal) {
+int zxDialog::create(WORD IDD, HWND hParent, bool modal) {
 	if(!preCreate()) return IDCANCEL;
 	HookWindowCreate(this);
-	if((hWnd = CreateDialog(hInst, MAKEINTRESOURCE(IDD), (wndParent ? wndParent->getHWND() : nullptr), DlgProc))) {
-		parent = wndParent;
+	HWND hPWnd((hParent ? hParent : theApp->getHWND()));
+	if((hWnd = CreateDialog(hInst, MAKEINTRESOURCE(IDD), hPWnd, DlgProc))) {
+		hWndParent = hPWnd;
 		postCreate();
 		if(modal) {
+			HWND hWndFrame(theApp->getHWND());
+			EnableWindow(hWndFrame, FALSE);
+			EnableWindow(hWndParent, FALSE);
 			ShowWindow(hWnd, true);
 			UpdateWindow(hWnd);
 			nResult = 0;
 			MSG msg;
 			while(!nResult) {
 				do {
-					if(!SshMsgPump(&msg, true)) break;
+					if(!msgPump(&msg)) break;
 				} while(::PeekMessage(&msg, NULL, NULL, NULL, PM_NOREMOVE));
 			}
+			EnableWindow(hWndParent, TRUE);
+			EnableWindow(hWndFrame, TRUE);
 			return nResult;
 		}
 	}
 	return IDOK;
 }
-*/
 
-int zxDialog::create(WORD IDD, zxWnd* wndParent, bool modal) {
-	if(!preCreate()) return IDCANCEL;
-	LPCDLGTEMPLATE lpDialogTemplate = NULL;
-	auto hResource = ::FindResource(hInst, MAKEINTRESOURCE(IDD), RT_DIALOG);
-	auto hDialogTemplate = LoadResource(hInst, hResource);
-	if(hDialogTemplate != NULL) lpDialogTemplate = (LPCDLGTEMPLATE)LockResource(hDialogTemplate);
-	if(lpDialogTemplate == NULL) return -1;
-	if(!CreateDlgIndirect(lpDialogTemplate, wndParent, hInst)) return -1;
-	parent = wndParent;
-	postCreate();
-	if(modal) {
-		ShowWindow(hWnd, true);
-		UpdateWindow(hWnd);
-		nResult = 0;
-		MSG msg;
-		while(!nResult) {
-			do {
-				if(!SshMsgPump(&msg, true)) break;
-			} while(::PeekMessage(&msg, NULL, NULL, NULL, PM_NOREMOVE));
-		}
-		return nResult;
-	}
-	UnlockResource(hDialogTemplate);
-	FreeResource(hDialogTemplate);
-	return IDOK;
-}
-
-BOOL zxDialog::CreateDlgIndirect(LPCDLGTEMPLATE lpDialogTemplate, zxWnd* pParentWnd, HINSTANCE hInst) {
-
-	_AFX_OCC_DIALOG_INFO occDialogInfo;
-
-	HGLOBAL hTemplate = NULL;
-
-	HWND hWnd = NULL;
-	lpDialogTemplate = preCreateDialog(&occDialogInfo, lpDialogTemplate);
-	if(lpDialogTemplate == NULL) return FALSE;
-
-	if(hTemplate != NULL) lpDialogTemplate = (DLGTEMPLATE*)GlobalLock(hTemplate);
-	HookWindowCreate(this);
-	hWnd = ::CreateDialogIndirect(hInst, lpDialogTemplate, pParentWnd->getHWND(), DlgProc);
-	postCreateDialog(&occDialogInfo);
-
-	if(hTemplate != NULL) {
-		GlobalUnlock(hTemplate);
-		GlobalFree(hTemplate);
-	}
-	if(hWnd == NULL) return FALSE;
-	return TRUE;
-}
-
-const DLGTEMPLATE* zxDialog::preCreateDialog(_AFX_OCC_DIALOG_INFO* pDlgInfo, const DLGTEMPLATE* pOrigTemplate) {
-	pDlgInfo->m_ppOleDlgItems = (DLGITEMTEMPLATE**)calloc(sizeof(DLGITEMTEMPLATE*), (DlgTemplateItemCount(pOrigTemplate) + 1));
-
-	DLGTEMPLATE* pNewTemplate = splitDialogTemplate(pOrigTemplate, pDlgInfo->m_ppOleDlgItems);
-	pDlgInfo->m_pNewTemplate = pNewTemplate;
-
-	DLGITEMTEMPLATE *pItem = findFirstDlgItem(pOrigTemplate);
-	DLGITEMTEMPLATE *pNextItem;
-	BOOL bDialogEx = IsDialogEx(pOrigTemplate);
-
-	int iItem, iItems = DlgTemplateItemCount(pOrigTemplate);
-	pDlgInfo->m_pItemInfo = new _AFX_OCC_DIALOG_INFO::ItemInfo[iItems];
-	memset(pDlgInfo->m_pItemInfo, 0, sizeof(_AFX_OCC_DIALOG_INFO::ItemInfo) * iItems);
-	pDlgInfo->m_cItems = iItems;
-	LPCWSTR pszClass;
-	DWORD dwStyle;
-
-	for(iItem = 0; iItem < iItems; iItem++) {
-		pNextItem = findNextDlgItem(pItem, bDialogEx);
-		if(bDialogEx) {
-			DLGITEMTEMPLATEEX *pItemEx = (DLGITEMTEMPLATEEX *)pItem;
-			pDlgInfo->m_pItemInfo[iItem].nId = pItemEx->id;
-			pszClass = (LPCWSTR)(pItemEx + 1);
-			dwStyle = pItemEx->style;
-		} else {
-			pDlgInfo->m_pItemInfo[iItem].nId = pItem->id;
-			pszClass = (LPCWSTR)(pItem + 1);
-			dwStyle = pItem->style;
-		}
-		pDlgInfo->m_pItemInfo[iItem].bAutoRadioButton = pszClass[0] == 0xffff && pszClass[1] == 0x0080 && (dwStyle & 0x0f) == BS_AUTORADIOBUTTON;
-		pItem = pNextItem;
-	}
-
-	return (pNewTemplate != NULL) ? pNewTemplate : pOrigTemplate;
-}
-
-void zxDialog::postCreateDialog(_AFX_OCC_DIALOG_INFO* pDlgInfo) {
-	if(pDlgInfo->m_pNewTemplate != NULL) {
-		GlobalFree(pDlgInfo->m_pNewTemplate);
-		pDlgInfo->m_pNewTemplate = NULL;
-	}
-
-	if(pDlgInfo->m_ppOleDlgItems != NULL) {
-		free(pDlgInfo->m_ppOleDlgItems);
-		pDlgInfo->m_ppOleDlgItems = NULL;
-	}
-
-	if(pDlgInfo->m_pItemInfo != NULL) {
-		delete[] pDlgInfo->m_pItemInfo;
-		pDlgInfo->m_pItemInfo = NULL;
-	}
-}
-
-DLGTEMPLATE* zxDialog::splitDialogTemplate(const DLGTEMPLATE* pTemplate, DLGITEMTEMPLATE** ppOleDlgItems) {
-	DLGITEMTEMPLATE* pFirstItem = findFirstDlgItem(pTemplate);
-	ULONG cbHeader = ULONG((BYTE*)pFirstItem - (BYTE*)pTemplate);
-	ULONG cbNewTemplate = cbHeader;
-
-	BOOL bDialogEx = IsDialogEx(pTemplate);
-
-	int iItem;
-	int nItems = (int)DlgTemplateItemCount(pTemplate);
-	DLGITEMTEMPLATE* pItem = pFirstItem;
-	DLGITEMTEMPLATE* pNextItem = pItem;
-	LPWSTR pszClassName;
-	BOOL bHasOleControls = FALSE;
-
-	for(iItem = 0; iItem < nItems; iItem++) {
-		pNextItem = findNextDlgItem(pItem, bDialogEx);
-
-		pszClassName = bDialogEx ?
-			(LPWSTR)(((DLGITEMTEMPLATEEX*)pItem) + 1) :
-			(LPWSTR)(pItem + 1);
-
-		if(pszClassName[0] == L'{') {
-			bHasOleControls = TRUE;
-		} else {
-			cbNewTemplate += ULONG((BYTE*)pNextItem - (BYTE*)pItem);
-		}
-
-		pItem = pNextItem;
-	}
-	if(!bHasOleControls) {
-		ppOleDlgItems[0] = (DLGITEMTEMPLATE*)(-1);
-		return NULL;
-	}
-	BYTE* pNew = (BYTE*)GlobalAlloc(GMEM_FIXED, cbNewTemplate);
-	DLGTEMPLATE* pNewTemplate = (DLGTEMPLATE*)pNew;
-	memcpy_s(pNew, cbNewTemplate, pTemplate, cbHeader);
-	pNew += cbHeader;
-	DlgTemplateItemCount(pNewTemplate) = 0;
-
-	pItem = pFirstItem;
-	pNextItem = pItem;
-
-	for(iItem = 0; iItem < nItems; iItem++) {
-		pNextItem = findNextDlgItem(pItem, bDialogEx);
-
-		pszClassName = bDialogEx ? (LPWSTR)(((DLGITEMTEMPLATEEX*)pItem) + 1) : (LPWSTR)(pItem + 1);
-		if(pszClassName[0] == L'{') {
-			ppOleDlgItems[iItem] = pItem;
-		} else {
-			ULONG cbItem = ULONG((BYTE*)pNextItem - (BYTE*)pItem);
-			memcpy_s(pNew, cbItem, pItem, cbItem);
-			pNew += cbItem;
-			++DlgTemplateItemCount(pNewTemplate);
-			ppOleDlgItems[iItem] = NULL;
-		}
-		pItem = pNextItem;
-	}
-	ppOleDlgItems[nItems] = (DLGITEMTEMPLATE*)(-1);
-	return pNewTemplate;
+void zxDialog::onClose() {
+	endDialog(IDCANCEL);
 }

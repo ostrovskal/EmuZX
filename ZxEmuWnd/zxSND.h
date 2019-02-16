@@ -5,10 +5,6 @@
 
 #pragma comment(lib,"dsound.lib")
 
-#define SOUND_STEREO_AY_NONE	0
-#define SOUND_STEREO_AY_ACB		1
-#define SOUND_STEREO_AY_ABC		2
-
 #define MIN_SPEED_PERCENTAGE	2
 #define MAX_SPEED_PERCENTAGE	500
 #define AMPL_BEEPER				( 50 * 256)
@@ -53,8 +49,8 @@ public:
 protected:
 	void frame(short* data, int len);
 	void uninit();
-	bool init(int freq, int stereo, bool _8bit);
-	double getVolume(int volume);
+	bool dxinit();
+	double getVolume(int type);
 	void finish();
 	bool initBlip(zxBlipBuffer** buf, zxBlipSynth** synth);
 	void ayInit();
@@ -62,7 +58,7 @@ protected:
 	void ayDoTone(int level, unsigned int tone_count, int *var, int chan);
 	void ayOverlay();
 	DWORD getEffectiveProcessorSpeed();
-	void init();
+	bool init();
 	void ayWrite(int reg, int val, DWORD now);
 	void ayReset();
 	void specdrumWrite(ssh_w port, ssh_b val);

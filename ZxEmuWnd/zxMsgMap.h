@@ -190,9 +190,9 @@ enum SshSig {
 
 #define ON_WM_TIMER() { WM_TIMER, 0, 0, 0, sshSig_v_up_v, (SSH_PMSG)(SSH_PMSGW)(static_cast<void (zxWnd::*)(UINT_PTR) > ( &ThisClass::onTimer)) },
 
-#define ON_WM_HSCROLL() { WM_HSCROLL, 0, 0, 0, sshSig_SCROLL, (SSH_PMSG)(SSH_PMSGW)(static_cast<void (zxWnd::*)(UINT, UINT, HWND> ( &ThisClass::onHScroll)) },
+#define ON_WM_HSCROLL() { WM_HSCROLL, 0, 0, 0, sshSig_SCROLL, (SSH_PMSG)(SSH_PMSGW)(static_cast<void (zxWnd::*)(UINT, UINT, HWND)>(&ThisClass::onHScroll)) },
 
-#define ON_WM_VSCROLL() { WM_VSCROLL, 0, 0, 0, sshSig_SCROLL, (SSH_PMSG)(SSH_PMSGW)(static_cast<void (zxWnd::*)(UINT, UINT, HWND) > ( &ThisClass::onVScroll)) },
+#define ON_WM_VSCROLL() { WM_VSCROLL, 0, 0, 0, sshSig_SCROLL, (SSH_PMSG)(SSH_PMSGW)(static_cast<void (zxWnd::*)(UINT, UINT, HWND)>(&ThisClass::onVScroll)) },
 
 #define ON_WM_ENTERIDLE() { WM_ENTERIDLE, 0, 0, 0, sshSig_v_u_W, (SSH_PMSG)(SSH_PMSGW)(static_cast<void (zxWnd::*)(UINT, HWND) > ( &ThisClass::onEnterIdle)) },
 

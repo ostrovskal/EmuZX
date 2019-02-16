@@ -46,7 +46,7 @@ void zxDlgListBps::onNewEdit() {
 		bpItem = &bps[itemSelected];
 		add.edit(bpItem);
 	}
-	if(add.create(IDD_DIALOG_ADD_BP, this, true) == IDOK) {
+	if(add.create(IDD_DIALOG_ADD_BP, hWnd, true) == IDOK) {
 		auto _bp = &add.result;
 		// проверка на пересечение
 		for(int i = 0; i < COUNT_BP; i++) {

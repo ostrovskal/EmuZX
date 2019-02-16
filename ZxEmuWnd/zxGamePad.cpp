@@ -95,6 +95,22 @@ bool zxGamepad::init(HWND hWnd) {
 		if(FAILED(pDI->QueryInterface(IID_IDirectInputJoyConfig8, (void**)&pJoyCfg))) throw(0);
 		if(FAILED(pDI->EnumDevices(DI8DEVCLASS_GAMECTRL, EnumJoys, this, DIEDFL_ATTACHEDONLY))) throw(1);
 
+		// установить режим
+		for(int i = 0; i < COUNT_CONTROLLERS; i++) {
+			zxString map = theApp->getOpt(OPT_JOY1_MAPPING + i)->sval;
+			// POV4, but12, xAxis2, yAxis2, zAxis2, xRot2, yRot2, zRot2
+			int count = 0;
+			auto maps = map.split(L",", count);
+			memset(&mapOrig[i], 0, countButtons);
+			
+			if(count > countButtons) count = countButtons;
+			if(count < 0) count = 0;
+			for(int j = 0; j < count; j++) {
+				mapOrig[i][j] = (ssh_b)*(ssh_u*)asm_ssh_wton(maps[j].str(), (ssh_u)Radix::_hex);// _wtol(maps[j].str());
+			}
+			changeMode(i, theApp->getOpt(OPT_JOY1_STATUS + i)->dval);
+		}
+
 	} catch(...) {
 		cleanup();
 		reset();
@@ -158,42 +174,72 @@ void zxGamepad::reset() {
 	ssh_memzero(inserted, sizeof(inserted));
 	ssh_memzero(removed, sizeof(removed));
 	ssh_memzero(granPOV, sizeof(granPOV));
-	ssh_memzero(map, sizeof(map));
 	ssh_memzero(modes, sizeof(modes));
 	ssh_memzero(types, sizeof(types));
 	ssh_memzero(joys, sizeof(joys));
 }
 
-void zxGamepad::changeMode(ssh_d idx, Mode m, Remapping* remapData, int count) {
-	static Remapping kempston[5] = {{31, 8},{31, 1},{31, 4},{31, 2},{31, 16}};
-	static Remapping sinclair[5] = {{239, 2}, {239, 8}, {239, 4}, {239, 16}, {239, 1}};
-	
-	ssh_memzero(&map[idx][0], sizeof(Remapping) * 16);
-	switch(m) {
-		case KEMPSTON:
-			memcpy(&map[idx][0], &kempston, sizeof(Remapping) * 5);
-			break;
-		case SINCLAIR:
-			memcpy(&map[idx][0], &sinclair, sizeof(Remapping) * 5);
-			break;
-		default:
-			memcpy(&map[idx][0], remapData, sizeof(Remapping) * count);
-			break;
+void zxGamepad::changeMode(ssh_d idx, int mode) {
+	static ssh_b kempston[5] = {ZX_KEY_KEM_UP, ZX_KEY_KEM_DOWN, ZX_KEY_KEM_LEFT, ZX_KEY_KEM_RIGHT, ZX_KEY_KEM_FIRE};
+	static ssh_b sinclair1[5] = {ZX_KEY_8, ZX_KEY_9, ZX_KEY_6, ZX_KEY_7, ZX_KEY_0};
+	static ssh_b sinclair2[5] = {ZX_KEY_3, ZX_KEY_4, ZX_KEY_1, ZX_KEY_2, ZX_KEY_5};
+	static ssh_b cursor[5] = {ZX_KEY_UP, ZX_KEY_DOWN, ZX_KEY_LEFT, ZX_KEY_RIGHT, ZX_KEY_0};
+	static ssh_b keyboard[9] = {ZX_KEY_Q, ZX_KEY_A, ZX_KEY_O, ZX_KEY_P, ZX_KEY_SPACE, ZX_KEY_M, ZX_KEY_D, ZX_KEY_S, ZX_KEY_E};
+
+	ssh_b* m = nullptr;
+	int count = 5;
+	switch(mode) {
+		case JOY_KEMPSTON: m = kempston; break;
+		case JOY_INTERFACE_I: m = sinclair1; break;
+		case JOY_INTERFACE_II: m = sinclair2; break;
+		case JOY_CURSOR: m = cursor; break;
+		case JOY_KEYBOARD: m = keyboard; count = 9; break;
 	}
-	modes[idx] = m;
+	modes[idx] = mode;
+	memcpy(&mapCurrent[idx], &mapOrig[idx], countButtons);
+	if(m) memcpy(&mapCurrent[idx], m, count);
 }
 
-void zxGamepad::remap(ssh_d idx, Buttons but) {
-	auto m = &map[idx][but];
-	auto bit = m->bit;
-	auto is = is_pressed(idx, but);
-	if(modes[idx] == Mode::KEMPSTON) {
-		auto val = *_KEMPSTON;
-		if(is) val |= bit; else val &= ~bit;
-		*_KEMPSTON = val;
+void zxGamepad::updateKey(bool pressed, int k) {
+	ZX_KEY* key = &keys[k];
+	if(key->bitEx) {
+		ssh_b portEx = key->portEx;
+		ssh_b bitEx = key->bitEx;
+		if(pressed) _KEYS[portEx] &= ~bitEx; else _KEYS[portEx] |= bitEx;
+	}
+	ssh_b port = key->port;
+	ssh_b bit = key->bit;
+	if(port == 31) {
+		if(pressed) (*_KEMPSTON) |= bit; else (*_KEMPSTON) &= ~bit;
 	} else {
-		auto val = _KEYS[m->port];
-		if(is) val &= ~bit; else val |= bit;
-		_KEYS[m->port] = val;
+		if(pressed) _KEYS[port] &= ~bit; else _KEYS[port] |= bit;
+	}
+}
+
+void zxGamepad::remap(ssh_d idx) {
+	// проверить все кнопки джойстика и установить/сбросить соответствующие им кнопки на клаве
+	for(int i = 0; i < countButtons; i++) {
+		ssh_b k = mapCurrent[idx][i];
+		if(k == 0) continue;
+		if(i > but12) {
+			// проверить оси и повороты
+			long val;
+			if(i > zAxisM) {
+				//xRotP, xRotM, yRotP, yRotM, zRotP, zRotM
+				val = is_rotate(idx, (Axis)(i / 2 - xRotP));
+			} else {
+				//xAxisP, xAxisM, yAxisP, yAxisM, zAxisP, zAxisM
+				val = is_axis(idx, (Axis)(i / 2 - xAxisP));
+			}
+			if(val > 0 && (i & 1)) {
+				updateKey(true, k);
+			} else if(val < 0 && !(i & 1)) {
+				updateKey(true, k);
+			} else {
+				updateKey(false, k);
+			}
+		} else {
+			updateKey(wButtons[i] & (1 << i), k);
+		}
 	}
 }

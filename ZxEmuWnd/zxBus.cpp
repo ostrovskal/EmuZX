@@ -64,13 +64,22 @@ zxBus::~zxBus() {
 	bankRAM = 0;
 }
 
-void zxBus::changeTurbo(bool accel) {
-	delayCPU = (theApp->getOpt(OPT_DELAY_CPU)->dval / (accel ? 2 : 1));
-	delayGPU = (theApp->getOpt(OPT_DELAY_GPU)->dval / (accel ? 2 : 1));
-}
-
-void zxBus::changeSound() {
+void zxBus::updateData() {
+	// задержка ЦПУ и ГПУ
+	int nTurbo = (theApp->getOpt(OPT_TURBO)->dval ? 2 : 1);
+	delayCPU = (theApp->getOpt(OPT_DELAY_CPU)->dval / nTurbo);
+	delayGPU = (theApp->getOpt(OPT_DELAY_GPU)->dval / nTurbo);
+	// наличие звука
 	isSound = theApp->getOpt(OPT_DELAY_CPU)->dval;
+	// громкость звука
+	// задержка звука
+	periodSND = theApp->getOpt(OPT_PERIOD_SND)->dval;
+	// задержка мелькания
+	periodBLINK = theApp->getOpt(OPT_PERIOD_BLINK)->dval;
+	// задержка бордера
+	periodBORDER = theApp->getOpt(OPT_PERIOD_BORDER)->dval;
+	// обновить ГПУ
+	GPU.updateData();
 }
 
 ssh_b* zxBus::getMemBank(ssh_b page, bool rom) {
@@ -84,6 +93,10 @@ void zxBus::swapPage(ssh_b page, TypeSwap type) {
 		case SWAP_ROM:
 			if(page != (*_ROM)) {
 				if(newMem = getMemBank(page, true)) {
+					if((*_TSTATE) & ZX_WRITE_ROM) {
+						auto oldMem = getMemBank(*_ROM, true);
+						if(oldMem) memcpy(oldMem, &memZX, 16384);
+					}
 					memcpy(&memZX, newMem, 16384);
 					*_ROM = page;
 				}
@@ -93,8 +106,12 @@ void zxBus::swapPage(ssh_b page, TypeSwap type) {
 			if(page != *_RAM) {
 				if(newMem = getMemBank(page, false)) {
 					auto oldMem = getMemBank(*_RAM, false);
-					if(oldMem) memcpy(oldMem, &memZX[0xc000], 16384);
+					if(oldMem) {
+						memcpy(oldMem, &memZX[0xc000], 16384);
+						//if(*_RAM == 2) memcpy(oldMem, &memZX[0x8000], 16384);
+					}
 					memcpy(&memZX[0xc000], newMem, 16384);
+					//if(page == 2) memcpy(&memZX[0x8000], newMem, 16384);
 					*_RAM = page;
 				}
 			}
@@ -196,8 +213,10 @@ void zxBus::signalRESET() {
 	*_KEMPSTON = 0;
 	*_PC_EXIT_CALL = 0;
 	*_RAM = *_VID = *_ROM = -1;
+	theApp->opts.nameLoadProg = L"BASIC";
 	swapPage(0, SWAP_ROM);
 	modifyTSTATE(0, ~(ZX_EXEC | ZX_DEBUG | ZX_BUFFER_GPU));
+	theApp->updateCaption();
 }
 
 void zxBus::signalINT() {
@@ -244,6 +263,7 @@ ssh_d zxBus::execute() {
 	ssh_u sndTm = 0;
 	ssh_u startCpu = sample.LowPart;
 	ssh_u startBrd = startCpu;
+	ssh_u startSnd = startCpu;
 	ssh_u startGpu = startCpu;
 
 	while(!((*_TSTATE) & ZX_TERMINATE)) {
@@ -258,9 +278,12 @@ ssh_d zxBus::execute() {
 		if(((*_TSTATE) & ZX_EXEC)) {
 			if((current - startCpu) > delayCPU) {
 				step(false); startCpu = current;
-				if(isSound) SND.execute(sndTm++);
 			}
-			if((current - startBrd) > (delayCPU * 16)) {
+			if((current - startSnd) > (delayCPU * periodSND)) {
+				if(isSound) SND.execute(sndTm++);
+				startSnd = current;
+			}
+			if((current - startBrd) > (delayCPU * periodBORDER)) {
 				GPU.execute();
 				startBrd = current;
 			}

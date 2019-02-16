@@ -11,15 +11,16 @@ public:
 	void execute();
 	bool saveScreen(ssh_cws path);
 	void showScreen();
+	void updateData();
 protected:
-	void drawLine(ssh_d* addr, ssh_b val);
 	void decodeColor(ssh_b color);
 	void makeCanvas();
 	ssh_d* memoryPrimary;
-	ssh_b invert;
+	ssh_d blink, blinkMsk, blinkShift;
 	ssh_d ink;
 	ssh_d paper;
 	HBITMAP hbmpMemPrimary;
 	HDC hdcMemPrimary;
+	ssh_d colours[16];
 };
 

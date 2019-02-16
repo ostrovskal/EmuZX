@@ -96,40 +96,6 @@ bool dlgSaveOrOpenFile(bool bOpen, ssh_cws title, ssh_cws filter, ssh_cws defExt
 	return result;
 }
 
-bool zxFrame::changeState(int id_opt, int id, bool change) {
-	auto opt = getOpt(id_opt);
-	if(change) opt->dval = !opt->dval;
-	bool v = (bool)opt->dval;
-	CheckMenuItem(hMenu, id, v << 3);
-	if(hWndToolbar) SendMessage(hWndToolbar, TB_SETSTATE, id, TBSTATE_ENABLED | (int)v);
-	return v;
-}
-
-void zxFrame::changeTurbo(bool change) {
-	bus.changeTurbo(changeState(OPT_TURBO, IDM_TURBO, change));
-}
-
-void zxFrame::changeSound(bool change) {
-	changeState(OPT_SOUND, IDM_SOUND, change);
-	bus.changeSound();
-}
-
-void zxFrame::changeWndDebugger(bool change) {
-	debug->show(changeState(OPT_DEBUGGER, IDM_DEBUGGER, change));
-}
-
-void zxFrame::changeWndKeyboard(bool change) {
-	keyboard->show(changeState(OPT_KEYBOARD, IDM_KEYBOARD, change));
-}
-
-void zxFrame::changeExecute(bool exec, bool change) {
-	modifyTSTATE(exec * ZX_EXEC, ZX_EXEC);
-	getOpt(OPT_EXECUTE)->dval = exec;
-	CheckMenuItem(hMenu, IDM_PAUSE, exec << 3);
-	if(hWndToolbar) SendMessage(hWndToolbar, TB_SETSTATE, IDM_PAUSE, TBSTATE_ENABLED | (int)exec);
-	if(change) debug->setProgrammPause(!exec, false);
-}
-
 BEGIN_MSG_MAP(zxFrame, zxWnd)
 	ON_NOTIFY(TBN_DROPDOWN, IDT_TOOLBAR_MAIN, onNotify)
 	ON_WM_CLOSE()
@@ -144,16 +110,110 @@ BEGIN_MSG_MAP(zxFrame, zxWnd)
 	ON_COMMAND(IDM_EXIT, onClose)
 	ON_COMMAND(IDM_OPEN, onOpen)
 	ON_COMMAND(IDM_SAVE, onSave)
-	ON_COMMAND(IDM_PAUSE, onPause)
-	ON_COMMAND(IDM_SOUND, onSound)
-	ON_COMMAND(IDM_TURBO, onTurbo)
-	ON_COMMAND(IDM_DEBUGGER, onDebugger)
-	ON_COMMAND(IDM_KEYBOARD, onKeyboard)
-	ON_COMMAND_RANGE(IDM_48K, IDM_128K, onModel)
-	ON_COMMAND_RANGE(IDM_1X, IDM_AS_IS, onAspectRatio)
-	ON_COMMAND_RANGE(IDM_PP_NONE, IDM_PP_BILINEAR, onFilter)
+	ON_COMMAND(IDM_PAUSE, onUpdate)
+	ON_COMMAND(IDM_SOUND, onUpdate)
+	ON_COMMAND(IDM_TURBO, onUpdate)
+	ON_COMMAND(IDM_DEBUGGER, onUpdate)
+	ON_COMMAND(IDM_KEYBOARD, onUpdate)
+	ON_COMMAND_RANGE(IDM_48K, IDM_128K, onUpdate)
+	ON_COMMAND_RANGE(IDM_1X, IDM_AS_IS, onUpdate)
+	ON_COMMAND_RANGE(IDM_PP_NONE, IDM_PP_BILINEAR, onUpdate)
 	ON_COMMAND_RANGE(1000, 1009, onProcessMRU)
 END_MSG_MAP()
+
+void zxFrame::updateCaption() {
+	zxString::fmt(L"sshZX (%s - %s) %s [%s]", (((*_TSTATE) & ZX_EXEC) ? L"execute" : L"pause"), (getOpt(OPT_TURBO)->dval ? L"turbo" : L"normal"),
+				  nameROMs[getOpt(OPT_MEM_MODEL)->dval], opts.nameLoadProg.str());
+	SetWindowText(theApp->getHWND(), (LPCWSTR)tmpBuf);
+}
+
+bool zxFrame::checkedSubMenu(HMENU hMenu, int id_opt, int val, int* ids) {
+	int id;
+	auto mids = ids;
+	auto opt = getOpt(id_opt);
+
+	if(val == -1) val = opt->dval;
+
+	while((id = *mids++)) CheckMenuItem(hMenu, id, 0);
+	CheckMenuItem(hMenu, ids[val], MF_CHECKED);
+
+	auto ret = opt->dval != val;
+	if(ret) opt->dval = val;
+	return ret;
+}
+
+bool zxFrame::changeState(int id_opt, int id, bool change) {
+	auto opt = getOpt(id_opt);
+	if(change) opt->dval = !opt->dval;
+	bool v = (bool)opt->dval;
+	CheckMenuItem(hMenu, id, v << 3);
+	if(hWndToolbar) SendMessage(hWndToolbar, TB_SETSTATE, id, TBSTATE_ENABLED | (int)v);
+	return v;
+}
+
+void zxFrame::onUpdate() {
+	static int change[] = { IDM_PAUSE, ST_EXECUTE | ST_EXECUTE_GO, 
+							IDM_TURBO, ST_TURBO, IDM_SOUND, ST_SOUND, IDM_DEBUGGER, ST_DEBUGGER, IDM_KEYBOARD, ST_KEYBOARD,
+							IDM_FILTER, ST_FILTER, IDM_PP_NONE, ST_FILTER, IDM_PP_BILINEAR, ST_FILTER, IDM_PP_MIXED, ST_FILTER, 
+							IDM_1X, ST_ASPECT, IDM_2X, ST_ASPECT, IDM_3X, ST_ASPECT, IDM_4X, ST_ASPECT, IDM_AS_IS, ST_ASPECT,
+							IDM_MODEL, ST_MODEL, IDM_48K, ST_MODEL, IDM_128K, ST_MODEL};
+	for(int i = 0; i < 34; i += 2) {
+		if(change[i] == wmId) {
+			int state = change[i + 1];
+			if(wmId == IDM_PAUSE) state |= (!(*_TSTATE & ZX_EXEC) * STS_EXECUTE);
+			updateData(state);
+			break;
+		}
+	}
+}
+
+void zxFrame::updateData(ssh_d state) {
+	bool exec = getOpt(OPT_EXECUTE)->dval;
+	if(state & ST_EXECUTE) {
+		exec = (state & STS_EXECUTE);
+		modifyTSTATE(exec * ZX_EXEC, ZX_EXEC);
+	}
+	getOpt(OPT_EXECUTE)->dval = exec;
+	changeState(OPT_EXECUTE, IDM_PAUSE, false);
+	if(state & ST_EXECUTE_GO) debug->setProgrammPause(!exec, false);
+
+	changeState(OPT_TURBO, IDM_TURBO, state & ST_TURBO);
+	changeState(OPT_SOUND_ALL, IDM_SOUND, state & ST_SOUND);
+	debug->show(changeState(OPT_DEBUGGER, IDM_DEBUGGER, state & ST_DEBUGGER));
+	keyboard->show(changeState(OPT_KEYBOARD, IDM_KEYBOARD, state & ST_KEYBOARD));
+
+	bus.updateData();
+
+	int val = ((state & ST_FILTER) ? wmId - IDM_PP_NONE : -1);
+	checkedSubMenu(hMenu, OPT_PP, val, idsPP);
+
+	val = ((state & ST_MODEL) ? wmId - IDM_48K : -1);
+	checkedSubMenu(hMenu, OPT_MEM_MODEL, val, idsModel);
+	if(state & ST_MODEL) bus.changeModel(val, *_MODEL);
+
+	val = ((state & ST_ASPECT) ? wmId - IDM_1X : -1);
+	checkedSubMenu(hMenu, OPT_ASPECT_RATIO, val, idsAR);
+	if(state & ST_ASPECT) {
+		RECT r;
+		if(GetWindowRect(hWnd, &r)) {
+			int x = r.left;
+			int y = r.top;
+			int cx = r.right - x;
+			int cy = r.bottom - y;
+			SIZE sz;
+			makeWndSize(&sz);
+			GetClientRect(hWnd, &r);
+			int nCx = sz.cx + (cx - r.right);
+			int nCy = sz.cy + (cy - r.bottom);
+			x += ((cx - nCx) / 2);
+			y += ((cy - nCy) / 2);
+			if(x < 0) x = 0;
+			if(y < 0) y = 0;
+			MoveWindow(hWnd, x, y, nCx, nCy, true);
+		}
+	}
+	updateCaption();
+}
 
 void zxFrame::onKeyDown(UINT nVirtKey, UINT nRepeat, UINT nFlags) {
 	processKeys();
@@ -170,7 +230,7 @@ void zxFrame::processKeys() {
 
 void zxFrame::onSettings() {
 	zxDlgSettings dlg;
-	dlg.create(IDD_DIALOG_SETTINGS, this, true);
+	dlg.create(IDD_DIALOG_SETTINGS, hWnd, true);
 }
 
 void zxFrame::onReset() {
@@ -194,56 +254,6 @@ void zxFrame::onClose() {
 	DestroyWindow(hWnd);
 }
 
-void zxFrame::onPause() {
-	changeExecute(!((*_TSTATE) & ZX_EXEC), true);
-}
-
-void zxFrame::onTurbo() {
-	changeTurbo(true);
-}
-
-void zxFrame::onSound() {
-	changeSound(true);
-}
-
-void zxFrame::onDebugger() {
-	changeWndDebugger(true);
-}
-
-void zxFrame::onKeyboard() {
-	changeWndKeyboard(true);
-}
-
-void zxFrame::onFilter() {
-	checkedSubMenu(hMenu, OPT_PP, wmId - IDM_PP_NONE, idsPP);
-}
-
-void zxFrame::onModel() {
-	checkedSubMenu(hMenu, OPT_MEM_MODEL, wmId - IDM_48K, idsModel);
-	bus.changeModel(wmId - IDM_48K, *_MODEL);
-}
-
-void zxFrame::onAspectRatio() {
-	RECT r;
-	if(GetWindowRect(hWnd, &r)) {
-		checkedSubMenu(hMenu, OPT_ASPECT_RATIO, wmId - IDM_1X, idsAR);
-		int x = r.left;
-		int y = r.top;
-		int cx = r.right - x;
-		int cy = r.bottom - y;
-		SIZE sz;
-		makeWndSize(&sz);
-		GetClientRect(hWnd, &r);
-		int nCx = sz.cx + (cx - r.right);
-		int nCy = sz.cy + (cy - r.bottom);
-		x += ((cx - nCx) / 2);
-		y += ((cy - nCy) / 2);
-		if(x < 0) x = 0;
-		if(y < 0) y = 0;
-		MoveWindow(hWnd, x, y, nCx, nCy, true);
-	}
-}
-
 void zxFrame::onOpen() {
 	zxString folder(getOpt(OPT_CUR_PATH)->sval);
 	if(wmId == IDM_OPEN)
@@ -262,6 +272,7 @@ void zxFrame::onOpen() {
 			getOpt(OPT_CUR_PATH)->sval = folder.left(pos);
 			opts.nameLoadProg = folder.substr(pos, folder.find_rev(L'.') - pos);
 			modifyMRU(folder);
+			updateCaption();
 		}
 	}
 }
@@ -356,14 +367,12 @@ void zxFrame::onNotify(LPNMHDR nm, LRESULT* pResult) {
 	MapWindowPoints(lpnmTB->hdr.hwndFrom, HWND_DESKTOP, (LPPOINT)&rc, 2);
 
 	HMENU hPopupMenu = nullptr;
-	int* ids = nullptr;
-	int id_opt = -1;
 	switch(id) {
-		case IDM_MODEL: ids = idsModel; id_opt = OPT_MEM_MODEL; hPopupMenu = hMenuModel; break;
+		case IDM_MODEL: hPopupMenu = hMenuModel; break;
 		case IDM_OPEN: hPopupMenu = hMenuMRU; break;
-		case IDM_FILTER: ids = idsPP; id_opt = OPT_PP; hPopupMenu = hMenuPP; break;
+		case IDM_FILTER: hPopupMenu = hMenuPP; break;
 	}
-	if(id_opt != -1) checkedSubMenu(hPopupMenu, id_opt, -1, ids);
+	updateData(0);
 
 	tpm.cbSize = sizeof(TPMPARAMS);
 	tpm.rcExclude = rc;
@@ -414,7 +423,7 @@ zxFrame::~zxFrame() {
 
 void zxFrame::makeWndSize(SIZE* sz) {
 	int mul = (getOpt(OPT_ASPECT_RATIO)->dval) + 1;
-	if(mul > 5) mul = 2;
+	if(mul > 4) mul = 2;
 	sz->cx = 320 * mul;
 	sz->cy = (256 * mul) + 46;
 }
@@ -443,14 +452,13 @@ int zxFrame::run() {
 	hMenuPP = GetSubMenu(GetSubMenu(hMenu, 1), 3);
 
 	debug = new zxDebugger;
-	debug->create(IDD_DIALOG_DEBUGGER, this, false);
+	debug->create(IDD_DIALOG_DEBUGGER, hWnd, false);
 
 	keyboard = new zxKeyboard;
-	keyboard->create(IDD_DIALOG_KEYBOARD, this, false);
+	keyboard->create(IDD_DIALOG_KEYBOARD, hWnd, false);
 
 	gamepad = new zxGamepad;
 	gamepad->init(hWnd);
-	gamepad->changeMode(0, zxGamepad::KEMPSTON, nullptr, 0);
 
 	loadState(opts.mainDir + L"auto_state.zx");
 
@@ -458,15 +466,7 @@ int zxFrame::run() {
 	setOrGetWndPos(keyboard->getHWND(), OPT_WND_KEY_POS, false, false);
 	setOrGetWndPos(hWnd, OPT_WND_MAIN_POS, false, true);
 
-	changeSound(false);
-	changeTurbo(false);
-	changeExecute(getOpt(OPT_EXECUTE)->dval, true);
-	changeWndDebugger(false);
-	changeWndKeyboard(false);
-
-	checkedSubMenu(hMenu, OPT_MEM_MODEL, -1, idsModel);
-	checkedSubMenu(hMenu, OPT_PP, -1, idsPP);
-	checkedSubMenu(hMenu, OPT_ASPECT_RATIO, -1, idsAR);
+	updateData(getOpt(OPT_EXECUTE)->dval * STS_EXECUTE | ST_EXECUTE | ST_EXECUTE_GO);
 
 	for(int i = 9; i >= 0; i--) modifyMRU(getOpt(OPT_MRU9)->sval);
 
@@ -477,7 +477,7 @@ int zxFrame::run() {
 		
 	MSG msg;
 
-	while(SshMsgPump(&msg, false)) { }
+	while(msgPump(&msg)) { }
 	return (int)msg.wParam;
 }
 
@@ -507,21 +507,6 @@ void zxFrame::modifyMRU(zxString path) {
 			SetMenuItemInfo(hMenuMRU, i, TRUE, &mii);
 		}
 	}
-}
-
-bool zxFrame::checkedSubMenu(HMENU hMenu, int id_opt, int val, int* ids) {
-	int id;
-	auto mids = ids;
-	auto opt = getOpt(id_opt);
-
-	if(val == -1) val = opt->dval;
-
-	while((id = *mids++)) CheckMenuItem(hMenu, id, 0);
-	CheckMenuItem(hMenu, ids[val], MF_CHECKED);
-
-	auto ret = opt->dval != val;
-	if(ret) opt->dval = val;
-	return ret;
 }
 
 bool zxFrame::saveState(ssh_cws path) {
