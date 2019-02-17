@@ -31,9 +31,7 @@ protected:
 	virtual INT_PTR defWindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 	virtual bool preCreate() { return true; }
 	virtual void postCreate() {  }
-	const SSH_MSGMAP_ENTRY* findMessageEntry(const SSH_MSGMAP_ENTRY* lpEntry, UINT nMsg, UINT nCode, UINT nID);
 	ssh_cws registerClass(ssh_cws name, int idMenu, WNDPROC proc);
-	HWND hWndParent;
 	HWND hWnd, hWndToolbar;
 	UINT wndID;
 	UINT wmId;
@@ -49,7 +47,6 @@ class zxDialog : public zxWnd {
 	friend static INT_PTR CALLBACK DlgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 public:
 	zxDialog() : zxWnd(), nResult(0) {}
-	virtual ~zxDialog() { }
 	int create(WORD IDD, HWND hWndParent, bool modal);
 	virtual bool dialogMessage(MSG* pMsg) const override { return IsDialogMessage(hWnd, pMsg); }
 protected:

@@ -68,9 +68,7 @@ protected:
 
 	ssh_msg void onClose();
 	ssh_msg void onDrawItem(int id, LPDRAWITEMSTRUCT dis);
-
-	virtual bool preCreate() override;
-	virtual void postCreate() override;
+	virtual int onInitDialog(HWND hWnd) override;
 
 	void updateUndoRedo(bool set);
 	void updatePrevNextBP();

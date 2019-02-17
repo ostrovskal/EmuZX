@@ -217,6 +217,8 @@ protected:
 		return groupOps;
 	}
 
+	ssh_w cmdJump(ssh_w pc);
+
 	void execute(int prefix1, int prefix2);
 
 	inline ssh_b fromRP_SP(ssh_b rp) { return prefSP[prefix + (rp & 6)]; }

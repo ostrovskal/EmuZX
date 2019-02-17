@@ -104,7 +104,7 @@ void zxListBox::onPaint() {
 				// заполнить стк
 				dis.itemState = (isSel ? ODS_SELECTED : 0);
 				dis.itemID = idx;
-				SendMessage(hWndParent, WM_DRAWITEM, wndID, (LPARAM)&dis);
+				SendMessage(GetParent(hWnd), WM_DRAWITEM, wndID, (LPARAM)&dis);
 				rc->top += heightItem;
 				rc->bottom += heightItem;
 			}
@@ -152,7 +152,7 @@ void zxListBox::onVScroll(UINT code, UINT p, HWND hWndScroll) {
 }
 
 void zxListBox::sendNotify(int code) {
-	SendMessage(hWndParent, WM_COMMAND, MAKELONG(wndID, code), (LPARAM)hWnd);
+	SendMessage(GetParent(hWnd), WM_COMMAND, MAKELONG(wndID, code), (LPARAM)hWnd);
 	InvalidateRect(hWnd, nullptr, false);
 }
 

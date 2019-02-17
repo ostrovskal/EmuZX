@@ -11,26 +11,25 @@ public:
 		SWAP_ROM, SWAP_RAM, SWAP_VRAM
 	};
 	
-	zxBus() :	memROM(nullptr), bankROM(0), memRAM(nullptr), bankRAM(0), isSound(false), 
-				delayCPU(10), delayGPU(20), periodSND(1), periodBORDER(16), periodBLINK(15) { 
+	zxBus() :	pageROM(nullptr), pageRAM(nullptr), isSound(false), delayCPU(10), delayGPU(20), periodSND(1), periodBORDER(16), periodBLINK(15) { 
 	}
 	
 	virtual ~zxBus();
 
 	void step(bool run_debugger);
-	void swapPage(ssh_b page, TypeSwap type);
 	void updateData();
-	int countMemBank(bool rom) const { return (rom ? bankROM : bankRAM); }
-	ssh_b* getMemBank(ssh_b page, bool rom);
+	void execute();
+	void swapPage(ssh_b page, TypeSwap type);
 	bool loadState(int hf);
 	bool saveState(int hf);
 	bool changeModel(int newModel, int oldModel);
 	bool saveScreen(ssh_cws path) { return GPU.saveScreen(path); }
+	int countPages(bool rom) const;
+	ssh_b* getPage(ssh_b page, bool rom);
 protected:
 	void signalRESET();
 	void signalINT();
 	void signalNMI();
-	ssh_d execute();
 
 	ssh_d delayCPU, delayGPU;
 	ssh_d periodSND, periodBLINK, periodBORDER;
@@ -41,11 +40,7 @@ protected:
 	zxGPU GPU;
 	zxSND SND;
 
-	// банки ПЗУ
-	ssh_b* memROM;
-	int bankROM;
-
-	// банки памяти
-	ssh_b* memRAM;
-	int bankRAM;
+	// страницы ПЗУ
+	ssh_b* pageROM;
+	ssh_b* pageRAM;
 };

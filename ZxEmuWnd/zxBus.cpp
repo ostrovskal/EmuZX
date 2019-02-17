@@ -8,7 +8,9 @@
 #include "zxKeyboard.h"
 
 // содержмое памяти
-ssh_b memZX[50 + 65536];
+ssh_b memZX[70 + 65536];
+
+bool isStartThread = true;
 
 // адрес прерывания
 ssh_b* _I(&memZX[RI]);
@@ -28,6 +30,11 @@ ssh_b* _PORT_FE(&memZX[FE]);
 ssh_b* _LOCK_FD(&memZX[LOCK_FD]);
 ssh_b* _KEYS(&memZX[KEYS0]);
 ssh_b* _KEMPSTON(&memZX[KEMPSTON]);
+ssh_b* _COVOX(&memZX[COVOX]);
+ssh_b* _AY(&memZX[AY]);
+ssh_b* _RAY(&memZX[RAY1]);
+ssh_b* _SPECDRUM(&memZX[SPECDRUM]);
+ssh_b* _SCREEN(&memZX[SCREEN]);
 
 // RAM
 ssh_b* _RAM(&memZX[RAM]);
@@ -58,10 +65,8 @@ ssh_w* _PC_EXIT_CALL((ssh_w*)&memZX[PC_EXIT_CALL1]);
 ssh_w* _TSTATE((ssh_w*)&memZX[TSTATE1]);
 
 zxBus::~zxBus() {
-	SAFE_DELETE(memROM);
-	SAFE_DELETE(memRAM);
-	bankROM = 0;
-	bankRAM = 0;
+	SAFE_DELETE(pageROM);
+	SAFE_DELETE(pageRAM);
 }
 
 void zxBus::updateData() {
@@ -71,6 +76,8 @@ void zxBus::updateData() {
 	delayGPU = (theApp->getOpt(OPT_DELAY_GPU)->dval / nTurbo);
 	// наличие звука
 	isSound = theApp->getOpt(OPT_DELAY_CPU)->dval;
+	// запись в ROM
+	modifyTSTATE(ZX_WRITE_ROM * theApp->getOpt(OPT_WRITE_ROM)->dval, 0);
 	// громкость звука
 	// задержка звука
 	periodSND = theApp->getOpt(OPT_PERIOD_SND)->dval;
@@ -82,9 +89,19 @@ void zxBus::updateData() {
 	GPU.updateData();
 }
 
-ssh_b* zxBus::getMemBank(ssh_b page, bool rom) {
-	if(rom) return (page < bankROM ? (memROM + page * 16384) : nullptr);
-	return (page < bankRAM ? (memRAM + page * 16384) : nullptr);
+int zxBus::countPages(bool rom) const {
+	static int banks[] = {0, 1, 6, 2, 6, 2, 14, 4};
+	return banks[*_MODEL * 2 + rom];
+}
+
+ssh_b* zxBus::getPage(ssh_b page, bool rom) {
+	static int pagesRAM[] = {0, 16384, -32768, 32768, 49152, -16384, 65536, 81920, 98304, 114688, 131072, 147456, 163840, 180224, 196608, 212992};
+	static int pagesROM[] = {0, 16384, 32768, 49152};
+	int banks = countPages(rom);
+	if(page >= banks) return nullptr;
+	if(rom) return pageROM + pagesROM[page];
+	int offs = pagesRAM[page];
+	return (offs < 0 ? &memZX[-offs] : &pageRAM[offs]);
 }
 
 void zxBus::swapPage(ssh_b page, TypeSwap type) {
@@ -92,9 +109,9 @@ void zxBus::swapPage(ssh_b page, TypeSwap type) {
 	switch(type) {
 		case SWAP_ROM:
 			if(page != (*_ROM)) {
-				if(newMem = getMemBank(page, true)) {
+				if(newMem = getPage(page, true)) {
 					if((*_TSTATE) & ZX_WRITE_ROM) {
-						auto oldMem = getMemBank(*_ROM, true);
+						auto oldMem = getPage(*_ROM, true);
 						if(oldMem) memcpy(oldMem, &memZX, 16384);
 					}
 					memcpy(&memZX, newMem, 16384);
@@ -104,28 +121,17 @@ void zxBus::swapPage(ssh_b page, TypeSwap type) {
 			break;
 		case SWAP_RAM:
 			if(page != *_RAM) {
-				if(newMem = getMemBank(page, false)) {
-					auto oldMem = getMemBank(*_RAM, false);
-					if(oldMem) {
-						memcpy(oldMem, &memZX[0xc000], 16384);
-						//if(*_RAM == 2) memcpy(oldMem, &memZX[0x8000], 16384);
-					}
+				if(newMem = getPage(page, false)) {
+					auto oldMem = getPage(*_RAM, false);
+					if(oldMem) memcpy(oldMem, &memZX[0xc000], 16384);
 					memcpy(&memZX[0xc000], newMem, 16384);
-					//if(page == 2) memcpy(&memZX[0x8000], newMem, 16384);
 					*_RAM = page;
 				}
 			}
 			break;
 		case SWAP_VRAM:
-			if(page != *_VID) {
-				if(newMem = getMemBank(page, false)) {
-					auto oldMem = getMemBank(*_VID, false);
-					if(oldMem) memcpy(oldMem, &memZX[0x4000], 16384);
-					memcpy(&memZX[0x4000], newMem, 16384);
-					*_VID = page;
-				}
-				break;
-			}
+			*_VID = page;
+			break;
 	}
 }
 
@@ -152,24 +158,14 @@ bool zxBus::changeModel(int newModel, int oldModel) {
 			theApp->opts.nameLoadProg = L"BASIC";
 			theApp->getOpt(OPT_MEM_MODEL)->dval = newModel;
 			*_MODEL = newModel;
-			SAFE_DELETE(memROM);
-			SAFE_DELETE(memRAM);
-			memROM = pROM;
-			switch(newModel) {
-				case MODEL_48K:
-					bankRAM = 0; bankROM = 1;
-					break;
-				case MODEL_128K:
-					bankRAM = 8; bankROM = 2;
-					break;
-			}
-			if(bankRAM) {
-				memRAM = new ssh_b[bankRAM * 16384];
-				memset(memRAM, 0, bankRAM * 16384);
-			}
-			signalRESET();
+			SAFE_DELETE(pageROM);
+			SAFE_DELETE(pageRAM);
+			pageROM = pROM;
+			modifyTSTATE((newModel != MODEL_48K) * ZX_128K, ZX_128K);
+			pageRAM = new ssh_b[countPages(false) * 16384];
 		}
 	}
+	signalRESET();
 	return true;
 }
 
@@ -177,10 +173,10 @@ bool zxBus::loadState(int hf) {
 	// грузим основную память
 	if(_read(hf, memZX, sizeof(memZX)) != sizeof(memZX)) return false;
 	// грузим банки ОЗУ
-	if(*_MODEL != MODEL_48K) {
-		int banks = countMemBank(false);
+	if(*_TSTATE & ZX_128K) {
+		int banks = countPages(false);
 		for(int i = 0; i < banks; i++) {
-			if(_read(hf, getMemBank(i, false), 16384) != 16384) return false;
+			if(_read(hf, getPage(i, false), 16384) != 16384) return false;
 		}
 	}
 	return true;
@@ -188,14 +184,14 @@ bool zxBus::loadState(int hf) {
 
 bool zxBus::saveState(int hf) {
 	// сохраняем регистры
-	if(_write(hf, &memZX[65536], 50) != 50) return false;
+	if(_write(hf, &memZX[65536], 70) != 70) return false;
 	// сохраняем основную память
 	if(_write(hf, memZX, sizeof(memZX)) != sizeof(memZX)) return false;
-	if(*_MODEL != MODEL_48K) {
+	if(*_TSTATE & ZX_128K) {
 		// количество банков и их содержимое
-		int banks = countMemBank(false);
+		int banks = countPages(false);
 		for(int i = 0; i < banks; i++) {
-			if(_write(hf, getMemBank(i, false), 16384) != 16384) return false;
+			if(_write(hf, getPage(i, false), 16384) != 16384) return false;
 		}
 	}
 	return true;
@@ -203,19 +199,26 @@ bool zxBus::saveState(int hf) {
 
 void zxBus::signalRESET() {
 	memset(memZX, 0, 65536);
-	memset(memRAM, 0, bankRAM * 16384);
+	memset(pageRAM, 0, countPages(false) * 16384);
 	memset(&memZX[RC_], 0, 8);
 	memset(_KEYS, 255, 8);
-	*_IFF1 = *_IFF2 = *_IM = *_LOCK_FD = *_PORT_FE = 0;
-	*_AF = *_BC = *_DE = *_HL = *_IX = *_IY = *_PC = 0;
+	memset(_RAY, 0, 16);
+	*_IFF1 = *_IFF2 = *_IM = *_PORT_FE = 0;
+	*_BC = *_DE = *_HL = *_IX = *_IY = *_PC = 0;
 	*_R = *_I = 0;
-	*_SP = 65534;
+	*_SP = *_AF = 65535;
+	*_LOCK_FD = (((*_TSTATE) & ZX_128K) ? 0 : 32);
+	*_AY = 0;
+	*_COVOX = 0;
+	*_SPECDRUM = 0;
 	*_KEMPSTON = 0;
 	*_PC_EXIT_CALL = 0;
-	*_RAM = *_VID = *_ROM = -1;
+	*_RAM = *_ROM = -1;
 	theApp->opts.nameLoadProg = L"BASIC";
 	swapPage(0, SWAP_ROM);
-	modifyTSTATE(0, ~(ZX_EXEC | ZX_DEBUG | ZX_BUFFER_GPU));
+	swapPage(0, SWAP_RAM);
+	swapPage(5, SWAP_VRAM);
+	modifyTSTATE(0, ~(ZX_128K | ZX_EXEC | ZX_DEBUG | ZX_BUFFER_GPU));
 	theApp->updateCaption();
 }
 
@@ -252,43 +255,41 @@ void zxBus::step(bool run_debugger) {
 	}
 }
 
-ssh_d zxBus::execute() {
+void zxBus::execute() {
 	LARGE_INTEGER sample;
-	QueryPerformanceFrequency(&sample);
+	static DWORD ms;
+	static ssh_u startBrd, startSnd, startGpu, startTrap, sndTm, current;
 
-	DWORD ms = sample.LowPart / 1000;
-
-	QueryPerformanceCounter(&sample);
-
-	ssh_u sndTm = 0;
-	ssh_u startCpu = sample.LowPart;
-	ssh_u startBrd = startCpu;
-	ssh_u startSnd = startCpu;
-	ssh_u startGpu = startCpu;
-
-	while(!((*_TSTATE) & ZX_TERMINATE)) {
-		QueryPerformanceCounter(&sample);
-		ssh_u current = sample.LowPart;
-		if((current - startGpu) > (ms * delayGPU)) {
-			theApp->keyboard->processJoystick();
-			GPU.showScreen();
-			(*_TSTATE) |= ZX_TRAP;
-			startGpu = current;
+	if(isStartThread) {
+		isStartThread = false;
+		startBrd = current;
+		startSnd = current;
+		startGpu = current;
+		startTrap = current;
+		sndTm = 0;
+		current = 0;
+		QueryPerformanceFrequency(&sample);
+		ms = sample.LowPart / 1000;
+	}
+	current++;
+	if((current - startTrap) > ms) {
+		theApp->keyboard->processJoystick();
+		(*_TSTATE) |= ZX_TRAP;
+		startTrap = current;
+	}
+	if((current - startGpu) > (ms / delayGPU)) {
+		GPU.showScreen();
+		startGpu = current;
+	}
+	if(((*_TSTATE) & ZX_EXEC)) {
+		step(false);
+		if((current - startSnd) > periodSND) {
+			if(isSound) SND.execute(sndTm++);
+			startSnd = current;
 		}
-		if(((*_TSTATE) & ZX_EXEC)) {
-			if((current - startCpu) > delayCPU) {
-				step(false); startCpu = current;
-			}
-			if((current - startSnd) > (delayCPU * periodSND)) {
-				if(isSound) SND.execute(sndTm++);
-				startSnd = current;
-			}
-			if((current - startBrd) > (delayCPU * periodBORDER)) {
-				GPU.execute();
-				startBrd = current;
-			}
+		if((current - startBrd) > periodBORDER) {
+			GPU.execute(false);
+			startBrd = current;
 		}
 	}
-
-	return 0;
 }

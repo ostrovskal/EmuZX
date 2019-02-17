@@ -99,7 +99,7 @@ void zxDlgListBps::onClickList(LPNMHDR nm, LRESULT* pResult) {
 	updateItems();
 }
 
-void zxDlgListBps::postCreate() {
+int zxDlgListBps::onInitDialog(HWND hWnd) {
 	debug = theApp->debug;
 	hWndList = GetDlgItem(hWnd, IDC_LIST_BP);
 	ListView_SetExtendedListViewStyleEx(hWndList, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
@@ -118,6 +118,7 @@ void zxDlgListBps::postCreate() {
 		SendMessage(hWndList, LVM_INSERTCOLUMN, i, (LPARAM)&lvc);
 	}
 	setItems();
+	return 1;
 }
 
 void zxDlgListBps::updateItems() {

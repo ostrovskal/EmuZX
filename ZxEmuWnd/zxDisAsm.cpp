@@ -267,7 +267,6 @@ void zxDisAsm::execute(int prefix1, int prefix2) {
 		readOps();
 	}
 	(this->*table_ops[groupOps * 3 + prefix2])();
-
 }
 
 ssh_w zxDisAsm::decode(ssh_w pc, ssh_d count) {
@@ -370,6 +369,23 @@ zxString zxDisAsm::makeCode(ssh_w address, int length, ssh_b dec) const {
 	return code;
 }
 
+ssh_w zxDisAsm::cmdJump(ssh_w pc) {
+	auto b = memZX[pc];
+	if(b == 0xdd || b == 0xfd || b == 0xed) pc++;
+	readOps();
+	pc++; _pc--;
+	if(groupOps == 3) {
+		if((typeOps == 4 || (typeOps == 5 && codeOps == 1) || typeOps == 2 || typeOps == 7 || 
+			(typeOps == 3 && codeOps == 0) || (typeOps == 1 && codeOps == 5))) {
+			return *(ssh_w*)(memZX + pc);
+		}
+	} else if(groupOps == 0 && typeOps == 0 && codeOps > 1) {
+		char d = (char)memZX[pc++];
+		return (pc + d);
+	}
+	return pc;
+}
+
 ssh_w zxDisAsm::move(ssh_w pc, int count) {
 	_pc = pc;
 	if(count > 0) {
@@ -377,9 +393,37 @@ ssh_w zxDisAsm::move(ssh_w pc, int count) {
 			pos = 0;
 			execute(0, 0);
 		}
-	} else if(count < 0){
-		_pc += count;
-		// TODO: сдвиг дизасма назад
+	} else if(count < 0) {
+		int cc = 200;
+		int mn_diff = 1000000;
+		int mn_addr = 0;
+		int pc_t = _pc + count;
+		while(cc--) {
+			int addr = cmdJump(_pc);
+			if(addr < pc_t) {
+				int diff = pc_t - addr;
+				int mn = diff + count;
+				if(mn < mn_diff) {
+					mn_diff = mn;
+					mn_addr = addr;
+					if(mn < 30) break;
+				}
+			}
+			pos = 0;
+			execute(0, 0);
+		}
+		if(mn_diff > 7000) _pc += count;
+		else {
+			int pc;
+			_pc = mn_addr;
+			while(mn_diff > 0) {
+				pos = 0;
+				pc = _pc;
+				execute(0, 0);
+				mn_diff -= (_pc - pc);
+				if(_pc > pc_t) { _pc = pc; break; }
+			}
+		}
 	}
 	return _pc;
 }

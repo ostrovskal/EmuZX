@@ -20,12 +20,17 @@ zxGPU::zxGPU() {
 	blink = blinkMsk = blinkShift = 0;
 	hbmpMemPrimary = nullptr;
 	hdcMemPrimary = nullptr;
+	hbmpMemBack = nullptr;
+	hdcMemBack = nullptr;
 	memoryPrimary = nullptr;
+	memoryBack = nullptr;
 }
 
 zxGPU::~zxGPU() {
 	::DeleteObject(hbmpMemPrimary);
 	::DeleteObject(hdcMemPrimary);
+	::DeleteObject(hbmpMemBack);
+	::DeleteObject(hdcMemBack);
 }
 
 void zxGPU::updateData() {
@@ -51,13 +56,22 @@ void zxGPU::makeCanvas() {
 
 	hbmpMemPrimary = ::CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void**)&memoryPrimary, NULL, 0);
 	hdcMemPrimary = ::CreateCompatibleDC(NULL);
+	hbmpMemBack = ::CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, (void**)&memoryBack, NULL, 0);
+	hdcMemBack = ::CreateCompatibleDC(NULL);
 }
 
 void zxGPU::showScreen() {
 	HDC hdc;
 	if((hdc = ::GetDC(theApp->getHWND()))) {
-		auto hMem = hdcMemPrimary;
-		auto h = SelectObject(hdcMemPrimary, hbmpMemPrimary);
+		HGDIOBJ h;
+		HDC hMem;
+		if(!(*_TSTATE & ZX_BUFFER_GPU)) {
+			hMem = hdcMemPrimary;
+			h = SelectObject(hdcMemPrimary, hbmpMemPrimary);
+		} else {
+			hMem = hdcMemBack;
+			h = SelectObject(hdcMemBack, hbmpMemBack);
+		}
 		LPRECT r = &theApp->wndRect;
 		StretchBlt(hdc, r->left, r->top, r->right - r->left, r->bottom - r->top, hMem, 0, 0, WIDTH_SCREEN + SIZE_BORDER * 2, HEIGHT_SCREEN + SIZE_BORDER * 2, SRCCOPY);
 		SelectObject(hMem, h);
@@ -66,45 +80,45 @@ void zxGPU::showScreen() {
 	blink++;
 }
 
-void zxGPU::execute() {
+void zxGPU::execute(bool screen) {
+
 	int y = *_SCAN;
-	ssh_d* dest = memoryPrimary;
+	ssh_d* dest = memBuffer(true);
 	dest += y * (WIDTH_SCREEN + SIZE_BORDER * 2);
+	
 	ssh_b col = (*_PORT_FE) & 7;
 	ssh_d c = colours[col];
-
 	for(int x = 0; x < (WIDTH_SCREEN + SIZE_BORDER * 2); x++) {
 		if(y < SIZE_BORDER || y >= (HEIGHT_SCREEN + SIZE_BORDER)) *(dest + x) = c;
 		else if(x < SIZE_BORDER || x >= (WIDTH_SCREEN + SIZE_BORDER)) *(dest + x) = c;
 	}
+	if(y >= SIZE_BORDER && y < (HEIGHT_SCREEN + SIZE_BORDER)) {
+		// нарисовать скан линию экрана
+		int yy = 191 - (y - SIZE_BORDER);
+		int y_bank = (yy / 64) * 2048;
+		int offs = scan_offs[yy & 63] + y_bank;
+
+		dest += SIZE_BORDER;
+		ssh_b* memScreen = theApp->bus.getPage(*_VID, false);
+		auto src_cols = ((yy >> 3) * 32) + (memScreen + 6144);
+		auto src = memScreen + offs;
+
+		for(int x = 0; x < 32; x++) {
+			decodeColor(*(src_cols + x));
+			ssh_b val = *(src + x);
+			for(int bit = 128; bit > 0; bit >>= 1) {
+				*dest++ = ((val & bit) ? ink : paper);
+			}
+		}
+	}
 	y++;
 	if(y >= (HEIGHT_SCREEN + SIZE_BORDER * 2)) y = 0;
 	*_SCAN = y;
-	if(!y) {
-		ssh_d* dest = memoryPrimary;
-		dest += SIZE_BORDER * (WIDTH_SCREEN + SIZE_BORDER * 2);
-		auto src_cols = &memZX[23264];
-		for(int n = 0; n < HEIGHT_SCREEN; n++) {
-			// нарисовать скан линию экрана
-			int yy = 191 - n;
-			int y_bank = (yy / 64) * 2048;
-			int offs = scan_offs[yy & 63] + y_bank;
-			auto src = &memZX[16384] + offs;
 
-			dest += SIZE_BORDER;
-			for(int x = 0; x < 32; x++) {
-				decodeColor(*(src_cols + x));
-				auto val = *(src + x);
-				for(int bit = 128; bit > 0; bit >>= 1) {
-					*dest++ = ((val & bit) ? ink : paper);
-				}
-			}
-			dest += SIZE_BORDER;
-			if(!(yy & 7)) src_cols -= 32;
-		}
+	if(!y) {
 		auto filter = theApp->getOpt(OPT_PP)->dval;
 		if(filter > 0) {
-			ssh_d* dest = memoryPrimary;
+			dest = memBuffer(true);
 			int x = 0, y = 1;
 			while(y++ < ((HEIGHT_SCREEN - 1) + SIZE_BORDER * 2)) {
 				while(x++ < ((WIDTH_SCREEN - 1) + SIZE_BORDER * 2)) {
@@ -115,6 +129,14 @@ void zxGPU::execute() {
 			}
 		}
 		modifyTSTATE((*_TSTATE) ^ ZX_BUFFER_GPU, ZX_BUFFER_GPU);
+	}
+}
+
+ssh_d* zxGPU::memBuffer(bool primary) {
+	if((*_TSTATE) & ZX_BUFFER_GPU) {
+		return primary ? memoryPrimary : memoryBack;
+	} else {
+		return primary ? memoryBack : memoryPrimary;
 	}
 }
 

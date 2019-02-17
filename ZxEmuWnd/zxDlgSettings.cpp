@@ -6,7 +6,7 @@ static SHEET_DATA sheetCommon[] = {
 	{IDC_SLIDER_PERIOD_CPU, OPT_DELAY_CPU, (ssh_cws)0x0210},
 	{IDC_SLIDER_PERIOD_GPU, OPT_DELAY_GPU, (ssh_cws)0x0a28},
 	{IDC_SLIDER_PERIOD_BORDER, OPT_PERIOD_BORDER, (ssh_cws)0x0820},
-	{IDC_SLIDER_PERIOD_BLINK, OPT_PERIOD_BLINK, (ssh_cws)0x0208},
+	{IDC_SLIDER_PERIOD_BLINK, OPT_PERIOD_BLINK, (ssh_cws)0x0309},
 	{IDC_CHECK_WRITE_ROM, OPT_WRITE_ROM},
 	{IDC_CHECK_AUTO_SAVE, OPT_AUTO_SAVE},
 };
@@ -25,7 +25,7 @@ static SHEET_DATA sheetSnd[] = {
 	{IDC_CHECK_8BIT, OPT_SND_8BIT},
 
 	{IDC_COMBO_STEREO_AY, OPT_SND_AY_STEREO, L"None;ABC;ACB"},
-	{IDC_COMBO_SND_FREQ, OPT_SND_FREQUENCY, L"22050;44100;48000"},
+	{IDC_COMBO_SND_FREQ, OPT_SND_FREQUENCY, L"44100;22050;11025"},
 };
 
 static SHEET_DATA sheetGpu[] = {
@@ -53,7 +53,7 @@ static SHEET_DATA sheetGpu[] = {
 
 static SHEET_DATA sheetJoy[] = {
 	{IDC_COMBO_JOY_NUMBER, 0, L"№ 1;№ 2;№ 3;№ 4"},
-	{IDC_COMBO_JOY_MAPPING, 0, L"NOTHING;KEMPSTON;SINCLAIR 1;SINCLAIR 2;CURSOR;KEYBOARD;CUSTOM"},
+	{IDC_COMBO_JOY_MAPPING, OPT_JOY1_MAPPING, L"KEMPSTON;SINCLAIR 1;SINCLAIR 2;CURSOR;KEYBOARD;CUSTOM"},
 	{IDC_COMBO_AXIS_X, 0, L"X +;X -"},
 	{IDC_COMBO_AXIS_Y, 0, L"Y +;Y -"},
 	{IDC_COMBO_AXIS_Z, 0, L"Z +;Z -"},
@@ -61,15 +61,9 @@ static SHEET_DATA sheetJoy[] = {
 	{IDC_COMBO_ROT_Y, 0, L"Y +;Y -"},
 	{IDC_COMBO_ROT_Z, 0, L"Z +;Z -"},
 	{IDC_SPLIT_POV_UP, zxGamepad::povUp},
+	{IDC_SPLIT_POV_RIGHT, zxGamepad::povRight},
 	{IDC_SPLIT_POV_DOWN, zxGamepad::povDown},
 	{IDC_SPLIT_POV_LEFT, zxGamepad::povLeft},
-	{IDC_SPLIT_POV_RIGHT, zxGamepad::povRight},
-	{IDC_SPLIT_AXIS_X, zxGamepad::xAxisP},
-	{IDC_SPLIT_AXIS_Y, zxGamepad::yAxisP},
-	{IDC_SPLIT_AXIS_Z, zxGamepad::zAxisP},
-	{IDC_SPLIT_ROT_X, zxGamepad::xRotP},
-	{IDC_SPLIT_ROT_Y, zxGamepad::yRotP},
-	{IDC_SPLIT_ROT_Z, zxGamepad::zRotP},
 	{IDC_SPLIT_BUT1, zxGamepad::but1},
 	{IDC_SPLIT_BUT2, zxGamepad::but2},
 	{IDC_SPLIT_BUT3, zxGamepad::but3},
@@ -82,6 +76,12 @@ static SHEET_DATA sheetJoy[] = {
 	{IDC_SPLIT_BUT10, zxGamepad::but10},
 	{IDC_SPLIT_BUT11, zxGamepad::but11},
 	{IDC_SPLIT_BUT12, zxGamepad::but12},
+	{IDC_SPLIT_AXIS_X, zxGamepad::xAxisP},
+	{IDC_SPLIT_AXIS_Y, zxGamepad::yAxisP},
+	{IDC_SPLIT_AXIS_Z, zxGamepad::zAxisP},
+	{IDC_SPLIT_ROT_X, zxGamepad::xRotP},
+	{IDC_SPLIT_ROT_Y, zxGamepad::yRotP},
+	{IDC_SPLIT_ROT_Z, zxGamepad::zRotP},
 };
 
 
@@ -92,15 +92,17 @@ BEGIN_MSG_MAP(zxDlgSheetGpu, zxDialog)
 END_MSG_MAP()
 
 BEGIN_MSG_MAP(zxDlgSheetJoystick, zxDialog)
-	ON_NOTIFY_RANGE(BCN_DROPDOWN, IDC_SPLIT_POV_UP, IDC_SPLIT_BUT12, onSplitButtonDropdown)
+	ON_NOTIFY_RANGE(BCN_DROPDOWN, IDC_SPLIT_POV_UP, IDC_SPLIT_ROT_Z, onSplitButtonDropdown)
 	ON_CONTROL(CBN_SELCHANGE, IDC_COMBO_JOY_NUMBER, onComboJoyNumber)
 	ON_CONTROL(CBN_SELCHANGE, IDC_COMBO_JOY_MAPPING, onComboJoyMapping)
 	ON_CONTROL_RANGE(CBN_SELCHANGE, IDC_COMBO_AXIS_X, IDC_COMBO_AXIS_Z, onComboJoyAxis)
 	ON_CONTROL_RANGE(CBN_SELCHANGE, IDC_COMBO_ROT_X, IDC_COMBO_ROT_Z, onComboJoyRot)
+	ON_COMMAND_RANGE(IDC_BUTTON_NA, IDC_BUTTON_KEMPSTON_FIRE, onSplitMenu)
 END_MSG_MAP()
 
 BEGIN_MSG_MAP(zxDlgSettings, zxDialog)
 	ON_NOTIFY(TCN_SELCHANGE, IDC_TAB_SETTINGS, onNotifyTabSettings)
+	ON_COMMAND(IDDEFAULT, onDefault)
 END_MSG_MAP()
 
 int zxDlgSheetCommon::onInitDialog(HWND hWnd) {
@@ -212,47 +214,124 @@ int zxDlgSheetGpu::onInitDialog(HWND hWnd) {
 }
 
 void zxDlgSheetJoystick::onComboJoyNumber() {
-
+	// поставить статус выбранного джойстика
+	curJoy = (int)SendMessage(sheetJoy[0].hWnd, CB_GETCURSEL, 0, 0);
+	SendMessage(sheetJoy[1].hWnd, CB_SETCURSEL, mapping[curJoy], 0);
+	onComboJoyMapping();
 }
 
 void zxDlgSheetJoystick::onComboJoyMapping() {
-
+	int mode = (int)SendMessage(sheetJoy[1].hWnd, CB_GETCURSEL, 0, 0);
+	mapping[curJoy] = mode;
+	// установить все кнопки
+	for(int i = 8; i < 30; i++) {
+		auto k = &sheetJoy[i];
+		auto val = status[curJoy][k->index];
+		if(i > 23) {
+			// узнать что выбрано в комбо осей и поворотов
+			switch(SendMessage(sheetJoy[i - 10].hWnd, CB_GETCURSEL, 0, 0)) {
+				case 0: break;
+				case 1: val = status[curJoy][k->index + 1]; break;
+				default: val = 0; break;
+			}
+		}
+		EnableWindow(k->hWnd, TRUE);
+		SetWindowText(k->hWnd, keys[val].name_c);
+	}
+	// предопределенные раскладки
+	int count = 0;
+	auto m = zxGamepad::getPredefinedMode(mode, count);
+	if(m) {
+		for(int i = 0; i < count; i++) {
+			auto k = &sheetJoy[i + 8];
+			// блокируем кнопку
+			EnableWindow(k->hWnd, FALSE);
+			// устанавливаем во временную раскладку
+			//status[curJoy][i + 8] = m[i];
+			// устанавливаем текст на кнопку
+			SetWindowText(k->hWnd, keys[m[i]].name_c);
+		}
+	}
 }
 
 void zxDlgSheetJoystick::onComboJoyAxis() {
-
+	int key = (wmId - IDC_COMBO_AXIS_X);
+	int sel = (int)SendMessage(sheetJoy[key + 2].hWnd, CB_GETCURSEL, 0, 0);
+	auto k = &sheetJoy[key + 24];
+	SetWindowText(k->hWnd, keys[status[curJoy][k->index + sel]].name_c);
 }
 
 void zxDlgSheetJoystick::onComboJoyRot() {
-
+	int key = (wmId - IDC_COMBO_ROT_X);
+	int sel = (int)SendMessage(sheetJoy[key + 5].hWnd, CB_GETCURSEL, 0, 0);
+	auto k = &sheetJoy[key + 27];
+	SetWindowText(k->hWnd, keys[status[curJoy][k->index + sel]].name_c);
 }
 
 int zxDlgSheetJoystick::onInitDialog(HWND hWnd) {
 	for(auto& j : sheetJoy) {
-		j.hWnd = GetDlgItem(hWnd, j.id);
+		HWND h;
+		h = GetDlgItem(hWnd, j.id);
+		j.hWnd = h;
 		if(j.items) {
 			zxString its(j.items);
 			int count = 0;
 			auto items = its.split(L";", count);
-			for(int i = 0; i < count; i++) {
-				SendMessage(j.hWnd, CB_ADDSTRING, 0, (LPARAM)items[i].str());
-			}
+			for(int i = 0; i < count; i++) SendMessage(h, CB_ADDSTRING, 0, (LPARAM)items[i].str());
+			SendMessage(h, CB_SETCURSEL, 0, 0);
 		}
 	}
+	for(int i = 0; i < 2; i++) {
+		mapping[i] = theApp->gamepad->getMode(i);
+		memcpy(&status[i], theApp->gamepad->getOrigMap(i), zxGamepad::countButtons);
+	}
+	onComboJoyNumber();
 	return 1;
+}
+
+void zxDlgSheetJoystick::default() {
+	for(int i = 0; i < 2; i++) {
+		mapping[i] = (ssh_b)theApp->getOpt(OPT_JOY1_MAPPING + i)->ddef;
+		memset(&status[i], 0, zxGamepad::countButtons);
+	}
+	SendMessage(sheetJoy[0].hWnd, CB_SETCURSEL, 0, 0);
+	onComboJoyNumber();
+}
+
+void zxDlgSheetJoystick::onSplitMenu() {
+	int key = wmId - IDC_BUTTON_NA;
+	auto k = &sheetJoy[curKey];
+	if(curKey > 23) {
+		int sel = (int)SendMessage(sheetJoy[curKey - 22].hWnd, CB_GETCURSEL, 0, 0);
+		status[curJoy][k->index + sel] = key;
+	}
+	else {
+		status[curJoy][k->index] = key;
+	}
+	SetWindowText(k->hWnd, keys[key].name_c);
 }
 
 void zxDlgSheetJoystick::onSplitButtonDropdown(NMHDR* nm, LRESULT* res) {
 	TPMPARAMS tpm;
 	RECT rc;
 
+	curKey = (wmId - IDC_SPLIT_POV_UP) + 8;
 	GetWindowRect(GetDlgItem(hWnd, wmId), &rc);
 	tpm.cbSize = sizeof(TPMPARAMS);
 	tpm.rcExclude = rc;
 
 	auto hMenu = LoadMenu(hInst, MAKEINTRESOURCE(IDR_MENU_JOYSTICK));
 	auto hPopup = GetSubMenu(hMenu, 0);
+	int id;
 
+	auto k = &sheetJoy[curKey];
+	if(curKey > 23) {
+		int sel = (int)SendMessage(sheetJoy[curKey - 22].hWnd, CB_GETCURSEL, 0, 0);
+		id = status[curJoy][k->index + sel];
+	} else {
+		id = status[curJoy][k->index];
+	}
+	CheckMenuItem(hPopup, id + IDC_BUTTON_NA, MF_CHECKED);
 	TrackPopupMenuEx(hPopup, TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_VERTICAL, rc.left, rc.bottom, hWnd, &tpm);
 
 	DestroyMenu(hMenu);
@@ -310,6 +389,33 @@ void zxDlgSettings::onNotifyTabSettings(NMHDR*, LRESULT*) {
 	}
 }
 
+void zxDlgSettings::onDefault() {
+	int count = 0;
+	SHEET_DATA* sh = nullptr;
+	switch(SendMessage(hWndTab, TCM_GETCURSEL, 0, 0)) {
+		case 0: sh = sheetCommon; count = 6; break;
+		case 1: sh = sheetGpu; count = 16; break;
+		case 2: sh = sheetSnd; count = 12; break;
+	}
+	for(int i = 0; i < count; i++) {
+		auto k = &sh[i];
+		auto opt = theApp->getOpt(k->index);
+		if(opt) opt->dval = opt->ddef;
+	}
+	pageCurrent->default();
+}
+
+void zxDlgSettings::onOK() {
+	pageCommon.save();
+	pageSound.save();
+	pageGpu.save();
+	pageJoystick.save();
+	//if(theApp->getOpt(OPT_AUTO_SAVE)->dval) theApp->opts.save(L"");
+	theApp->bus.updateData();
+	zxDialog::onOK();
+}
+
+
 void zxDlgSheetCommon::onOK() {
 	for(int i = 0; i < 6; i++) {
 		auto k = &sheetCommon[i];
@@ -332,26 +438,18 @@ void zxDlgSheetGpu::onOK() {
 }
 
 void zxDlgSheetJoystick::onOK() {
-	for(int i = 0; i < zxGamepad::COUNT_CONTROLLERS; i++) {
+	for(int i = 0; i < 2; i++) {
 		zxString val;
 		for(int j = 0; j < 28; j++) {
-			_itow_s(map[i][j], tmpBuf, 260, 16);
+			_itow_s(status[i][j], tmpBuf, 260, 16);
 			val += tmpBuf;
 			if(j < 27) val += L',';
 		}
-		theApp->getOpt(i + OPT_JOY1_MAPPING)->sval = val;
-		theApp->getOpt(i + OPT_JOY1_STATUS)->dval = status[i];
+		theApp->getOpt(i + OPT_JOY1_STATUS)->sval = val;
+		theApp->getOpt(i + OPT_JOY1_MAPPING)->dval = mapping[i];
+		// обновить раскладку джойстика
+		memcpy(theApp->gamepad->getOrigMap(i), &status[i], zxGamepad::countButtons);
+		theApp->gamepad->changeMode(i, mapping[i]);
 	}
 	zxDialog::onOK();
 }
-
-void zxDlgSettings::onOK() {
-	pageCommon.onOK();
-	pageSound.onOK();
-	pageGpu.onOK();
-	pageJoystick.onOK();
-	//if(theApp->getOpt(OPT_AUTO_SAVE)->dval) theApp->opts.save()
-	theApp->bus.updateData();
-	zxDialog::onOK();
-}
-

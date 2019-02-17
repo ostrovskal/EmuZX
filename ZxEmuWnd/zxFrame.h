@@ -55,6 +55,7 @@ protected:
 	ssh_msg void onRestore();
 	ssh_msg void onReset();
 	ssh_msg void onClose();
+	ssh_msg void onSizing(UINT corner, LPRECT rect);
 	ssh_msg void onProcessMRU();
 	ssh_msg void onSize(UINT type, int nWidth, int nHeight);
 	ssh_msg void onNotify(LPNMHDR nmNMHDR, LRESULT* pResult);

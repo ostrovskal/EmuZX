@@ -79,15 +79,15 @@ bool loadZ80(const zxString& path) {
 					switch(head2->hardMode) {
 						case 0: case 1: model = MODEL_48K; break;
 						case 3: case 4: case 5: case 6: model = MODEL_128K; break;
-						case 9: model = MODEL_PENTAGON; break;
-						case 10: model = MODEL_SCORPION; break;
+						case 9: model = MODEL_PENTAGON_128K; break;
+						case 10: model = MODEL_SCORPION_256K; break;
 					}
 				} else if(version == 3) {
 					switch(head2->hardMode) {
 						case 0: case 1: case 3: model = MODEL_48K; break;
 						case 4: case 5: case 6: model = MODEL_128K; break;
-						case 9: model = MODEL_PENTAGON; break;
-						case 10: model = MODEL_SCORPION; break;
+						case 9: model = MODEL_PENTAGON_128K; break;
+						case 10: model = MODEL_SCORPION_256K; break;
 					}
 				}
 			}
@@ -108,13 +108,13 @@ bool loadZ80(const zxString& path) {
 							}
 							break;
 						case MODEL_128K:
-						case MODEL_PENTAGON:
+						case MODEL_PENTAGON_128K:
 							if(page >= 3 && page <= 10)
-								pageS = theApp->bus.getMemBank(page - 3, false);
+								pageS = theApp->bus.getPage(page - 3, false);
 							break;
-						case MODEL_SCORPION:
+						case MODEL_SCORPION_256K:
 							if(page >= 3 && page <= 18)
-								pageS = theApp->bus.getMemBank(page - 3, false);
+								pageS = theApp->bus.getPage(page - 3, false);
 							break;
 					}
 					ptr += 3;
@@ -138,9 +138,9 @@ bool loadZ80(const zxString& path) {
 			if(version == 1) *_PC = z80->PC;
 			else *_PC = head2->PC;
 			if(model == MODEL_128K) {
-				*_RAM = -1; *_VID = -1; *_ROM = 0;
+				*_RAM = -1; *_ROM = 0;
 				writePort(0xfd, 0x7f, head2->hardState);
-				memcpy(&memZX[0x8000], theApp->bus.getMemBank(2, false), 16384);
+				//memcpy(&memZX[0x8000], theApp->bus.getMemBank(2, false), 16384);
 			}
 		}
 	} catch(...) { result = false; }

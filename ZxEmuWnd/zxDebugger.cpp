@@ -286,32 +286,6 @@ void zxDebugger::onClose() {
 	theApp->updateData(ST_DEBUGGER);
 }
 
-void zxDebugger::postCreate() {
-	hWndDA = zxDA.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 5, 33, 379, 515, hWnd, IDC_LIST_DA, 0);
-	hWndSP = zxSP.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 390, 338, 171, 210, hWnd, IDC_LIST_SP, 0);
-	hWndDT = zxDT.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 5, 575, 558, 131, hWnd, IDC_LIST_DT, 0);
-
-	for(auto& zx : dlgElems) {
-		zx.hWndMain = GetDlgItem(hWnd, zx.idMain);
-		zx.hWndText = GetDlgItem(hWnd, zx.idText);
-		zx.val = (((zx.regb == nullptr) ? *zx.regw : (ssh_w)*zx.regb) & zx.msk) >> zx.shift;
-	}
-	SendMessage(hWndDA, WM_SETFONT, WPARAM(hFont), TRUE);
-	SendMessage(hWndDA, LB_SETITEMHEIGHT, 0, 16);
-	SendMessage(hWndDA, LB_SETCOUNT, 65534, 0);
-
-	countVisibleItems = (int)SendMessage(hWndDA, LB_GETCOUNT, 1, 0);
-
-	SendMessage(hWndSP, WM_SETFONT, WPARAM(hFont), TRUE);
-	SendMessage(hWndSP, LB_SETITEMHEIGHT, 0, 16);
-	SendMessage(hWndSP, LB_SETCOUNT, 32769, 0);
-
-	SendMessage(hWndDT, WM_SETFONT, WPARAM(hFont), TRUE);
-	SendMessage(hWndDT, LB_SETITEMHEIGHT, 0, 16);
-	SendMessage(hWndDT, LB_SETCOUNT, 4097, 0);
-	_sp = -1;
-}
-
 void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
 	zxString txt;
 
@@ -364,7 +338,7 @@ zxDebugger::~zxDebugger() {
 	DeleteObject(hbrUnsel);
 }
 
-bool zxDebugger::preCreate() {
+int zxDebugger::onInitDialog(HWND hWnd) {
 	hFont = CreateFont(-12, 0, 0, 0, FW_THIN, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_TT_PRECIS,
 					   CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN, L"Courier New");
 
@@ -388,7 +362,32 @@ bool zxDebugger::preCreate() {
 			bp->flags	= _wtoi(vals[4]);
 		}
 	}
-	return true;
+
+	hWndDA = zxDA.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 5, 33, 379, 515, hWnd, IDC_LIST_DA, 0);
+	hWndSP = zxSP.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 390, 338, 171, 210, hWnd, IDC_LIST_SP, 0);
+	hWndDT = zxDT.create(L"zxListBox", nullptr, WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_BORDER, 5, 575, 558, 131, hWnd, IDC_LIST_DT, 0);
+
+	for(auto& zx : dlgElems) {
+		zx.hWndMain = GetDlgItem(hWnd, zx.idMain);
+		zx.hWndText = GetDlgItem(hWnd, zx.idText);
+		zx.val = (((zx.regb == nullptr) ? *zx.regw : (ssh_w)*zx.regb) & zx.msk) >> zx.shift;
+	}
+	SendMessage(hWndDA, WM_SETFONT, WPARAM(hFont), TRUE);
+	SendMessage(hWndDA, LB_SETITEMHEIGHT, 0, 16);
+	SendMessage(hWndDA, LB_SETCOUNT, 65534, 0);
+
+	countVisibleItems = (int)SendMessage(hWndDA, LB_GETCOUNT, 1, 0);
+
+	SendMessage(hWndSP, WM_SETFONT, WPARAM(hFont), TRUE);
+	SendMessage(hWndSP, LB_SETITEMHEIGHT, 0, 16);
+	SendMessage(hWndSP, LB_SETCOUNT, 32769, 0);
+
+	SendMessage(hWndDT, WM_SETFONT, WPARAM(hFont), TRUE);
+	SendMessage(hWndDT, LB_SETITEMHEIGHT, 0, 16);
+	SendMessage(hWndDT, LB_SETCOUNT, 4097, 0);
+	_sp = -1;
+
+	return 1;
 }
 
 void zxDebugger::show(bool visible) {

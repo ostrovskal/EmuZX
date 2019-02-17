@@ -11,8 +11,8 @@ protected:
 	ssh_msg void onNotifyAddr2();
 	ssh_msg void onNotifyAccess();
 
-	virtual void postCreate() override;
 	virtual void onOK() override;
+	virtual int onInitDialog(HWND hWnd) override;
 
 	int getValue(HWND hWnd, int def);
 	void updateAccess();

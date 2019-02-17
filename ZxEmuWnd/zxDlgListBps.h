@@ -13,7 +13,7 @@ protected:
 	ssh_msg void onRemove();
 	ssh_msg void onSave();
 	ssh_msg void onClickList(LPNMHDR nm, LRESULT* pResult);
-	virtual void postCreate() override;
+	virtual int onInitDialog(HWND hWnd) override;
 	virtual void onOK() override;
 	void setItems();
 	void updateItems();

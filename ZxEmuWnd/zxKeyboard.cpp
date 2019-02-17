@@ -60,7 +60,7 @@ static ZX_KEY_EX keysExShift[] = {
 };
 
 ZX_KEY keys[] = {
-	{IDC_BUTTON_CAPS_LOCK},
+	{IDC_BUTTON_CAPS_LOCK, 0, 0, 0, 0, VK_CAPITAL, L"", L"", L"N/A"},
 	{IDC_BUTTON_K1, 3, 0x1, 0, 0, '1', L"1", L"1", L"1", L"blue", L"DEF FN", L"!", L"edit"},
 	{IDC_BUTTON_K2, 3, 0x2, 0, 0, '2', L"2", L"2", L"2", L"red", L"FN", L"@", L"caps lock"},
 	{IDC_BUTTON_K3, 3, 0x4, 0, 0, '3', L"3", L"3", L"3", L"magenta", L"LINE", L"#", L"tr video"},
@@ -91,7 +91,7 @@ ZX_KEY keys[] = {
 	{IDC_BUTTON_KK, 6, 0x4, 0, 0, 'K', L"LIST", L"k", L"K", L"LEN", L"SCRN$", L"+", L"K"},
 	{IDC_BUTTON_KL, 6, 0x2, 0, 0, 'L', L"LET", L"l", L"L", L"USR", L"ATTR", L"=", L"L"},
 	{IDC_BUTTON_ENTER, 6, 0x1, 0, 0, VK_RETURN, L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER"},
-	{IDC_BUTTON_CAPS_SHIFT, 0, 0x1, 0, 0, VK_CONTROL, L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT", L"CAPS SHIFT"},
+	{IDC_BUTTON_CAPS_SHIFT, 0, 0x1, 0, 0, VK_CONTROL, L"CAPS", L"CAPS", L"CAPS", L"CAPS", L"CAPS", L"CAPS", L"CAPS"},
 	{IDC_BUTTON_KZ, 0, 0x2, 0, 0, 'Z', L"COPY", L"z", L"Z", L"LN", L"BEEP", L":", L"Z"},
 	{IDC_BUTTON_KX, 0, 0x4, 0, 0, 'X', L"CLEAR", L"x", L"X", L"EXP", L"INK", L"FUNT", L"X"},
 	{IDC_BUTTON_KC, 0, 0x8, 0, 0, 'C', L"CONT", L"c", L"C", L"LPRINT", L"PAPER", L"?", L"C"},
@@ -99,19 +99,17 @@ ZX_KEY keys[] = {
 	{IDC_BUTTON_KB, 7, 0x10, 0, 0, 'B', L"BORDER", L"b", L"B", L"BIN", L"BRIGHT", L"*", L"B"},
 	{IDC_BUTTON_KN, 7, 0x8, 0, 0, 'N', L"NEXT", L"n", L"N", L"INKEYS$", L"OVER", L",", L"N"},
 	{IDC_BUTTON_KM, 7, 0x4, 0, 0, 'M', L"PAUSE", L"m", L"M", L"PI", L"INVERSE", L".", L"M"},
-	{IDC_BUTTON_SYMBOL_SHIFT, 7, 0x2, 0, 0, VK_SHIFT, L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT", L"SYMBOL SHIFT"},
-	{IDC_BUTTON_SPACE, 7, 0x1, 0, 0, VK_SPACE, L"", L"", L"", L"", L"", L"", L""},
-	/*
-	{0, 4, 0x8, 0, 1, VK_UP},
-	{0, 4, 0x10, 0, 1, VK_DOWN},
-	{0, 3, 0x10, 0, 1, VK_LEFT},
-	{0, 4, 0x4, 0, 1, VK_RIGHT},
-	{0, 31, 0x8, 0, 0, VK_UP},
-	{0, 31, 0x1, 0, 0, VK_DOWN},
-	{0, 31, 0x4, 0, 0, VK_LEFT},
-	{0, 31, 0x2, 0, 0, VK_RIGHT},
-	{0, 31, 0x10, 0, 0, '0'},
-	*/
+	{IDC_BUTTON_SYMBOL_SHIFT, 7, 0x2, 0, 0, VK_SHIFT, L"SYMBOL", L"SYMBOL", L"SYMBOL", L"SYMBOL", L"SYMBOL", L"SYMBOL", L"SYMBOL"},
+	{IDC_BUTTON_SPACE, 7, 0x1, 0, 0, VK_SPACE, L"", L"", L"SPACE", L"", L"", L"", L""},
+	{0, 4, 0x8, 0, 1, VK_UP, L"", L"", L"UP"},
+	{0, 4, 0x10, 0, 1, VK_DOWN, L"", L"", L"DOWN"},
+	{0, 3, 0x10, 0, 1, VK_LEFT, L"", L"", L"LEFT"},
+	{0, 4, 0x4, 0, 1, VK_RIGHT, L"", L"", L"RIGHT"},
+	{0, 31, 0x8, 0, 0, VK_UP, L"", L"", L"K_UP"},
+	{0, 31, 0x4, 0, 0, VK_DOWN, L"", L"", L"K_DOWN"},
+	{0, 31, 0x2, 0, 0, VK_LEFT, L"", L"", L"K_LEFT"},
+	{0, 31, 0x1, 0, 0, VK_RIGHT, L"", L"", L"K_RIGHT"},
+	{0, 31, 0x10, 0, 0, '0', L"", L"", L"K_FIRE"},
 	{IDC_BUTTON_ENTER1, 6, 0x1, 0, 0, VK_RETURN, L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER"},
 };
 
@@ -158,11 +156,13 @@ void zxKeyboard::processKeys() {
 		}
 	}
 	for(auto& k : keys) {
-		ssh_b bit = k.bit;
-		if(vkKeys[k.vk_code] & 0x80) {
-			_KEYS[k.port] &= ~bit;
-		} else {
-			_KEYS[k.port] |= bit;
+		if(k.hWndKey) {
+			ssh_b bit = k.bit;
+			if(vkKeys[k.vk_code] & 0x80) {
+				_KEYS[k.port] &= ~bit;
+			} else {
+				_KEYS[k.port] |= bit;
+			}
 		}
 	}
 	// проверить режим клавиатуры
@@ -229,11 +229,12 @@ void zxKeyboard::highlightKey(ssh_cws name, ZX_KEY* k, int isVirt) {
 }
 
 void zxKeyboard::processJoystick() {
-	return;
-	auto pad = theApp->gamepad;
-	pad->update();
-	if(pad->is_connected(0)) pad->remap(0);
-	if(pad->is_connected(1)) pad->remap(1);
-	if(pad->is_connected(2)) pad->remap(2);
-	if(pad->is_connected(3)) pad->remap(3);
+	if(theApp->getOpt(OPT_JOYSTICK_ALL)->dval) {
+		auto pad = theApp->gamepad;
+		pad->update();
+		if(pad->is_connected(0)) pad->remap(0);
+//		if(pad->is_connected(1)) pad->remap(1);
+	//	if(pad->is_connected(2)) pad->remap(2);
+		//if(pad->is_connected(3)) pad->remap(3);
+	}
 }

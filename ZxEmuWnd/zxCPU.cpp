@@ -41,7 +41,8 @@ void writePort(ssh_b lport, ssh_b hport, ssh_b val) {
 		case 0xfb: break;
 		// specdrum
 		case 0xdf: break;
-
+		// AY
+		case 0xff: break;
 		// 0, 1, 2 - бордер
 		// 3 MIC - при записи/загрузке
 		// 4 - SOUND

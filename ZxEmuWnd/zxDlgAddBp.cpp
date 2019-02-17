@@ -10,7 +10,7 @@ BEGIN_MSG_MAP(zxDlgAddBp, zxDialog)
 	ON_CONTROL(CBN_SELCHANGE, IDC_COMBO_ACCESS, onNotifyAccess)
 END_MSG_MAP()
 
-void zxDlgAddBp::postCreate() {
+int zxDlgAddBp::onInitDialog(HWND hWnd) {
 	HWND h;
 	h = GetDlgItem(hWnd, IDC_COMBO_COND);
 	for(auto& c : cond_bp) SendMessage(h, CB_ADDSTRING, 0, (LPARAM)c);
@@ -34,6 +34,7 @@ void zxDlgAddBp::postCreate() {
 		SendMessage(h, CB_SETCURSEL, 0, 0);
 	}
 	updateAccess();
+	return 1;
 }
 
 int zxDlgAddBp::getValue(HWND hWnd, int flag) {

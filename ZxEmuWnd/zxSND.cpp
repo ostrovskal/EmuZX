@@ -213,7 +213,7 @@ bool zxSND::initBlip(zxBlipBuffer** buf, zxBlipSynth** syn) {
 		finish();
 		return false;
 	}
-	(*syn)->setVolume(getVolume(SND_BEEPER));
+	(*syn)->setVolume(getVolume(SND_BEEP));
 	(*syn)->setOutput(*buf);
 	(*buf)->setBassFreq(speaker_type[0].bass);
 	(*syn)->setTrebleEq(speaker_type[0].treble);

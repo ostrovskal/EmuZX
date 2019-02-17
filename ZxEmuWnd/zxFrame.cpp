@@ -9,17 +9,36 @@
 #include "Z80.h"
 
 static ssh_w old_tstate = 0;
-static int idsModel[] = {IDM_48K, IDM_128K, 0};
+static int idsModel[] = {IDM_48K, IDM_128K, IDM_PENTAGON_128K, IDM_SCORPION_256K, 0};
 static int idsPP[] = {IDM_PP_NONE, IDM_PP_MIXED, IDM_PP_BILINEAR, 0};
 static int idsAR[] = {IDM_1X, IDM_2X, IDM_3X, IDM_4X, IDM_AS_IS, 0};
+
+ssh_cws nameROMs[] = {L"48K", L"128K", L"PENTAGON 128K", L"SCORPION 256K"};
+ssh_cws namePPs[] = {L"None", L"TV", L"Bilinear"};
+
 
 static CRITICAL_SECTION cs;
 
 HMENU hMenu = nullptr;
 HINSTANCE hInst = nullptr;
 
+HANDLE hTM;
+LARGE_INTEGER dueTime;
+
+void procTimer(void* p, DWORD l, DWORD h) {
+	for(int i = 0; i < 1620 / *(ssh_d*)p; i++) {
+		theApp->bus.execute();
+	}
+}
+
 static ssh_d WINAPI ProcBus(void* params) {
-	return theApp->bus.execute();
+	hTM = CreateWaitableTimer(NULL, FALSE, NULL);
+	dueTime.QuadPart = -10000;
+	while(true) {
+		SetWaitableTimer(hTM, &dueTime, 0, procTimer, (void*)&(theApp->bus.delayCPU), FALSE);
+		SleepEx(30, TRUE);
+	}
+	return 0;
 }
 
 void setOrGetWndPos(HWND h, int id_opt, bool get, bool activate) {
@@ -101,6 +120,7 @@ BEGIN_MSG_MAP(zxFrame, zxWnd)
 	ON_WM_CLOSE()
 	ON_WM_DESTROY()
 	ON_WM_SIZE()
+	ON_WM_SIZING()
 	ON_WM_ERASEBKGND()
 	ON_WM_KEYDOWN()
 	ON_WM_KEYUP()
@@ -115,7 +135,8 @@ BEGIN_MSG_MAP(zxFrame, zxWnd)
 	ON_COMMAND(IDM_TURBO, onUpdate)
 	ON_COMMAND(IDM_DEBUGGER, onUpdate)
 	ON_COMMAND(IDM_KEYBOARD, onUpdate)
-	ON_COMMAND_RANGE(IDM_48K, IDM_128K, onUpdate)
+	ON_COMMAND(IDM_JOYSTICK, onUpdate)
+	ON_COMMAND_RANGE(IDM_48K, IDM_SCORPION_256K, onUpdate)
 	ON_COMMAND_RANGE(IDM_1X, IDM_AS_IS, onUpdate)
 	ON_COMMAND_RANGE(IDM_PP_NONE, IDM_PP_BILINEAR, onUpdate)
 	ON_COMMAND_RANGE(1000, 1009, onProcessMRU)
@@ -153,11 +174,12 @@ bool zxFrame::changeState(int id_opt, int id, bool change) {
 
 void zxFrame::onUpdate() {
 	static int change[] = { IDM_PAUSE, ST_EXECUTE | ST_EXECUTE_GO, 
+							IDM_JOYSTICK, ST_JOYSTICK,
 							IDM_TURBO, ST_TURBO, IDM_SOUND, ST_SOUND, IDM_DEBUGGER, ST_DEBUGGER, IDM_KEYBOARD, ST_KEYBOARD,
 							IDM_FILTER, ST_FILTER, IDM_PP_NONE, ST_FILTER, IDM_PP_BILINEAR, ST_FILTER, IDM_PP_MIXED, ST_FILTER, 
 							IDM_1X, ST_ASPECT, IDM_2X, ST_ASPECT, IDM_3X, ST_ASPECT, IDM_4X, ST_ASPECT, IDM_AS_IS, ST_ASPECT,
 							IDM_MODEL, ST_MODEL, IDM_48K, ST_MODEL, IDM_128K, ST_MODEL};
-	for(int i = 0; i < 34; i += 2) {
+	for(int i = 0; i < 35; i += 2) {
 		if(change[i] == wmId) {
 			int state = change[i + 1];
 			if(wmId == IDM_PAUSE) state |= (!(*_TSTATE & ZX_EXEC) * STS_EXECUTE);
@@ -178,6 +200,7 @@ void zxFrame::updateData(ssh_d state) {
 	if(state & ST_EXECUTE_GO) debug->setProgrammPause(!exec, false);
 
 	changeState(OPT_TURBO, IDM_TURBO, state & ST_TURBO);
+	changeState(OPT_JOYSTICK_ALL, IDM_JOYSTICK, state & ST_JOYSTICK);
 	changeState(OPT_SOUND_ALL, IDM_SOUND, state & ST_SOUND);
 	debug->show(changeState(OPT_DEBUGGER, IDM_DEBUGGER, state & ST_DEBUGGER));
 	keyboard->show(changeState(OPT_KEYBOARD, IDM_KEYBOARD, state & ST_KEYBOARD));
@@ -235,6 +258,81 @@ void zxFrame::onSettings() {
 
 void zxFrame::onReset() {
 	modifyTSTATE(ZX_RESET, 0);
+}
+
+void zxFrame::onSizing(UINT corner, LPRECT rect) {
+	/*
+	RECT *selr, wr, cr, statr, or;
+	int width, height, w_ofs, h_ofs, w_max, h_max;
+
+	selr = (RECT *)lParam;
+	GetWindowRect( fuse_hWnd, &wr );
+	GetClientRect( fuse_hWnd, &cr );
+	GetClientRect( fuse_hStatusWindow, &statr );
+
+	w_ofs = ( wr.right - wr.left ) - ( cr.right - cr.left );
+	h_ofs = ( wr.bottom - wr.top ) - ( cr.bottom - cr.top );
+	if( settings_current.statusbar ) h_ofs += ( statr.bottom - statr.top );
+
+	// max scaler size in desktop workarea
+	SystemParametersInfo(SPI_GETWORKAREA, 0, &or , 0);
+	w_max = (or .right - or .left) - w_ofs + DISPLAY_ASPECT_WIDTH / 2;
+	w_max /= DISPLAY_ASPECT_WIDTH;
+	h_max = (or .bottom - or .top) - h_ofs + DISPLAY_SCREEN_HEIGHT / 2;
+	h_max /= DISPLAY_SCREEN_HEIGHT;
+
+	if(w_max < h_max) {
+		h_max = w_max;
+	} else {
+		w_max = h_max;
+	}
+
+	// current scaler
+	width = selr->right - selr->left + DISPLAY_ASPECT_WIDTH / 2;
+	height = selr->bottom - selr->top + DISPLAY_SCREEN_HEIGHT / 2;
+
+	width -= w_ofs; height -= h_ofs;
+	width /= DISPLAY_ASPECT_WIDTH; height /= DISPLAY_SCREEN_HEIGHT;
+
+	if(wParam == WMSZ_LEFT || wParam == WMSZ_RIGHT) {
+		height = width;
+	} else if(wParam == WMSZ_TOP || wParam == WMSZ_BOTTOM) {
+		width = height;
+	}
+
+	if(width < 1 || height < 1) {
+		width = 1; height = 1;
+	}
+
+	if(width > w_max || height > h_max) {
+		width = w_max; height = h_max;
+	}
+
+	if(width > MAX_SCALE || height > MAX_SCALE) {
+		width = MAX_SCALE; height = MAX_SCALE;
+	}
+
+	if(width < height) {
+		height = width;
+	} else {
+		width = height;
+	}
+
+	width *= DISPLAY_ASPECT_WIDTH; height *= DISPLAY_SCREEN_HEIGHT;
+	width += w_ofs; height += h_ofs;
+
+	// Set window size
+	if(wParam == WMSZ_TOP || wParam == WMSZ_TOPLEFT || wParam == WMSZ_TOPRIGHT) {
+		selr->top = selr->bottom - height;
+	} else {
+		selr->bottom = selr->top + height;
+	}
+	if(wParam == WMSZ_LEFT || wParam == WMSZ_TOPLEFT || wParam == WMSZ_BOTTOMLEFT) {
+		selr->left = selr->right - width;
+	} else {
+		selr->right = selr->left + width;
+	}
+	*/
 }
 
 void zxFrame::onDestroy() {
@@ -390,7 +488,8 @@ static TBBUTTON tbb[] = {
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
 	{4, IDM_PAUSE, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Остановить\\Возобновить эмуляцию\\Alt+P"},
 	{5, IDM_SOUND, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Вкл\\Выкл звук"},
-	{6, IDM_KEYBOARD, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Показать\\Скрыть клавиатуру\\Alt+K"},
+	{12, IDM_JOYSTICK, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Вкл\\Выкл джойстик"},
+	{13, IDM_KEYBOARD, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Показать\\Скрыть клавиатуру\\Alt+K"},
 	{7, IDM_DEBUGGER, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Показать\\Скрыть дизассемблер\\Alt+D"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
 	{8, IDM_TURBO, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Ускорить\\Замедлить\\Alt+T"},
@@ -422,10 +521,26 @@ zxFrame::~zxFrame() {
 }
 
 void zxFrame::makeWndSize(SIZE* sz) {
+	RECT rc;
 	int mul = (getOpt(OPT_ASPECT_RATIO)->dval) + 1;
 	if(mul > 4) mul = 2;
 	sz->cx = 320 * mul;
 	sz->cy = (256 * mul) + 46;
+	if(hWnd) {
+		GetWindowRect(hWnd, &rc);
+		rc.right += sz->cx;
+		rc.bottom += sz->cy;
+	} else {
+		rc.left = CW_USEDEFAULT;
+		rc.top = CW_USEDEFAULT;
+		rc.right = sz->cx;
+		rc.bottom = sz->cy;
+	}
+	//std::chrono::microseconds(50);
+	AdjustWindowRect(&rc, GetWindowLong(hWnd, GWL_STYLE), TRUE);
+}
+
+void APIENTRY ProcWTimer(void* param, DWORD low, DWORD high) {
 }
 
 int zxFrame::run() {
@@ -441,14 +556,14 @@ int zxFrame::run() {
 	if(!bus.changeModel(getOpt(OPT_MEM_MODEL)->dval, 255))
 		return -1;
 
-	makeToolbar(IDB_TOOLBAR_COMMON, tbb, 12, 19, 32, 32, IDT_TOOLBAR_MAIN);
+	makeToolbar(IDB_TOOLBAR_COMMON, tbb, 14, 20, 32, 32, IDT_TOOLBAR_MAIN);
 
 	ShowWindow(hWnd, true);
 	UpdateWindow(hWnd);
 
 	hMenu = GetMenu(hWnd);
 	hMenuMRU = GetSubMenu(GetSubMenu(hMenu, 0), 7);
-	hMenuModel = GetSubMenu(GetSubMenu(hMenu, 2), 4);
+	hMenuModel = GetSubMenu(GetSubMenu(hMenu, 2), 6);
 	hMenuPP = GetSubMenu(GetSubMenu(hMenu, 1), 3);
 
 	debug = new zxDebugger;
@@ -458,7 +573,7 @@ int zxFrame::run() {
 	keyboard->create(IDD_DIALOG_KEYBOARD, hWnd, false);
 
 	gamepad = new zxGamepad;
-	gamepad->init(hWnd);
+	gamepad->init();
 
 	loadState(opts.mainDir + L"auto_state.zx");
 
@@ -472,13 +587,16 @@ int zxFrame::run() {
 
 	DWORD cpuID;
 	hCpuThread = CreateThread(nullptr, 0, ProcBus, nullptr, 0, &cpuID);
-
+	
 	SetActiveWindow(hWnd);
-		
-	MSG msg;
 
-	while(msgPump(&msg)) { }
-	return (int)msg.wParam;
+	while(true) {
+//		while(!::PeekMessage(&thState.msg, NULL, NULL, NULL, PM_NOREMOVE)) {
+//			theApp->bus.execute();
+//		}
+		if(!msgPump()) break;
+	}
+	return (int)thState.msg.wParam;
 }
 
 void zxFrame::modifyMRU(zxString path) {
@@ -546,8 +664,8 @@ bool zxFrame::loadState(ssh_cws path) {
 		_wsopen_s(&_hf, path, _O_RDONLY | _O_BINARY, _SH_DENYRD, _S_IREAD);
 		if(_hf != -1) {
 			auto l = _filelength(_hf);
-			ssh_b tmpRegs[50];
-			if(_read(_hf, tmpRegs, 50) != 50) throw(0);
+			ssh_b tmpRegs[70];
+			if(_read(_hf, tmpRegs, 70) != 70) throw(0);
 			// меняем иодель
 			if(!bus.changeModel(tmpRegs[MODEL - 65536], oldModel)) throw(0);
 			// грузим состояние

@@ -8,19 +8,20 @@ class zxGPU {
 public:
 	zxGPU();
 	virtual ~zxGPU();
-	void execute();
+	void execute(bool screen);
 	bool saveScreen(ssh_cws path);
 	void showScreen();
 	void updateData();
 protected:
 	void decodeColor(ssh_b color);
 	void makeCanvas();
-	ssh_d* memoryPrimary;
+	ssh_d* memBuffer(bool back);
+	ssh_d* memoryPrimary, *memoryBack;
 	ssh_d blink, blinkMsk, blinkShift;
 	ssh_d ink;
 	ssh_d paper;
-	HBITMAP hbmpMemPrimary;
-	HDC hdcMemPrimary;
+	HBITMAP hbmpMemPrimary, hbmpMemBack;
+	HDC hdcMemPrimary, hdcMemBack;
 	ssh_d colours[16];
 };
 

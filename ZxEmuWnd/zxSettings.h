@@ -1,17 +1,5 @@
 #pragma once
 
-#define DELAY_CPU		10
-#define DELAY_GPU		20
-
-#define MODEL_48K		0
-#define MODEL_128K		1
-#define MODEL_SCORPION	2
-#define MODEL_PENTAGON	3
-
-#define PP_NONE			0
-#define PP_MIXED		1
-#define PP_BILINEAR		2
-
 #define OPT_MRU0		0
 #define OPT_MRU1		1
 #define OPT_MRU2		2
@@ -102,18 +90,20 @@
 #define OPT_JOY4_STATUS		77
 
 #define OPT_SOUND_ALL		78
+#define OPT_JOYSTICK_ALL	79
 
 #define OPTT_STRING		0
 #define OPTT_DWORD		1
-#define OPTT_BOOL		2
+#define OPTT_HEX		2
+#define OPTT_BOOL		3
 
 #define AY_STEREO_NONE	0
 #define AY_STEREO_ABC	1
 #define AY_STEREO_ACB	2
 
-#define SND_FREQ_22050	0
-#define SND_FREQ_44100	1
-#define SND_FREQ_48000	2
+#define SND_FREQ_44100	0
+#define SND_FREQ_22050	1
+#define SND_FREQ_11025	2
 
 #define AR_1X			0
 #define AR_2X			1
@@ -124,16 +114,27 @@
 #define JOY_KEMPSTON		0
 #define JOY_INTERFACE_I		1
 #define JOY_INTERFACE_II	2
-#define JOY_SINCLAIR		3
-#define JOY_CURSOR			4
-#define JOY_KEYBOARD		5	// O,P,Q,A,SPACE,M,N,B,V
-#define JOY_CUSTOM			6
+#define JOY_CURSOR			3
+#define JOY_KEYBOARD		4	// O,P,Q,A,SPACE,M,N,B,V
+#define JOY_CUSTOM			5
+
+#define DELAY_CPU			10
+#define DELAY_GPU			20
+
+#define MODEL_48K			0
+#define MODEL_128K			1
+#define MODEL_PENTAGON_128K	3
+#define MODEL_SCORPION_256K	2
+
+#define PP_NONE				0
+#define PP_MIXED			1
+#define PP_BILINEAR			2
 
 struct ZX_OPTION {
 	ssh_b type;
 	ssh_cws name;
-	DWORD dval;
-	zxString sval;
+	DWORD ddef, dval;
+	zxString sdef, sval;
 };
 
 class zxSettings {

@@ -8,14 +8,8 @@ BEGIN_MSG_MAP(zxDialog, zxWnd)
 	ON_WM_CLOSE()
 END_MSG_MAP()
 
-struct THREAD_STATE {
-	HHOOK hHookOldCbtFilter;
-	zxWnd* wndInit;
-};
-
 static bool wndInit = false;
 static zxWnd* wnds[256];
-static THREAD_STATE thState;
 
 const SSH_MSGMAP* zxWnd::GetMessageMap() const {
 	return GetThisMessageMap(); 
@@ -25,6 +19,15 @@ const SSH_MSGMAP* PASCAL zxWnd::GetThisMessageMap() {
 	static const SSH_MSGMAP_ENTRY _messageEntries[] = { {0, 0, 0, 0, 0, (SSH_PMSG)0 } };
 	static const SSH_MSGMAP messageMap = { nullptr, &_messageEntries[0] };
 	return &messageMap; 
+}
+
+static const SSH_MSGMAP_ENTRY* findMessageEntry(const SSH_MSGMAP_ENTRY* lpEntry, UINT nMsg, UINT nCode, UINT nID) {
+	while(lpEntry->nSig != sshSig_end) {
+		if(lpEntry->nMessage == nMsg && lpEntry->nCode == nCode && (nID >= lpEntry->nID && nID <= lpEntry->nLastID))
+			return lpEntry;
+		lpEntry++;
+	}
+	return nullptr;
 }
 
 zxWnd* zxWnd::fromHWND(HWND hWnd) {
@@ -67,12 +70,10 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
 
 static INT_PTR CALLBACK DlgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	if(message == WM_INITDIALOG) {
-		// special case for WM_INITDIALOG
 		zxDialog* dlg = (zxDialog*)zxWnd::fromHWND(hWnd);
 		if(dlg) return dlg->onInitDialog(hWnd); else return 1;
 	}
 	return 0;
-//	return MainWndProc(hWnd, message, wParam, lParam);
 }
 
 LRESULT CALLBACK cbtFilterHook(int code, WPARAM wParam, LPARAM lParam) {
@@ -98,15 +99,6 @@ void HookWindowCreate(zxWnd* wnd) {
 	thState.wndInit = wnd;
 }
 
-const SSH_MSGMAP_ENTRY* zxWnd::findMessageEntry(const SSH_MSGMAP_ENTRY* lpEntry, UINT nMsg, UINT nCode, UINT nID) {
-	while(lpEntry->nSig != sshSig_end) {
-		if(lpEntry->nMessage == nMsg && lpEntry->nCode == nCode && (nID >= lpEntry->nID && nID <= lpEntry->nLastID))
-			return lpEntry;
-		lpEntry++;
-	}
-	return nullptr;
-}
-
 INT_PTR zxWnd::wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	LRESULT lResult = 0;
 	if(!onWndMsg(message, wParam, lParam, &lResult))
@@ -124,7 +116,6 @@ BOOL zxWnd::onWndMsg(UINT msg, WPARAM wParam, LPARAM lParam, LRESULT* pResult) {
 	POINT pt;
 	HANDLE handle;
 	UINT nCode = 0;
-	HWND hWndCtrl;
 	SSH_NOTIFY notify;
 	SSH_NOTIFY* pNotify = nullptr;
 	LRESULT lResult = FALSE;
@@ -133,12 +124,10 @@ BOOL zxWnd::onWndMsg(UINT msg, WPARAM wParam, LPARAM lParam, LRESULT* pResult) {
 	if(msg == WM_COMMAND) {
 		wmId = LOWORD(wParam);
 		nCode = HIWORD(wParam);
-		hWndCtrl = (HWND)lParam;
 		if(wmId == 0) return FALSE;
-		if(hWndCtrl == NULL) nCode = CN_COMMAND;
+		if((HWND)lParam == NULL) nCode = CN_COMMAND;
 	} else if(msg == WM_NOTIFY) {
 		NMHDR* pNMHDR = (NMHDR*)lParam;
-		hWndCtrl = pNMHDR->hwndFrom;
 		wmId = LOWORD(wParam);
 		nCode = pNMHDR->code;
 		notify.pResult = &lResult;
@@ -406,7 +395,7 @@ LReturnTrue:
 	return TRUE;
 }
 
-zxWnd::zxWnd() : wndID(0), pfnSuper(nullptr), hBmp(nullptr),  hWnd(nullptr), hWndToolbar(nullptr), hWndParent(nullptr), hAccel(nullptr) {
+zxWnd::zxWnd() : wndID(0), pfnSuper(nullptr), hBmp(nullptr),  hWnd(nullptr), hWndToolbar(nullptr), hAccel(nullptr) {
 	if(!wndInit) {
 		memset(wnds, -1, sizeof(wnds));
 		wndInit = true;
@@ -454,7 +443,6 @@ HWND zxWnd::create(LPCWSTR className, LPCWSTR windowName, DWORD dwStyle, int x, 
 		return (HWND)0;
 	wndID = nID;
 	postCreate();
-	hWndParent = hPWnd;
 	return hWnd;
 }
 
@@ -471,27 +459,35 @@ HWND zxWnd::makeToolbar(WORD IDB, TBBUTTON* tbb, int cBitmaps, int cButtons, int
 }
 
 int zxDialog::create(WORD IDD, HWND hParent, bool modal) {
-	if(!preCreate()) return IDCANCEL;
 	HookWindowCreate(this);
 	HWND hPWnd((hParent ? hParent : theApp->getHWND()));
 	if((hWnd = CreateDialog(hInst, MAKEINTRESOURCE(IDD), hPWnd, DlgProc))) {
-		hWndParent = hPWnd;
-		postCreate();
 		if(modal) {
-			HWND hWndFrame(theApp->getHWND());
-			EnableWindow(hWndFrame, FALSE);
-			EnableWindow(hWndParent, FALSE);
+			// заблокировать все дочерние окна от главного
+			HWND hwnd = ::GetWindow(::GetDesktopWindow(), GW_CHILD);
+			HWND wndsDisabled[256];
+			int idx = 0;
+			while(hwnd) {
+				if(hwnd != hWnd && IsWindowEnabled(hwnd) && zxWnd::fromHWND(hwnd)) {
+					wndsDisabled[idx++] = hwnd;
+					EnableWindow(hwnd, FALSE);
+				}
+				hwnd = GetWindow(hwnd, GW_HWNDNEXT);
+			}
 			ShowWindow(hWnd, true);
 			UpdateWindow(hWnd);
 			nResult = 0;
-			MSG msg;
 			while(!nResult) {
 				do {
-					if(!msgPump(&msg)) break;
-				} while(::PeekMessage(&msg, NULL, NULL, NULL, PM_NOREMOVE));
+					if(!msgPump()) break;
+				} while(::PeekMessage(&thState.msg, NULL, NULL, NULL, PM_NOREMOVE));
 			}
-			EnableWindow(hWndParent, TRUE);
-			EnableWindow(hWndFrame, TRUE);
+			// разблокировать всё
+			while(idx-- >= 0) {
+				hwnd = wndsDisabled[idx];
+				if(IsWindow(hwnd)) 
+					EnableWindow(hwnd, TRUE);
+			}
 			return nResult;
 		}
 	}

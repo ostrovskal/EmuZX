@@ -108,8 +108,8 @@ enum SshSig {
 	sshSig_l,					// LRESULT ()
 	sshSig_l_p,					// LRESULT (POINT)	
 	sshSig_u_W_u,				// UINT (HWND, UINT)
-	sshSig_v_u_M,				// void (UINT, CMenu* )
-	sshSig_u_u_M,				// UINT (UINT, CMenu* )
+	sshSig_v_u_M,				// void (UINT, HMenu )
+	sshSig_u_u_M,				// UINT (UINT, HMenu )
 	sshSig_APPCOMMAND,			// void (HWND, UINT, UINT, UINT)
 	sshSig_u_u_u,				// UINT (UINT, UINT)
 	sshSig_MOUSE_XBUTTON,		// void (UINT, UINT, POINT)
@@ -149,6 +149,8 @@ enum SshSig {
 #define ON_WM_MOVE() { WM_MOVE, 0, 0, 0, sshSig_v_u_ii, (SSH_PMSG)(SSH_PMSGW)(static_cast<void (zxWnd::*)(int, int)>(&ThisClass::onMove)) },
 
 #define ON_WM_SIZE() { WM_SIZE, 0, 0, 0, sshSig_v_u_ii, (SSH_PMSG)(SSH_PMSGW)(static_cast<void (zxWnd::*)(UINT, int, int)>(&ThisClass::onSize)) },
+
+#define ON_WM_SIZING() { WM_SIZING, 0, 0, 0, sshSig_SIZING, (SSH_PMSG)(SSH_PMSGW)(static_cast<void (zxWnd::*)(UINT, LPRECT)>(&ThisClass::onSizing)) },
 
 #define ON_WM_ACTIVATE() { WM_ACTIVATE, 0, 0, 0, sshSig_ACTIVATE, (SSH_PMSG)(SSH_PMSGW)(static_cast<void (zxWnd::*)(UINT, HWND, BOOL)>(&ThisClass::onActivate)) },
 

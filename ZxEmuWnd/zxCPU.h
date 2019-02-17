@@ -16,6 +16,9 @@ enum CPU_REG {
 	RAM, ROM, VID, SCAN,
 	PC_EXIT_CALL1, PC_EXIT_CALL2,
 	MODEL, TSTATE1, TSTATE2,
+	SCREEN,
+	SPECDRUM, COVOX, AY,
+	RAY1, RAY2, RAY3, RAY4, RAY5, RAY6, RAY7, RAY8, RAY9, RAY10, RAY11, RAY12, RAY13, RAY14, RAY15, RAY16,
 	KEYS0, KEYS1, KEYS2, KEYS3, KEYS4, KEYS5, KEYS6, KEYS7
 };
 
@@ -68,7 +71,12 @@ extern ssh_b* _ROM;
 extern ssh_b* _SCAN;
 extern ssh_b* _KEYS;
 extern ssh_b* _KEMPSTON;
-extern ssh_b memZX[50 + 65536];
+extern ssh_b* _COVOX;
+extern ssh_b* _AY;
+extern ssh_b* _RAY;
+extern ssh_b* _SPECDRUM;
+extern ssh_b* _SCREEN;
+extern ssh_b memZX[70 + 65536];
 
 class zxCPU {
 	friend class zxBus;
