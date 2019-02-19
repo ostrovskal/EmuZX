@@ -1,93 +1,90 @@
 #pragma once
 
-#include <mmsystem.h>
-#include "dsound.h"
+#define TAPE_MAX_BLOCKS		100
+#define TIMER_CONST			19
 
-#pragma comment(lib,"dsound.lib")
+#define SND_ARRAY_LEN				1000
+#define SND_MAX_OUTPUT				0x7fff
+#define SND_STEP					800
+#define SND_BEEPER					255
 
-#define MIN_SPEED_PERCENTAGE	2
-#define MAX_SPEED_PERCENTAGE	500
-#define AMPL_BEEPER				( 50 * 256)
-#define AMPL_TAPE				( 2 * 256 )
-#define AMPL_AY_TONE			( 24 * 256 )
-#define AY_CHANGE_MAX			8000
-
-#define AY_ENV_CONT				8
-#define AY_ENV_ATTACK			4
-#define AY_ENV_ALT				2
-#define AY_ENV_HOLD				1
-#define AY_CLOCK_DIVISOR		16
-#define AY_CLOCK_RATIO			2
-
-struct ZX_AY_CHANGE {
-	DWORD tstates;
-	unsigned char reg, val;
-};
-
-struct ZX_SPEAKER_TYPE {
-	int bass;
-	double treble;
-};
-
-class zxBlipBuffer;
-class zxBlipSynth;
+#define SND_TICKS_PER_FRAME_1_CONST	882
+#define SND_TICKS_PER_FRAME_2_CONST	441
+#define SND_TICKS_PER_FRAME_4_CONST	220
+#define SND_TICKS_PER_FRAME_MAX		10000
 
 class zxSND {
+	friend class zxBus;
 public:
-	struct SOUNDBUFFER {
-		LPDIRECTSOUNDBUFFER		lp;
-		void*					address;
-		long					nNewSize;
-		long					nSize;
+	enum Buffers { NUM_BUFFERS = 10 };
+	enum RegisterAY {
+		AY_AFINE, AY_ACOARSE, AY_BFINE, AY_BCOARSE, AY_CFINE, AY_CCOARSE, AY_NOISEPER, AY_ENABLE, AY_AVOL,
+		AY_BVOL, AY_CVOL, AY_EFINE, AY_ECOARSE, AY_ESHAPE, AY_PORTA, AY_BEEPER, countRegAY
+	};
+	struct AY_CHANNEL {
+		ssh_w channelData[SND_TICKS_PER_FRAME_MAX * 2];
+		ssh_i genPeriod, genCounter, noiseCounter;
+		ssh_u rnd;
+		bool isChannel;
+		bool isNoise;
+		void gen(int i, zxSND* snd);
+	};
+	struct AY8910_STEPS {
+		ssh_d tcounter;
+		ssh_b reg, val;
+		ssh_i pos;
+	};
+	struct SND_DEVICE {
+		SND_DEVICE() : name(nullptr) {}
+		ssh_ws* name;
 	};
 
-	zxSND();
-	
-	virtual ~zxSND();
-	
-	void execute(ssh_u tm);
+	zxSND() : hsnd(0), nCurrent(0), countDevices(0), PSGcounter(0), updateStep(0),
+			  beepVal(0), isSndDump(false), beeperVolume(12) { }
+	void play(char* buffer, int len);
+	bool init(int nID);
+	void execute();
+	void stop();
+	void setTicksPerFrame(int delayCpu);
 protected:
-	void frame(short* data, int len);
-	void uninit();
-	bool dxinit();
-	double getVolume(int type);
-	void finish();
-	bool initBlip(zxBlipBuffer** buf, zxBlipSynth** synth);
-	void ayInit();
-	bool isInSoundEnabledRange();
-	void ayDoTone(int level, unsigned int tone_count, int *var, int chan);
-	void ayOverlay();
-	DWORD getEffectiveProcessorSpeed();
-	bool init();
-	void ayWrite(int reg, int val, DWORD now);
-	void ayReset();
-	void specdrumWrite(ssh_w port, ssh_b val);
-	void covoxWrite(ssh_w port, ssh_b val);
-	void beeper(ssh_d at_tstates, int on);
+	void applyRegisterAY(int reg, int val);
+	void writeNVRegAY(int reg, int val);
+	void writeRegAY(int reg, int val);
+	void envelopeStep();
+	void mix(ssh_w* buf, int freq, int offs, int count, ...);
 
-	LPDIRECTSOUND dSnd;
-	LPDIRECTSOUNDBUFFER	sndBuf;
+	HWAVEOUT hsnd;
+	WAVEHDR bufs[NUM_BUFFERS];
+	SND_DEVICE sndDevices[20];
+	AY8910_STEPS PSGARRAY[SND_ARRAY_LEN];
+	int PSGcounter;
 
-	int soundFramesiz;
-	int soundChannels;
-	unsigned int ayToneLevels[16];
-	unsigned int ayToneTick[3], ayToneHigh[3], ayNoiseTick;
-	unsigned int ayToneCycles, ayEnvCycles;
-	unsigned int ayEnvInternalTick, ayEnvTick;
-	unsigned int ayTonePeriod[3], ayNoisePeriod, ayEnvPeriod;
-	ssh_b ayRegisters[16];
-	ZX_AY_CHANGE ayChange[AY_CHANGE_MAX];
-	int ayChangeCount;
+	int countDevices;
+	char nCurrent;
+	int SND_TICKS_PER_FRAME[3];
 
-	zxBlipBuffer* blipLeft, *blipRight;
-	short* samples;
+	int registerLatch;
 
-	zxBlipSynth* beepLeft, *beepRight;
-	zxBlipSynth* ayLeftA, *ayLeftB, *ayLeftC;
-	zxBlipSynth* ayRightA, *ayRightB, *ayRightC;
-	zxBlipSynth* specLeft, *specRight;
-	zxBlipSynth* covoxLeft, *covoxRight;
-	int enabled;
-	int enabledEver;
-	int ayStereo;
+	ssh_i updateStep;
+
+	ssh_b curRegsAY[countRegAY];
+	ssh_b origRegsAY[countRegAY];
+
+	ssh_i beeperVolume;
+	ssh_b cont, att, alt, hold, up, holded;
+
+	AY_CHANNEL channelA, channelB, channelC;
+	
+	int stereoAY;
+	bool isSndDump;
+
+	ssh_w soundBuffer[SND_TICKS_PER_FRAME_MAX * 2 * 2];
+	ssh_w soundBufferDump[SND_TICKS_PER_FRAME_MAX * 2 * 2];
+	ssh_w beeperBuffer[SND_TICKS_PER_FRAME_MAX * 2];
+
+	ssh_w beepVal;
+	ssh_i periodN, periodE;
+	ssh_b envVolume;
+	ssh_i envelopeCounter;
+	ssh_w* mixing_ch[10];
 };

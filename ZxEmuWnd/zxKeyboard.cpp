@@ -167,12 +167,12 @@ void zxKeyboard::processKeys() {
 	}
 	// проверить режим клавиатуры
 	int nmode = KM_K;
-	int val = memZX[23617], val1 = 0, val2 = 0;
-	if(*_LOCK_FD || *_MODEL == MODEL_48K) {
+	int val = read_mem8(23617), val1 = 0, val2 = 0;
+	if(!(*_TSTATE & ZX_128K)) {
 		switch(val) {
 			case 0:
-				val1 = memZX[23658];
-				val2 = memZX[23611];
+				val1 = read_mem8(23658);
+				val2 = read_mem8(23611);
 				if(val2 & 8) {
 					nmode = (val1 & 8) ? KM_C : KM_L;
 				} else if(val1 & 16) nmode = KM_K;
@@ -183,7 +183,7 @@ void zxKeyboard::processKeys() {
 			default: nmode = KM_G; break;
 		}
 	} else {
-		nmode = (memZX[23611] & 8 ? ((memZX[23658] & 8) ? KM_C : KM_L) : KM_L);
+		nmode = (read_mem8(23611) & 8 ? ((read_mem8(23658) & 8) ? KM_C : KM_L) : KM_L);
 		if(nmode == KM_L && caps) nmode = KM_CH;
 	}
 	// проверить на нажатые кнопки

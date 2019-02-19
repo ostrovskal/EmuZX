@@ -49,14 +49,14 @@ ZX_OPTION opt[] = {
 	{OPTT_DWORD, L"periodBlink", 3},
 	{OPTT_DWORD, L"periodSound", 1},
 	{OPTT_DWORD, L"periodBorder", 16},
-	{OPTT_BOOL, L"writeROM", 0},
+	{OPTT_BOOL, L"interleavedEnable", 0},
 	{OPTT_BOOL, L"autoSave", 1},
 
 	{OPTT_DWORD, L"soundFrequency", SND_FREQ_44100},
 	{OPTT_DWORD, L"soundBeeperVolume", 50},
-	{OPTT_DWORD, L"soundAyVolume", 50},
-	{OPTT_DWORD, L"soundCovoxVolume", 50},
-	{OPTT_DWORD, L"soundSpecdrumVolume", 50},
+	{OPTT_DWORD, L"soundDeviceID", 0},
+	{OPTT_DWORD, L"soundEnable", 1},
+	{OPTT_DWORD, L"joyEnable", 0},
 	
 	{OPTT_DWORD, L"memoryModel", MODEL_48K},
 	{OPTT_DWORD, L"postProcess", PP_BILINEAR},
@@ -91,10 +91,7 @@ ZX_OPTION opt[] = {
 	{OPTT_STRING, L"joy1Status"},
 	{OPTT_STRING, L"joy2Status"},
 	{OPTT_STRING, L"joy3Status"},
-	{OPTT_STRING, L"joy4Status"},
-
-	{OPTT_BOOL, L"soundEnable", 1},
-	{OPTT_BOOL, L"joystickEnable", 0},
+	{OPTT_STRING, L"joy4Status"}
 };
 
 zxSettings::zxSettings() {

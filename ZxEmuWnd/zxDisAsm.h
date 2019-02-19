@@ -210,7 +210,7 @@ protected:
 	ssh_d cmdCount;
 	// читаем операцию
 	inline ssh_b readOps() {
-		ssh_b ops = memZX[_pc++];
+		ssh_b ops = read8();
 		typeOps = (ops & 0b00000111);
 		codeOps = (ops & 0b00111000) >> 3;
 		groupOps = ((ops & 0b11000000) >> 6);
@@ -227,11 +227,11 @@ protected:
 
 	inline ssh_b fromRP_AF(ssh_b rp) { return prefAF[prefix + (rp & 6)]; }
 
-	inline ssh_b read8() { return memZX[_pc++]; }
+	inline ssh_b read8() { return *get_mem(_pc++); }
 
-	inline ssh_w read16() { auto v = *(ssh_w*)(memZX + _pc); _pc += 2; return v; }
+	inline ssh_w read16() { return (read8() + (read8() << 8)); }
 
-	inline ssh_w addrReg(ssh_b reg) { return *(ssh_w*)(memZX + offsRegs[reg - 10]); }
+	inline ssh_w addrReg(ssh_b reg) { return *(ssh_w*)(cpuZX + offsRegs[reg - 10]); }
 
 	inline void put16(ssh_w nn) { _DA(nn & 255); _DA(nn >> 8); }
 

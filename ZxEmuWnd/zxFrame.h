@@ -74,6 +74,7 @@ protected:
 
 	HMENU hMenuMRU, hMenuPP, hMenuModel;
 	HANDLE hCpuThread;
+	UINT_PTR hTimer;
 	MENUITEMINFO mii;
 
 	DECL_MSG_MAP()

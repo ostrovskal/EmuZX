@@ -1,527 +1,319 @@
 
 #include "stdafx.h"
 #include "zxSND.h"
-#include "zxBlipBuffer.h"
-#include "zxCPU.h"
 
-static int sndFreq[3] = {22050, 44100, 48000};
+static int sndTicks[3] = {SND_TICKS_PER_FRAME_1_CONST, SND_TICKS_PER_FRAME_2_CONST, SND_TICKS_PER_FRAME_4_CONST};
+static int sndFreq[3] = {44100, 22050, 11025};
 
-#define MAX_AUDIO_BUFFER		8192 * 5
+static ssh_w volTable[zxSND::countRegAY] = {
+	0x0000 / 2, 0x0344 / 2, 0x04BC / 2, 0x06ED / 2,
+	0x0A3B / 2, 0x0F23 / 2, 0x1515 / 2, 0x2277 / 2,
+	0x2898 / 2, 0x4142 / 2, 0x5B2B / 2, 0x726C / 2,
+	0x9069 / 2, 0xB555 / 2, 0xD79B / 2, 0xFFFF / 2
+};
 
-static DWORD nextpos;
-static int sixteenbit;
+static ssh_b eshape[] = {
+	0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255,
+	0, 1, 255, 255, 0, 1, 255, 255, 0, 1, 255, 255, 0, 1, 255, 255,
+	1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1,
+	1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1
+};
 
-static ZX_SPEAKER_TYPE speaker_type[] = { {200, -37.0}, {1000, -67.0}, {0, 0.0} };
+void zxSND::play(char* buffer, int len) {
 
-void zxSND::execute(ssh_u new_tm) {
-	return;
-	long count;
-	ayOverlay();
-	blipLeft->endFrame(10);// machine_current->timings.tstates_per_frame);
-	if(ayStereo != AY_STEREO_NONE) {
-		blipRight->endFrame(10);// machine_current->timings.tstates_per_frame);
-		count = blipLeft->readSamples(samples, soundFramesiz, 1);
-		blipRight->readSamples(samples + 1, count, 1);
-		count <<= 1;
-	} else {
-		count = blipLeft->readSamples(samples, soundFramesiz, BLIP_BUFFER_DEF_STEREO);
-	}
-	frame(samples, count);
-	//movie_add_sound(samples, count);
-	ayChangeCount = 0;
+	char* memory = new char[len];
+	memcpy(memory, buffer, len);
+
+	WAVEHDR* curBuf(&bufs[nCurrent]);
+	WAVEHDR* oldBuf((nCurrent < (NUM_BUFFERS - 1)) ? &bufs[nCurrent + 1] : &bufs[0]);
+	ssh_memzero(curBuf, sizeof(WAVEHDR));
+	curBuf->lpData = memory;
+	curBuf->dwBufferLength = len;
+	curBuf->dwFlags = 0;
+	curBuf->dwLoops = 0;
+	waveOutPrepareHeader(hsnd, curBuf, sizeof(WAVEHDR));
+	waveOutWrite(hsnd, curBuf, sizeof(WAVEHDR));
+	while(waveOutUnprepareHeader(hsnd, oldBuf, sizeof(WAVEHDR)) == WAVERR_STILLPLAYING) Sleep(15);
+	SAFE_DELETE(oldBuf);
+	nCurrent++;
+	if(nCurrent >= NUM_BUFFERS) nCurrent = 0;
 }
 
-void zxSND::frame(short* data, int len) {
-	DWORD i1, i2;
-	int lsb = 1;
+bool zxSND::init(int nID) {
+	WAVEOUTCAPS woc;
+	WAVEFORMATEX wfx;
 
-	UCHAR *ucbuffer1, *ucbuffer2;
-	DWORD length1, length2;
-	DWORD playcursor;
-	long cursordiff;
+	int freq = sndFreq[theApp->getOpt(OPT_SND_FREQUENCY)->dval];
+	int bits = theApp->getOpt(OPT_SND_8BIT)->dval ? 8 : 16;
 
-	if(sixteenbit) len *= 2;
+	stereoAY = theApp->getOpt(OPT_SND_AY_STEREO)->dval;
+	updateStep = (ssh_i)(((double)SND_STEP * (double)freq * (double)8) / (double)(freq * bits * 2) * 2.0); // 1773400
 
-	while(len) {
-		while(true) {
-			IDirectSoundBuffer_GetCurrentPosition(sndBuf, &playcursor, NULL);
-			cursordiff = (long)nextpos - (long)playcursor;
-			if(playcursor > nextpos) cursordiff += MAX_AUDIO_BUFFER;
-			if(cursordiff < len * 6) break;
-			Sleep(10);
+	countDevices = waveOutGetNumDevs();
+
+	for(int i = 0; i <= countDevices; i++) {
+		SAFE_DELETE(sndDevices[i].name);
+		sndDevices[i].name = new ssh_ws[MAXPNAMELEN];
+		if(i == 0) {
+			wcscpy_s(sndDevices[i].name, MAXPNAMELEN, L"По умолчанию");
+		} else {
+			waveOutGetDevCaps(i - 1, &woc, sizeof(woc));
+			wcscpy_s(sndDevices[i].name, MAXPNAMELEN, woc.szPname);
 		}
-		if(SUCCEEDED(IDirectSoundBuffer_Lock(sndBuf, nextpos, (DWORD)len, (void**)&ucbuffer1, &length1, (void**)&ucbuffer2, &length2, 0))) {
-			for(i1 = 0; i1 < length1 && len > 0; i1++) {
-				if(sixteenbit) {
-					if(lsb) {
-						ucbuffer1[i1] = *data & 0xff;
-					} else {
-						ucbuffer1[i1] = *data >> 8;
-						data++;
-					}
-					lsb = !lsb;
+	}
+
+	ssh_memzero(&wfx, sizeof(wfx));
+
+	wfx.cbSize = sizeof(wfx);
+	wfx.wFormatTag = WAVE_FORMAT_PCM;
+	wfx.nChannels = 2;
+	wfx.nSamplesPerSec = freq;
+	wfx.wBitsPerSample = bits;
+	wfx.nBlockAlign = 2 * bits / 8;
+	wfx.nAvgBytesPerSec = wfx.nBlockAlign * freq;
+
+	return (waveOutOpen(&hsnd, nID, &wfx, 0, 0, CALLBACK_NULL) == MMSYSERR_NOERROR);
+}
+
+void zxSND::setTicksPerFrame(int delayCpu) {
+	// delayCPU = 10 => 100%
+	double delitel = TIMER_CONST * 100.0 / ((double)delayCpu / 10.0) * 100.0;
+	double koef = (double)delitel / (double)TIMER_CONST;
+
+	for(int i = 0; i < 2; i++) {
+		SND_TICKS_PER_FRAME[i] = (int)((double)sndTicks[i] * koef);
+		if(SND_TICKS_PER_FRAME[i] > SND_TICKS_PER_FRAME_MAX) SND_TICKS_PER_FRAME[i] = SND_TICKS_PER_FRAME_MAX;
+	}
+}
+
+void zxSND::writeNVRegAY(int reg, int val) {
+	if(PSGcounter < SND_ARRAY_LEN) {
+		PSGARRAY[PSGcounter].tcounter = theApp->bus.tCounter;
+		PSGARRAY[PSGcounter].reg = reg;
+		PSGARRAY[PSGcounter].val = val;
+		PSGcounter++;
+	}
+}
+
+void zxSND::writeRegAY(int reg, int val) {
+	if(reg < 16) {
+		curRegsAY[reg] = val;
+		writeNVRegAY(reg, val);
+	}
+}
+
+void zxSND::applyRegisterAY(int reg, int val) {
+	if(reg <= AY_ESHAPE) origRegsAY[reg] = val;
+	switch(reg) {
+		case AY_AFINE:
+		case AY_ACOARSE:
+			origRegsAY[AY_ACOARSE] &= 0x0f;
+			channelA.genPeriod = (origRegsAY[AY_AFINE] + 256 * origRegsAY[AY_ACOARSE]) * updateStep / SND_STEP;
+			if(!channelA.genPeriod) channelA.genPeriod = updateStep / SND_STEP;
+			break;
+		case AY_BFINE:
+		case AY_BCOARSE:
+			origRegsAY[AY_BCOARSE] &= 0x0f;
+			channelB.genPeriod = (origRegsAY[AY_BFINE] + 256 * origRegsAY[AY_BCOARSE]) * updateStep / SND_STEP;
+			if(!channelB.genPeriod) channelB.genPeriod = updateStep / SND_STEP;
+			break;
+		case AY_CFINE:
+		case AY_CCOARSE:
+			origRegsAY[AY_CCOARSE] &= 0x0f;
+			channelC.genPeriod = (origRegsAY[AY_CFINE] + 256 * origRegsAY[AY_CCOARSE]) * updateStep / SND_STEP;
+			if(!channelC.genPeriod) channelC.genPeriod = updateStep / SND_STEP;
+			break;
+		case AY_AVOL:
+			origRegsAY[AY_AVOL] &= 0x1f;
+			break;
+		case AY_BVOL:
+			origRegsAY[AY_BVOL] &= 0x1f;
+			break;
+		case AY_CVOL:
+			origRegsAY[AY_CVOL] &= 0x1f;
+			break;
+		case AY_ENABLE:
+			channelA.isChannel = (origRegsAY[AY_ENABLE] & 1);
+			channelB.isChannel = (origRegsAY[AY_ENABLE] & 2);
+			channelC.isChannel = (origRegsAY[AY_ENABLE] & 4);
+			channelA.isNoise =	 (origRegsAY[AY_ENABLE] & 8);
+			channelB.isNoise =	 (origRegsAY[AY_ENABLE] & 16);
+			channelC.isNoise =	 (origRegsAY[AY_ENABLE] & 32);
+			break;
+		case AY_NOISEPER:
+			origRegsAY[AY_NOISEPER] &= 0x1f;
+			periodN = origRegsAY[AY_NOISEPER] * updateStep / SND_STEP;
+			if(periodN == 0) periodN = updateStep / SND_STEP;
+			break;
+		case AY_EFINE:
+		case AY_ECOARSE:
+			periodE = ((origRegsAY[AY_EFINE] + 256 * origRegsAY[AY_ECOARSE])) * updateStep / SND_STEP;
+			if(periodE == 0) periodE = updateStep / SND_STEP / 2;
+			break;
+		case AY_ESHAPE: {
+			origRegsAY[AY_ESHAPE] &= 0x0f;
+			auto pshape = &eshape[origRegsAY[AY_ESHAPE] * 4];
+			cont = pshape[0]; att = pshape[1];
+			if(origRegsAY[AY_ESHAPE] > 7) { alt = pshape[2]; hold = pshape[3]; }
+			envelopeCounter = 0;
+			envVolume = (att ? 0 : 15);
+			up = att;
+			holded = 0;
+		}
+		break;
+		case SND_BEEPER:
+			beepVal = (val ? volTable[beeperVolume] : 0);
+			break;
+	}
+}
+
+void zxSND::envelopeStep() {
+	if(holded == 1) return;
+
+	if((alt ? periodE : (periodE * 2)) > envelopeCounter)
+		envelopeCounter++;
+	else {
+		envelopeCounter = 0;
+		if(up) {
+			if(envVolume < 15) envVolume++;
+			else {
+				if(cont == 0) { holded = 1; envVolume = 0; }
+				else if(hold) { if(alt) envVolume = 0; holded = 1; }
+				else { if(alt) up = 0; else envVolume = 0; }
+			}
+		} else {
+			if(envVolume > 0) envVolume--;
+			else {
+				if(cont == 0) { 
+					holded = 1;
+				} else if(hold) {
+					if(alt) envVolume = 15;
+					holded = 1;
 				} else {
-					ucbuffer1[i1] = ((*data++) >> 8) ^ 0x80;
+					if(alt) up = 1;
+					else envVolume = 15;
 				}
-				nextpos++;
-				len--;
-			}
-			if(ucbuffer2) {
-				for(i2 = 0; i2 < length2 && len > 0; i2++) {
-					if(sixteenbit) {
-						if(lsb) {
-							ucbuffer2[i2] = *data & 0xff;
-						} else {
-							ucbuffer2[i2] = *data >> 8;
-							data++;
-						}
-						lsb = !lsb;
-					} else {
-						ucbuffer2[i2] = ((*data++) >> 8) ^ 0x80;
-					}
-					nextpos++;
-					len--;
-				}
-			} else {
-				i2 = 0;
-			}
-			if(nextpos >= MAX_AUDIO_BUFFER) nextpos -= MAX_AUDIO_BUFFER;
-			IDirectSoundBuffer_Unlock(sndBuf, ucbuffer1, i1, ucbuffer2, i2);
-		}
-	}
-}
-
-bool zxSND::dxinit() {
-	WAVEFORMATEX pcmwf;
-	DSBUFFERDESC dsbd;
-
-	CoInitialize(NULL);
-
-	try {
-		if(FAILED(CoCreateInstance(CLSID_DirectSound, NULL, CLSCTX_INPROC_SERVER, IID_IDirectSound, (void**)&dSnd))) throw(0);
-		if(FAILED(IDirectSound_Initialize(dSnd, NULL))) throw(0);
-		if(FAILED(IDirectSound_SetCooperativeLevel(dSnd, GetDesktopWindow(), DSSCL_NORMAL))) throw(0);
-
-		memset(&pcmwf, 0, sizeof(WAVEFORMATEX));
-		pcmwf.cbSize = 0;
-		if(theApp->getOpt(OPT_SND_8BIT)->dval) {
-			pcmwf.wBitsPerSample = 8;
-			sixteenbit = 0;
-		} else {
-			pcmwf.wBitsPerSample = 16;
-			sixteenbit = 1;
-		}
-		ayStereo = theApp->getOpt(OPT_SND_AY_STEREO)->dval;
-		soundChannels = (ayStereo != AY_STEREO_NONE ? 2 : 1);
-
-		pcmwf.nChannels = soundChannels;
-		pcmwf.nBlockAlign = pcmwf.nChannels * (sixteenbit ? 2 : 1);
-		pcmwf.nSamplesPerSec = sndFreq[theApp->getOpt(OPT_SND_FREQUENCY)->dval];
-		pcmwf.nAvgBytesPerSec = pcmwf.nSamplesPerSec * pcmwf.nBlockAlign;
-		pcmwf.wFormatTag = WAVE_FORMAT_PCM;
-
-		memset(&dsbd, 0, sizeof(DSBUFFERDESC));
-		dsbd.dwBufferBytes = MAX_AUDIO_BUFFER;
-		dsbd.dwFlags = DSBCAPS_GLOBALFOCUS | DSBCAPS_CTRLVOLUME | DSBCAPS_CTRLFREQUENCY | DSBCAPS_STATIC | DSBCAPS_LOCSOFTWARE;
-		dsbd.dwSize = sizeof(DSBUFFERDESC);
-		dsbd.lpwfxFormat = &pcmwf;
-
-		if(FAILED(IDirectSound_CreateSoundBuffer(dSnd, &dsbd, &sndBuf, NULL))) throw(0);
-		if(FAILED(IDirectSoundBuffer_Play(sndBuf, 0, 0, DSBPLAY_LOOPING))) throw(0);
-
-		nextpos = 0;
-
-		return true;
-	} catch(...) {
-		uninit();
-	}
-	return false;
-}
-
-void zxSND::uninit() {
-	if(sndBuf) {
-		IDirectSoundBuffer_Stop(sndBuf);
-		IDirectSoundBuffer_Release(sndBuf);
-		sndBuf = nullptr;
-	}
-	if(dSnd) {
-		IDirectSound_Release(dSnd);
-		dSnd = nullptr;
-	}
-	CoUninitialize();
-}
-
-double zxSND::getVolume(int type) {
-	static int opts[] = {OPT_SND_BEEPER_VOL, OPT_SND_AY_VOL, OPT_SND_COVOX_VOL, OPT_SND_SPECDRUM_VOL};
-
-	double volume = (double)theApp->getOpt(opts[type])->dval;
-	if(volume < 0) volume = 0;
-	else if(volume > 100) volume = 100;
-	return volume / 100.0;
-}
-
-zxSND::zxSND() : dSnd(nullptr), sndBuf(nullptr) {
-	blipLeft = nullptr;
-	blipRight = nullptr;
-	beepLeft = nullptr;
-	beepRight = nullptr;
-	specLeft = nullptr;
-	specRight = nullptr;
-	covoxLeft = nullptr;
-	covoxRight = nullptr;
-	ayLeftA = nullptr;
-	ayRightA = nullptr;
-	ayLeftB = nullptr;
-	ayRightB = nullptr;
-	ayLeftC = nullptr;
-	ayRightC = nullptr;
-	samples = nullptr;
-	enabledEver = 0;
-	ayStereo = AY_STEREO_NONE;
-}
-
-zxSND::~zxSND() {
-	finish();
-	uninit();
-}
-
-void zxSND::finish() {
-	SAFE_DELETE(blipLeft);
-	SAFE_DELETE(blipRight);
-	SAFE_DELETE(beepLeft);
-	SAFE_DELETE(beepRight);
-	SAFE_DELETE(specLeft);
-	SAFE_DELETE(specRight);
-	SAFE_DELETE(covoxLeft);
-	SAFE_DELETE(covoxRight);
-	SAFE_DELETE(ayLeftA);
-	SAFE_DELETE(ayRightA);
-	SAFE_DELETE(ayLeftB);
-	SAFE_DELETE(ayRightB);
-	SAFE_DELETE(ayLeftC);
-	SAFE_DELETE(ayRightC);
-
-	SAFE_DELETE(samples);
-}
-
-bool zxSND::initBlip(zxBlipBuffer** buf, zxBlipSynth** syn) {
-	*buf = new zxBlipBuffer();
-	*syn = new zxBlipSynth();
-
-	(*buf)->setClockRate(getEffectiveProcessorSpeed());
-	if((*buf)->setSampleRate(sndFreq[theApp->getOpt(OPT_SND_FREQUENCY)->dval], 1000)) {
-		finish();
-		return false;
-	}
-	(*syn)->setVolume(getVolume(SND_BEEP));
-	(*syn)->setOutput(*buf);
-	(*buf)->setBassFreq(speaker_type[0].bass);
-	(*syn)->setTrebleEq(speaker_type[0].treble);
-	return true;
-}
-
-void zxSND::ayInit() {
-	static const int levels[16] = { 0x0000, 0x0385, 0x053D, 0x0770, 0x0AD7, 0x0FD5, 0x15B0, 0x230C, 0x2B4C, 0x43C1, 0x5A4B, 0x732F, 0x9204, 0xAFF1, 0xD921, 0xFFFF };
-
-	for(int f = 0; f < 16; f++) ayToneLevels[f] = (levels[f] * AMPL_AY_TONE + 0x8000) / 0xffff;
-	ayNoiseTick = ayNoisePeriod = 0;
-	ayEnvInternalTick = ayEnvTick = ayEnvPeriod = 0;
-	ayToneCycles = ayEnvCycles = 0;
-	for(int f = 0; f < 3; f++) ayToneTick[f] = ayToneHigh[f] = 0, ayTonePeriod[f] = 1;
-	ayChangeCount = 0;
-}
-
-bool zxSND::isInSoundEnabledRange() {
-	return true;
-	//return settings_current.emulation_speed >= MIN_SPEED_PERCENTAGE && settings_current.emulation_speed <= MAX_SPEED_PERCENTAGE;
-}
-
-void zxSND::ayDoTone(int level, unsigned int tone_count, int *var, int chan) {
-	*var = 0;
-	ayToneTick[chan] += tone_count;
-	if(ayToneTick[chan] >= ayTonePeriod[chan]) {
-		ayToneTick[chan] -= ayTonePeriod[chan];
-		ayToneHigh[chan] = !ayToneHigh[chan];
-	}
-	if(level) {
-		*var = (ayToneHigh[chan] ? level : 0);
-	}
-}
-
-void zxSND::ayOverlay() {
-	static int rng = 1;
-	static int noise_toggle = 0;
-	static int env_first = 1, env_rev = 0, env_counter = 15;
-	int tone_level[3];
-	int mixer, envshape;
-	int g, level;
-	DWORD f;
-	ZX_AY_CHANGE *change_ptr = ayChange;
-	int changes_left = ayChangeCount;
-	int reg, r;
-	int chan1, chan2, chan3;
-	int last_chan1 = 0, last_chan2 = 0, last_chan3 = 0;
-	unsigned int tone_count, noise_count;
-	for(f = 0; f < 10/*machine_current->timings.tstates_per_frame*/; f += AY_CLOCK_DIVISOR * AY_CLOCK_RATIO) {
-		while(changes_left && f >= change_ptr->tstates) {
-			ayRegisters[reg = change_ptr->reg] = change_ptr->val;
-			change_ptr++;
-			changes_left--;
-			switch(reg) {
-				case 0: case 1: case 2: case 3: case 4: case 5:
-					r = reg >> 1;
-					ayTonePeriod[r] = (ayRegisters[reg & ~1] | (ayRegisters[reg | 1] & 15) << 8);
-					if(!ayTonePeriod[r]) ayTonePeriod[r]++;
-					if(ayToneTick[r] >= ayTonePeriod[r] * 2)
-						ayToneTick[r] %= ayTonePeriod[r] * 2;
-					break;
-				case 6:
-					ayNoiseTick = 0;
-					ayNoisePeriod = (ayRegisters[reg] & 31);
-					break;
-				case 11: case 12:
-					ayEnvPeriod = ayRegisters[11] | (ayRegisters[12] << 8);
-					break;
-				case 13:
-					ayEnvInternalTick = ayEnvTick = ayEnvCycles = 0;
-					env_first = 1;
-					env_rev = 0;
-					env_counter = (ayRegisters[13] & AY_ENV_ATTACK) ? 0 : 15;
-					break;
 			}
 		}
-		for(g = 0; g < 3; g++) tone_level[g] = ayToneLevels[ayRegisters[8 + g] & 15];
-		envshape = ayRegisters[13];
-		level = ayToneLevels[env_counter];
-		for(g = 0; g < 3; g++) {
-			if(ayRegisters[8 + g] & 16) tone_level[g] = level;
-		}
-		ayEnvCycles += AY_CLOCK_DIVISOR;
-		noise_count = 0;
-		while(ayEnvCycles >= 16) {
-			ayEnvCycles -= 16;
-			noise_count++;
-			ayEnvTick++;
-			while(ayEnvTick >= ayEnvPeriod) {
-				ayEnvTick -= ayEnvPeriod;
-				if(env_first ||
-					((envshape & AY_ENV_CONT) && !(envshape & AY_ENV_HOLD))) {
-					if(env_rev)
-						env_counter -= (envshape & AY_ENV_ATTACK) ? 1 : -1;
-					else
-						env_counter += (envshape & AY_ENV_ATTACK) ? 1 : -1;
-					if(env_counter < 0)
-						env_counter = 0;
-					if(env_counter > 15)
-						env_counter = 15;
-				}
-				ayEnvInternalTick++;
-				while(ayEnvInternalTick >= 16) {
-					ayEnvInternalTick -= 16;
-					if(!(envshape & AY_ENV_CONT))
-						env_counter = 0;
-					else {
-						if(envshape & AY_ENV_HOLD) {
-							if(env_first && (envshape & AY_ENV_ALT))
-								env_counter = (env_counter ? 0 : 15);
-						} else {
-							/* non-hold */
-							if(envshape & AY_ENV_ALT)
-								env_rev = !env_rev;
-							else
-								env_counter = (envshape & AY_ENV_ATTACK) ? 0 : 15;
-						}
-					}
-					env_first = 0;
-				}
-				if(!ayEnvPeriod) break;
+	}
+}
+
+void zxSND::execute() {
+	if(!hsnd) init(0);
+
+	if(PSGcounter > 0) {
+		if(theApp->bus.tCounter == 0) theApp->bus.tCounter++;
+		for(int i = 0; i < PSGcounter; i++) PSGARRAY[i].pos = (SND_TICKS_PER_FRAME[0] - 1) * PSGARRAY[i].tcounter / theApp->bus.tCounter;
+	}
+	// Генерим звук
+	int j = 0;
+	for(int i = 0; i < SND_TICKS_PER_FRAME[0]; i++) {
+		if(PSGcounter > 0) {
+			while(i == PSGARRAY[j].pos) {
+				applyRegisterAY(PSGARRAY[j].reg, PSGARRAY[j].val);
+				PSGARRAY[j].pos = SND_TICKS_PER_FRAME[0];
+				j++;
+				if(j >= SND_ARRAY_LEN) break;
 			}
 		}
-		chan1 = tone_level[0];
-		chan2 = tone_level[1];
-		chan3 = tone_level[2];
-		mixer = ayRegisters[7];
-		ayToneCycles += AY_CLOCK_DIVISOR;
-		tone_count = ayToneCycles >> 3;
-		ayToneCycles &= 7;
-		if((mixer & 1) == 0) {
-			level = chan1;
-			ayDoTone(level, tone_count, &chan1, 0);
-		}
-		if((mixer & 0x08) == 0 && noise_toggle) chan1 = 0;
-		if((mixer & 2) == 0) {
-			level = chan2;
-			ayDoTone(level, tone_count, &chan2, 1);
-		}
-		if((mixer & 0x10) == 0 && noise_toggle)
-			chan2 = 0;
-		if((mixer & 4) == 0) {
-			level = chan3;
-			ayDoTone(level, tone_count, &chan3, 2);
-		}
-		if((mixer & 0x20) == 0 && noise_toggle)
-			chan3 = 0;
-		if(last_chan1 != chan1) {
-			ayLeftA->update(f, chan1);
-			if(ayRightA) ayRightA->update(f, chan1);
-			last_chan1 = chan1;
-		}
-		if(last_chan2 != chan2) {
-			ayLeftB->update(f, chan2);
-			if(ayRightB) ayRightB->update(f, chan2);
-			last_chan2 = chan2;
-		}
-		if(last_chan3 != chan3) {
-			ayLeftC->update(f, chan3);
-			if(ayRightC) ayRightC->update(f, chan3);
-			last_chan3 = chan3;
-		}
-		ayNoiseTick += noise_count;
-		while(ayNoiseTick >= ayNoisePeriod) {
-			ayNoiseTick -= ayNoisePeriod;
-			if((rng & 1) ^ ((rng & 2) ? 1 : 0)) noise_toggle = !noise_toggle;
-			if(rng & 1) rng ^= 0x24000;
-			rng >>= 1;
-			if(!ayNoisePeriod) break;
-		}
+		envelopeStep();
+		channelA.gen(i, this);
+		channelB.gen(i, this);
+		channelC.gen(i, this);
+		beeperBuffer[i] = beepVal;
 	}
-}
-
-DWORD zxSND::getEffectiveProcessorSpeed() {
-	return 50;// machine_current->timings.processor_speed / 100 * settings_current.emulation_speed;
-}
-
-bool zxSND::init() {
-	double treble;
-
-	if(!dxinit()) return false;
-	if(!initBlip(&blipLeft, &beepLeft)) return false;
-	if(ayStereo != AY_STEREO_NONE && !initBlip(&blipRight, &beepRight)) return false;
-	
-	treble = speaker_type[0].treble;
-
-	ayLeftA = new zxBlipSynth();
-	ayLeftA->setVolume(getVolume(SND_AY));
-	ayLeftA->setTrebleEq(treble);
-
-	ayLeftB = new zxBlipSynth();
-	ayLeftB->setVolume(getVolume(SND_AY));
-	ayLeftB->setTrebleEq(treble);
-
-	ayLeftC = new zxBlipSynth();
-	ayLeftC->setVolume(getVolume(SND_AY));
-	ayLeftC->setTrebleEq(treble);
-
-	specLeft = new zxBlipSynth();
-	specLeft->setOutput(blipLeft);
-	specLeft->setTrebleEq(treble);
-
-	covoxLeft = new zxBlipSynth();
-	covoxLeft->setVolume(getVolume(SND_COVOX));
-	covoxLeft->setOutput(blipLeft);
-	covoxLeft->setTrebleEq(treble);
-
-	ayRightA = nullptr;
-	ayRightB = nullptr;
-	ayRightC = nullptr;
-
-	zxBlipSynth **ayLeft = nullptr;
-	zxBlipSynth **ayLeftMid = nullptr;
-	zxBlipSynth **ayRightMid = nullptr;
-	zxBlipSynth **ayRight = nullptr;
-
-	if(ayStereo != AY_STEREO_NONE) {
-		if(ayStereo == AY_STEREO_ACB) {
-			ayLeft = &ayLeftA;
-			ayLeftMid = &ayLeftC;
-			ayRightMid = &ayRightC;
-			ayRight = &ayLeftB;
-		} else {
-			ayLeft = &ayLeftA;
-			ayLeftMid = &ayLeftB;
-			ayRightMid = &ayRightB;
-			ayRight = &ayLeftC;
-		} 
-		(*ayLeft)->setOutput(blipLeft);
-		(*ayLeftMid)->setOutput(blipLeft);
-		(*ayRight)->setOutput(blipRight);
-
-		*ayRightMid = new zxBlipSynth();
-		(*ayRightMid)->setVolume(getVolume(SND_AY));
-		(*ayRightMid)->setOutput(blipRight);
-		(*ayRightMid)->setTrebleEq(treble);
-
-		specRight = new zxBlipSynth();
-		specRight->setVolume(getVolume(SND_SPECDRUM));
-		specRight->setOutput(blipRight);
-		specRight->setTrebleEq(treble);
-
-		covoxRight = new zxBlipSynth();
-		covoxRight->setVolume(getVolume(SND_COVOX));
-		covoxRight->setOutput(blipRight);
-		covoxRight->setTrebleEq(treble);
-
-	} else {
-		ayLeftA->setOutput(blipLeft);
-		ayLeftB->setOutput(blipLeft);
-		ayLeftC->setOutput(blipLeft);
-	}
-	enabled = enabledEver = 1;
-	float hz = (float)10;// getEffectiveProcessorSpeed() / machine_current->timings.tstates_per_frame;
-	soundFramesiz = (int)((float)sndFreq[theApp->getOpt(OPT_SND_FREQUENCY)->dval] / hz);
-	soundFramesiz++;
-	samples = new short[soundFramesiz * soundChannels];
-	//movie_init_sound(22050, ayStereo);
-	return true;
-}
-
-void zxSND::ayWrite(int reg, int val, DWORD now) {
-	if(ayChangeCount < AY_CHANGE_MAX) {
-		ayChange[ayChangeCount].tstates = now;
-		ayChange[ayChangeCount].reg = (reg & 15);
-		ayChange[ayChangeCount].val = val;
-		ayChangeCount++;
-	}
-}
-
-void zxSND::ayReset() {
-	int f;
-	ayInit();
-	ayChangeCount = 0;
-	for(f = 0; f < 16; f++) ayWrite(f, 0, 0);
-	for(f = 0; f < 3; f++) ayToneHigh[f] = 0;
-	ayToneCycles = ayEnvCycles = 0;
-}
-
-void zxSND::specdrumWrite(ssh_w port, ssh_b val) {
+	// Микшируем и записываем
+	auto sndBuf = (isSndDump ? soundBufferDump : soundBuffer);
+	auto freq = theApp->getOpt(OPT_SND_FREQUENCY)->dval;
+	auto bufA = channelA.channelData;
+	auto bufB = channelB.channelData;
+	auto bufC = channelC.channelData;
+//	unsigned char stereo_mode = 0; /* 2=Mono 1=ABC 0=ACB*/
 	/*
-	specLeft->update(tstates, (val - 128) * 128);
-	if(specRight) specRight->update(tstates, (val - 128) * 128);
-	machine_current->specdrum.specdrum_dac = val - 128;
-	*/
-}
-
-void zxSND::covoxWrite(ssh_w port, ssh_b val) {
-	/*
-	covoxLeft->update(tstates, val * 128);
-	if(covoxRight) covoxRight->update(tstates, val * 128);
-	machine_current->covox.covox_dac = val;
-	*/
-}
-
-void zxSND::beeper(ssh_d at_tstates, int on) {
-	static int beeper_ampl[] = {0, AMPL_TAPE, AMPL_BEEPER, AMPL_BEEPER + AMPL_TAPE};
-	int val;
-
-	/*
-	if(tape_is_playing()) {
-		if(!settings_current.sound_load || machine_current->timex) on = on & 0x02;
-	} else {
-	if(on == 1) on = 0;
+	if (sound_fil!=-1)
+	{
+	if (stereo_mode==2)
+	{
+	Mix(sound_bufferD, 44100, 0,4,soundA,soundB,soundC,beeper_buffer);
+	Mix(sound_bufferD, 44100, 1,4,soundA,soundB,soundC,beeper_buffer);
 	}
+
+	if (stereo_mode==1)
+	{
+	Mix(sound_bufferD, 44100, 0,3,soundA,soundB,beeper_buffer);
+	Mix(sound_bufferD, 44100, 1,3,soundC,soundB,beeper_buffer);
+	}
+
+	if (stereo_mode==0)
+	{
+	Mix(sound_bufferD, 44100, 0,3,soundA,soundC,beeper_buffer);
+	Mix(sound_bufferD, 44100, 1,3,soundB,soundC,beeper_buffer);
+	}
+
+	TODO ("io_write(sound_fil, sound_bufferD, SOUND_TICKS_PER_FRAME*4);");
+	}
+
+	if (stereo_mode==2)
+	{
+	Mix(sound_buffer, 44100, 0,4,soundA,soundB,soundC,beeper_buffer);
+	Mix(sound_buffer, 44100, 1,4,soundA,soundB,soundC,beeper_buffer);
+	}
+
+	if (stereo_mode==1)
+	{
+	Mix(sound_buffer, 44100, 0,3,soundA,soundB,beeper_buffer);
+	Mix(sound_buffer, 44100, 1,3,soundC,soundB,beeper_buffer);
+	}
+
+	if (stereo_mode==0)
+	{
+	Mix(sound_buffer, 44100, 0,3,soundA,soundC,beeper_buffer);
+	Mix(sound_buffer, 44100, 1,3,soundB,soundC,beeper_buffer);
+	}
+
 	*/
-	if(on == 1) on = 0;
-	val = beeper_ampl[on];
-	beepLeft->update(at_tstates, val);
-	if(ayStereo != AY_STEREO_NONE) beepRight->update(at_tstates, val);
+
+	switch(stereoAY) {
+		case AY_STEREO_NONE:
+			mix(sndBuf, freq, 0, 3, bufA, bufC, beeperBuffer);
+			mix(sndBuf, freq, 1, 3, bufB, bufC, beeperBuffer);
+			break;
+		case AY_STEREO_ABC:
+			mix(sndBuf, freq, 0, 4, bufA, bufB, bufC, beeperBuffer);
+			mix(sndBuf, freq, 1, 4, bufA, bufB, bufC, beeperBuffer);
+			break;
+		case AY_STEREO_ACB:
+			mix(sndBuf, freq, 0, 3, bufA, bufB, beeperBuffer);
+			mix(sndBuf, freq, 1, 3, bufC, bufB, beeperBuffer);
+			break;
+	}
+	PSGcounter = 0;
+	theApp->bus.tCounter = 0;
+}
+
+void zxSND::mix(ssh_w* buf, int num, int offs, int count, ...) {
+	va_list ap;
+
+	va_start(ap, count);
+	for(int i = 0; i < count; i++) mixing_ch[i] = va_arg(ap, ssh_w*);
+	for(int i = 0; i < SND_TICKS_PER_FRAME[num]; i++) {
+		buf[i * 2 + offs] = 0;
+		for(int j = 0; j < count; j++) buf[i * 2 + offs] += mixing_ch[j][i << num] / count;
+	}
+}
+
+void zxSND::AY_CHANNEL::gen(int i, zxSND* snd) {
+	if(genCounter >= genPeriod) genCounter = 0;
+	bool tone = genCounter < (genPeriod / 2);
+	genCounter++;
+	if(noiseCounter >= snd->periodN) { noiseCounter = 0; rnd = rand(); }
+	bool noise = rnd & 1;
+	noiseCounter++;
+	channelData[i] = (((tone | isChannel) & (noise | isNoise)) | !genPeriod);
+	channelData[i] = (channelData[i]) ? (snd->origRegsAY[AY_AVOL] & 0x10) ? volTable[snd->envVolume] : volTable[snd->origRegsAY[AY_AVOL]] : 0;
+}
+
+void zxSND::stop() {
+	PSGcounter = 0;
+	origRegsAY[AY_AVOL] = origRegsAY[AY_BVOL] = origRegsAY[AY_CVOL] = 0;
 }

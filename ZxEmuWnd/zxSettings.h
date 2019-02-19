@@ -45,14 +45,16 @@
 #define OPT_PERIOD_BLINK	38
 #define OPT_PERIOD_SND		39
 #define OPT_PERIOD_BORDER	40
-#define OPT_WRITE_ROM		41
+#define OPT_INTERLEAVED		41
 #define OPT_AUTO_SAVE		42
 
 #define OPT_SND_FREQUENCY	43
 #define OPT_SND_BEEPER_VOL	44
-#define OPT_SND_AY_VOL		45
-#define OPT_SND_COVOX_VOL	46
-#define OPT_SND_SPECDRUM_VOL 47
+#define OPT_SND_DEVICE_ID	45
+
+#define OPT_SOUND_ALL		46
+#define OPT_JOYSTICK_ALL	47
+
 
 #define OPT_MEM_MODEL		48
 #define OPT_PP				49
@@ -89,33 +91,30 @@
 #define OPT_JOY3_STATUS		76
 #define OPT_JOY4_STATUS		77
 
-#define OPT_SOUND_ALL		78
-#define OPT_JOYSTICK_ALL	79
+#define OPTT_STRING			0
+#define OPTT_DWORD			1
+#define OPTT_HEX			2
+#define OPTT_BOOL			3
 
-#define OPTT_STRING		0
-#define OPTT_DWORD		1
-#define OPTT_HEX		2
-#define OPTT_BOOL		3
+#define AY_STEREO_NONE		0
+#define AY_STEREO_ABC		1
+#define AY_STEREO_ACB		2
 
-#define AY_STEREO_NONE	0
-#define AY_STEREO_ABC	1
-#define AY_STEREO_ACB	2
+#define SND_FREQ_44100		0
+#define SND_FREQ_22050		1
+#define SND_FREQ_11025		2
 
-#define SND_FREQ_44100	0
-#define SND_FREQ_22050	1
-#define SND_FREQ_11025	2
-
-#define AR_1X			0
-#define AR_2X			1
-#define AR_3X			2
-#define AR_4X			3
-#define AR_AS_IS		4
+#define AR_1X				0
+#define AR_2X				1
+#define AR_3X				2
+#define AR_4X				3
+#define AR_AS_IS			4
 
 #define JOY_KEMPSTON		0
 #define JOY_INTERFACE_I		1
 #define JOY_INTERFACE_II	2
 #define JOY_CURSOR			3
-#define JOY_KEYBOARD		4	// O,P,Q,A,SPACE,M,N,B,V
+#define JOY_KEYBOARD		4
 #define JOY_CUSTOM			5
 
 #define DELAY_CPU			10

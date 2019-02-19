@@ -16,29 +16,13 @@ static int idsAR[] = {IDM_1X, IDM_2X, IDM_3X, IDM_4X, IDM_AS_IS, 0};
 ssh_cws nameROMs[] = {L"48K", L"128K", L"PENTAGON 128K", L"SCORPION 256K"};
 ssh_cws namePPs[] = {L"None", L"TV", L"Bilinear"};
 
-
 static CRITICAL_SECTION cs;
 
 HMENU hMenu = nullptr;
 HINSTANCE hInst = nullptr;
 
-HANDLE hTM;
-LARGE_INTEGER dueTime;
-
-void procTimer(void* p, DWORD l, DWORD h) {
-	for(int i = 0; i < 1620 / *(ssh_d*)p; i++) {
-		theApp->bus.execute();
-	}
-}
-
-static ssh_d WINAPI ProcBus(void* params) {
-	hTM = CreateWaitableTimer(NULL, FALSE, NULL);
-	dueTime.QuadPart = -10000;
-	while(true) {
-		SetWaitableTimer(hTM, &dueTime, 0, procTimer, (void*)&(theApp->bus.delayCPU), FALSE);
-		SleepEx(30, TRUE);
-	}
-	return 0;
+static void CALLBACK timerProc(HWND hWNd, UINT nID, UINT_PTR elapsed, DWORD) {
+	theApp->bus.execute();
 }
 
 void setOrGetWndPos(HWND h, int id_opt, bool get, bool activate) {
@@ -178,8 +162,8 @@ void zxFrame::onUpdate() {
 							IDM_TURBO, ST_TURBO, IDM_SOUND, ST_SOUND, IDM_DEBUGGER, ST_DEBUGGER, IDM_KEYBOARD, ST_KEYBOARD,
 							IDM_FILTER, ST_FILTER, IDM_PP_NONE, ST_FILTER, IDM_PP_BILINEAR, ST_FILTER, IDM_PP_MIXED, ST_FILTER, 
 							IDM_1X, ST_ASPECT, IDM_2X, ST_ASPECT, IDM_3X, ST_ASPECT, IDM_4X, ST_ASPECT, IDM_AS_IS, ST_ASPECT,
-							IDM_MODEL, ST_MODEL, IDM_48K, ST_MODEL, IDM_128K, ST_MODEL};
-	for(int i = 0; i < 35; i += 2) {
+							IDM_MODEL, ST_MODEL, IDM_48K, ST_MODEL, IDM_128K, ST_MODEL, IDM_PENTAGON_128K, ST_MODEL, IDM_SCORPION_256K, ST_MODEL};
+	for(int i = 0; i < 40; i += 2) {
 		if(change[i] == wmId) {
 			int state = change[i + 1];
 			if(wmId == IDM_PAUSE) state |= (!(*_TSTATE & ZX_EXEC) * STS_EXECUTE);
@@ -509,14 +493,18 @@ zxFrame::zxFrame() : zxWnd() {
 	hMenuPP = nullptr;
 	hMenuModel = nullptr;
 	hCpuThread = nullptr;
+	hTimer = 0;
 	debug = nullptr;
 }
 
 zxFrame::~zxFrame() {
 	pauseCPU(true);
+	KillTimer(hWnd, hTimer);
+
 	SAFE_DELETE(debug);
 	SAFE_DELETE(keyboard);
 	SAFE_DELETE(gamepad);
+	CloseHandle(hCpuThread);
 	DeleteCriticalSection(&cs);
 }
 
@@ -538,9 +526,6 @@ void zxFrame::makeWndSize(SIZE* sz) {
 	}
 	//std::chrono::microseconds(50);
 	AdjustWindowRect(&rc, GetWindowLong(hWnd, GWL_STYLE), TRUE);
-}
-
-void APIENTRY ProcWTimer(void* param, DWORD low, DWORD high) {
 }
 
 int zxFrame::run() {
@@ -585,9 +570,11 @@ int zxFrame::run() {
 
 	for(int i = 9; i >= 0; i--) modifyMRU(getOpt(OPT_MRU9)->sval);
 
-	DWORD cpuID;
-	hCpuThread = CreateThread(nullptr, 0, ProcBus, nullptr, 0, &cpuID);
+//	DWORD cpuID;
+//	hCpuThread = CreateThread(nullptr, 0, ProcBus, nullptr, 0, &cpuID);
 	
+	hTimer = SetTimer(hWnd, 10000, 20, timerProc);
+
 	SetActiveWindow(hWnd);
 
 	while(true) {
@@ -664,10 +651,10 @@ bool zxFrame::loadState(ssh_cws path) {
 		_wsopen_s(&_hf, path, _O_RDONLY | _O_BINARY, _SH_DENYRD, _S_IREAD);
 		if(_hf != -1) {
 			auto l = _filelength(_hf);
-			ssh_b tmpRegs[70];
-			if(_read(_hf, tmpRegs, 70) != 70) throw(0);
+			ssh_b tmpRegs[COUNT_REGS];
+			if(_read(_hf, tmpRegs, COUNT_REGS) != COUNT_REGS) throw(0);
 			// меняем иодель
-			if(!bus.changeModel(tmpRegs[MODEL - 65536], oldModel)) throw(0);
+			if(!bus.changeModel(tmpRegs[MODEL], oldModel)) throw(0);
 			// грузим состояние
 			if(!bus.loadState(_hf)) throw(0);
 			// грузим имя сохраненной проги

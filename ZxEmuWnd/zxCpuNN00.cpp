@@ -5,41 +5,46 @@ funcCPU table_opsN00_XXX[] = {
 	&zxCPU::funcN00_000, &zxCPU::ldRp, &zxCPU::funcN00_010, &zxCPU::incRp, &zxCPU::incSSS, &zxCPU::incSSS, &zxCPU::ldSSS, &zxCPU::funcN00_111
 };
 
-void zxCPU::funcN00_000() {
+int zxCPU::funcN00_000() {
 	int d = (ops > 1 ? (char)read_mem8PC() : 0);
 	switch(ops) {
 		// NOP
-		case 0: break;
+		case 0: return 4;
 		// EX AF, AF'
-		case 1: swapReg(_AF, _AF + 4); break;
+		case 1: swapReg(_AF, _AF + 4); return 4;
 		// DJNZ
-		case 2: (*_B)--; if(*_B) (*_PC) += d; break;
+		case 2: (*_B)--; if(*_B) { (*_PC) += d; return 13; } return 8;
 		// JR
-		case 3: (*_PC) += d; break;
-		// JR CCC
-		default: if(isFlag(ops & 3)) (*_PC) += d;
+		case 3: (*_PC) += d; return 12;
 	}
+	// JR CCC
+	if(isFlag(ops & 3)) { 
+		(*_PC) += d;
+		return 12; 
+	}
+	return 7;
 }
 
-void zxCPU::funcN00_010() {
+int zxCPU::funcN00_010() {
 	if(ops < 4) {
 		// LD (BC/DE), A | LD A, (BC/DE)
 		ssh_w reg = *fromRP_AF(ops);
 		if(ops & 1) *_A = read_mem8(reg); else write_mem8(reg, *_A);
-	} else {
-		// LD [nn], HL/A | LD A/HL, [nn]
-		ssh_w nn = read_mem16PC();
-		ssh_w* reg = fromRP_AF(4);
-		bool d = ops & 2;
-		if(ops & 1) {
-			if(d) *_A = read_mem8(nn); else *reg = read_mem16(nn);
-		} else {
-			if(d) write_mem8(nn, *_A); else write_mem16(nn, *reg);
-		}
+		return 7;
 	}
+	// LD [nn], HL/A | LD A/HL, [nn]
+	ssh_w nn = read_mem16PC();
+	ssh_w* reg = fromRP_AF(4);
+	bool d = ops & 2;
+	if(ops & 1) {
+		if(d) *_A = read_mem8(nn); else *reg = read_mem16(nn);
+	} else {
+		if(d) write_mem8(nn, *_A); else write_mem16(nn, *reg);
+	}
+	return (d ? 13 : 16);
 }
 
-void zxCPU::funcN00_111() {
+int zxCPU::funcN00_111() {
 	ssh_b a = *_A;
 	ssh_b oldFc = getFlag(FC);
 	switch(ops) {
@@ -71,9 +76,10 @@ void zxCPU::funcN00_111() {
 		default: a = rotate(a, FH | FN | FC);
 	}
 	*_A = a;
+	return 4;
 }
 
-void zxCPU::ldRp() {
+int zxCPU::ldRp() {
 	ssh_w* reg = fromRP_SP(ops);
 	if(ops & 1) {
 		// ADD HL, RP; --***-0C	F5,H,F3 берутся по результатам сложения старших байтов
@@ -82,17 +88,19 @@ void zxCPU::ldRp() {
 		ssh_d val = valHL + *reg;
 		*hl = (ssh_w)val;
 		update_flags(FH | FN | FC, _FH(valHL >> 8, (*reg) >> 8, 0, 0) | (val > 65535));
-	} else {
-		// LD RP, NN
-		*reg = read_mem16PC();
+		return 11;
 	}
+	// LD RP, NN
+	*reg = read_mem16PC();
+	return 10;
 }
 
-void zxCPU::incRp() { 
+int zxCPU::incRp() { 
 	*fromRP_SP(ops) += ((ops & 1) ? -1 : 1);
+	return 6;
 }
 
-void zxCPU::incSSS() {
+int zxCPU::incSSS() {
 	// SZ5H3VN-
 	ssh_b n = typeOps & 1;
 	ssh_b* reg = fromPrefRON(ops);
@@ -101,9 +109,11 @@ void zxCPU::incSSS() {
 	ssh_b val = op1 + op2;
 	write_mem8(reg, val);
 	update_flags(FS | FZ | FH | FPV | FN, _FS(val) | _FZ(val) | _FH(op1, op2, 0, n) | _FV1(op1, op2, 0, n) | _FN(n));
+	return (prefix ? 19 : (ops == 6 ? 11 : 4));
 }
 
-void zxCPU::ldSSS() {
+int zxCPU::ldSSS() {
 	ssh_b* reg = fromPrefRON(ops);
 	write_mem8(reg, read_mem8PC());
+	return (prefix ? 15 : 7);
 }

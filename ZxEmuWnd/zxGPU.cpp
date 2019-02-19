@@ -5,6 +5,8 @@
 #include "zxSettings.h"
 #include "zxKeyboard.h"
 
+ssh_b p_ff_in;
+
 static ssh_d scan_offs[] = {
 	0, 256, 512, 768, 1024, 1280, 1536, 1792,
 	32, 288, 544, 800, 1056, 1312, 1568, 1824,
@@ -65,6 +67,9 @@ void zxGPU::showScreen() {
 	if((hdc = ::GetDC(theApp->getHWND()))) {
 		HGDIOBJ h;
 		HDC hMem;
+		hMem = hdcMemPrimary;
+		h = SelectObject(hdcMemPrimary, hbmpMemPrimary);
+		/*
 		if(!(*_TSTATE & ZX_BUFFER_GPU)) {
 			hMem = hdcMemPrimary;
 			h = SelectObject(hdcMemPrimary, hbmpMemPrimary);
@@ -72,6 +77,7 @@ void zxGPU::showScreen() {
 			hMem = hdcMemBack;
 			h = SelectObject(hdcMemBack, hbmpMemBack);
 		}
+		*/
 		LPRECT r = &theApp->wndRect;
 		StretchBlt(hdc, r->left, r->top, r->right - r->left, r->bottom - r->top, hMem, 0, 0, WIDTH_SCREEN + SIZE_BORDER * 2, HEIGHT_SCREEN + SIZE_BORDER * 2, SRCCOPY);
 		SelectObject(hMem, h);
@@ -80,7 +86,24 @@ void zxGPU::showScreen() {
 	blink++;
 }
 
-void zxGPU::execute(bool screen) {
+void zxGPU::execute() {
+	theApp->bus.screenOutNT(memBuffer(true), colours, ((blink & blinkMsk) >> blinkShift) == 0);
+	auto filter = 0;// theApp->getOpt(OPT_PP)->dval;
+	if(filter > 0) {
+		auto dest = memBuffer(true);
+		int x = 0, y = 1;
+		while(y++ < ((HEIGHT_SCREEN - 1) + SIZE_BORDER * 2)) {
+			while(x++ < ((WIDTH_SCREEN - 1) + SIZE_BORDER * 2)) {
+				*dest++ = (filter == 1 ? asm_ssh_mixed(dest, dest + (WIDTH_SCREEN + SIZE_BORDER * 2)) :
+						   asm_ssh_bilinear(x, y, (WIDTH_SCREEN + SIZE_BORDER * 2), dest));
+			}
+			x = 0;
+		}
+	}
+	showScreen();
+	return;
+	/*
+
 
 	int y = *_SCAN;
 	ssh_d* dest = memBuffer(true);
@@ -99,7 +122,7 @@ void zxGPU::execute(bool screen) {
 		int offs = scan_offs[yy & 63] + y_bank;
 
 		dest += SIZE_BORDER;
-		ssh_b* memScreen = theApp->bus.getPage(*_VID, false);
+		ssh_b* memScreen = pageVRAM;
 		auto src_cols = ((yy >> 3) * 32) + (memScreen + 6144);
 		auto src = memScreen + offs;
 
@@ -116,28 +139,31 @@ void zxGPU::execute(bool screen) {
 	*_SCAN = y;
 
 	if(!y) {
-		auto filter = theApp->getOpt(OPT_PP)->dval;
-		if(filter > 0) {
-			dest = memBuffer(true);
-			int x = 0, y = 1;
-			while(y++ < ((HEIGHT_SCREEN - 1) + SIZE_BORDER * 2)) {
-				while(x++ < ((WIDTH_SCREEN - 1) + SIZE_BORDER * 2)) {
-					*dest++ = (filter == 1 ? asm_ssh_mixed(dest, dest + (WIDTH_SCREEN + SIZE_BORDER * 2)) :
-							   asm_ssh_bilinear(x, y, (WIDTH_SCREEN + SIZE_BORDER * 2), dest));
-				}
-				x = 0;
-			}
-		}
-		modifyTSTATE((*_TSTATE) ^ ZX_BUFFER_GPU, ZX_BUFFER_GPU);
+	auto filter = theApp->getOpt(OPT_PP)->dval;
+	if(filter > 0) {
+	dest = memBuffer(true);
+	int x = 0, y = 1;
+	while(y++ < ((HEIGHT_SCREEN - 1) + SIZE_BORDER * 2)) {
+	while(x++ < ((WIDTH_SCREEN - 1) + SIZE_BORDER * 2)) {
+	*dest++ = (filter == 1 ? asm_ssh_mixed(dest, dest + (WIDTH_SCREEN + SIZE_BORDER * 2)) :
+	asm_ssh_bilinear(x, y, (WIDTH_SCREEN + SIZE_BORDER * 2), dest));
 	}
+	x = 0;
+	}
+	}
+	modifyTSTATE((*_TSTATE) ^ ZX_BUFFER_GPU, ZX_BUFFER_GPU);
+	}
+	*/
 }
 
 ssh_d* zxGPU::memBuffer(bool primary) {
-	if((*_TSTATE) & ZX_BUFFER_GPU) {
+//	if((*_TSTATE) & ZX_BUFFER_GPU) {
 		return primary ? memoryPrimary : memoryBack;
+		/*
 	} else {
 		return primary ? memoryBack : memoryPrimary;
 	}
+	*/
 }
 
 void zxGPU::decodeColor(ssh_b color) {

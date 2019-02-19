@@ -15,9 +15,9 @@ struct ZX_REG_TMP {
 };
 
 static ZX_REG_TMP regs[] = {
-	{(ssh_w*)&memZX[RC_], L"BC'"},{(ssh_w*)&memZX[RE_], L"DE'"},{(ssh_w*)&memZX[RL_], L"HL'"},
-	{(ssh_w*)&memZX[RC], L"BC"},{(ssh_w*)&memZX[RE], L"DE"},{(ssh_w*)&memZX[RL], L"HL"},
-	{(ssh_w*)&memZX[RSPL], L"SP"},{(ssh_w*)&memZX[RPCL], L"PC"},{(ssh_w*)&memZX[RXL], L"IX"},{(ssh_w*)&memZX[RYL], L"IY"}
+	{(ssh_w*)&cpuZX[RC_], L"BC'"},{(ssh_w*)&cpuZX[RE_], L"DE'"},{(ssh_w*)&cpuZX[RL_], L"HL'"},
+	{(ssh_w*)&cpuZX[RC], L"BC"},{(ssh_w*)&cpuZX[RE], L"DE"},{(ssh_w*)&cpuZX[RL], L"HL"},
+	{(ssh_w*)&cpuZX[RSPL], L"SP"},{(ssh_w*)&cpuZX[RPCL], L"PC"},{(ssh_w*)&cpuZX[RXL], L"IX"},{(ssh_w*)&cpuZX[RYL], L"IY"}
 };
 
 BEGIN_MSG_MAP(zxDebugger, zxDialog)
@@ -67,35 +67,35 @@ TBBUTTON tbb[] = {
 };
 
 ZX_DEBUGGER dlgElems[] = {
-	{L"BC", IDC_EDIT_BC, IDC_STATIC_BC, nullptr, (ssh_w*)&memZX[RC], 0xffff},
-	{L"DE", IDC_EDIT_DE, IDC_STATIC_DE, nullptr, (ssh_w*)&memZX[RE], 0xffff},
-	{L"HL", IDC_EDIT_HL, IDC_STATIC_HL, nullptr, (ssh_w*)&memZX[RL], 0xffff},
-	{L"AF", IDC_EDIT_AF, IDC_STATIC_AF, nullptr, (ssh_w*)&memZX[RF], 0xffff},
-	{L"BC'", IDC_EDIT_BC_, IDC_STATIC_BC_, nullptr, (ssh_w*)&memZX[RC_], 0xffff},
-	{L"DE'", IDC_EDIT_DE_, IDC_STATIC_DE_, nullptr, (ssh_w*)&memZX[RE_], 0xffff},
-	{L"HL'", IDC_EDIT_HL_, IDC_STATIC_HL_, nullptr, (ssh_w*)&memZX[RL_], 0xffff},
-	{L"AF'", IDC_EDIT_AF_, IDC_STATIC_AF_, nullptr, (ssh_w*)&memZX[RF_], 0xffff},
-	{L"SP", IDC_EDIT_SP, IDC_STATIC_SP, nullptr, (ssh_w*)&memZX[RSPL], 0xffff},
-	{L"IX", IDC_EDIT_IX, IDC_STATIC_IX, nullptr, (ssh_w*)&memZX[RXL], 0xffff},
-	{L"IY ", IDC_EDIT_IY, IDC_STATIC_IY, nullptr, (ssh_w*)&memZX[RYL], 0xffff},
-	{L"PC", IDC_EDIT_PC, IDC_STATIC_PC, nullptr, (ssh_w*)&memZX[RPCL], 0xffff},
-	{L"IFF1", IDC_EDIT_IFF1, IDC_STATIC_IFF1, &memZX[IFF1], nullptr, 1},
-	{L"IFF2", IDC_EDIT_IFF2, IDC_STATIC_IFF2, &memZX[IFF2], nullptr, 1},
-	{L"RAM", IDC_EDIT_RAM, IDC_STATIC_RAM, &memZX[RAM], nullptr, 7},
-	{L"ROM", IDC_EDIT_ROM, IDC_STATIC_ROM, &memZX[ROM], nullptr, 1},
-	{L"IM", IDC_EDIT_IM, IDC_STATIC_IM, &memZX[IM], nullptr, 0x3},
-	{L"VID", IDC_EDIT_VID, IDC_STATIC_VID, &memZX[VID], nullptr, 0x7},
-	{L"SCAN", IDC_EDIT_SCAN, IDC_STATIC_SCAN, &memZX[SCAN], nullptr, 0xff},
-	{L" I ", IDC_EDIT_I, IDC_STATIC_I, &memZX[RI], nullptr, 0xff},
-	{L" R ", IDC_EDIT_R, IDC_STATIC_R, &memZX[RR], nullptr, 0xff},
-	{L" S ", IDC_EDIT_S, IDC_STATIC_S, &memZX[RF], nullptr, FS, 7},
-	{L" Z ", IDC_EDIT_Z, IDC_STATIC_Z, &memZX[RF], nullptr, FZ, 6},
-	{L" 5 ", IDC_EDIT_5, IDC_STATIC_5, &memZX[RF], nullptr, 32, 5},
-	{L" H ", IDC_EDIT_H, IDC_STATIC_H, &memZX[RF], nullptr, FH, 4},
-	{L" 3 ", IDC_EDIT_3, IDC_STATIC_3, &memZX[RF], nullptr, 8,  3},
-	{L" P ", IDC_EDIT_P, IDC_STATIC_P, &memZX[RF], nullptr, FPV,2},
-	{L" N ", IDC_EDIT_N, IDC_STATIC_N, &memZX[RF], nullptr, FN, 1},
-	{L" C ", IDC_EDIT_C, IDC_STATIC_C, &memZX[RF], nullptr, FC, 0}
+	{L"BC", IDC_EDIT_BC, IDC_STATIC_BC, nullptr, (ssh_w*)&cpuZX[RC], 0xffff},
+	{L"DE", IDC_EDIT_DE, IDC_STATIC_DE, nullptr, (ssh_w*)&cpuZX[RE], 0xffff},
+	{L"HL", IDC_EDIT_HL, IDC_STATIC_HL, nullptr, (ssh_w*)&cpuZX[RL], 0xffff},
+	{L"AF", IDC_EDIT_AF, IDC_STATIC_AF, nullptr, (ssh_w*)&cpuZX[RF], 0xffff},
+	{L"BC'", IDC_EDIT_BC_, IDC_STATIC_BC_, nullptr, (ssh_w*)&cpuZX[RC_], 0xffff},
+	{L"DE'", IDC_EDIT_DE_, IDC_STATIC_DE_, nullptr, (ssh_w*)&cpuZX[RE_], 0xffff},
+	{L"HL'", IDC_EDIT_HL_, IDC_STATIC_HL_, nullptr, (ssh_w*)&cpuZX[RL_], 0xffff},
+	{L"AF'", IDC_EDIT_AF_, IDC_STATIC_AF_, nullptr, (ssh_w*)&cpuZX[RF_], 0xffff},
+	{L"SP", IDC_EDIT_SP, IDC_STATIC_SP, nullptr, (ssh_w*)&cpuZX[RSPL], 0xffff},
+	{L"IX", IDC_EDIT_IX, IDC_STATIC_IX, nullptr, (ssh_w*)&cpuZX[RXL], 0xffff},
+	{L"IY ", IDC_EDIT_IY, IDC_STATIC_IY, nullptr, (ssh_w*)&cpuZX[RYL], 0xffff},
+	{L"PC", IDC_EDIT_PC, IDC_STATIC_PC, nullptr, (ssh_w*)&cpuZX[RPCL], 0xffff},
+	{L"IFF1", IDC_EDIT_IFF1, IDC_STATIC_IFF1, &cpuZX[IFF1], nullptr, 1},
+	{L"IFF2", IDC_EDIT_IFF2, IDC_STATIC_IFF2, &cpuZX[IFF2], nullptr, 1},
+	{L"RAM", IDC_EDIT_RAM, IDC_STATIC_RAM, &cpuZX[RAM], nullptr, 7},
+	{L"ROM", IDC_EDIT_ROM, IDC_STATIC_ROM, &cpuZX[ROM], nullptr, 1},
+	{L"IM", IDC_EDIT_IM, IDC_STATIC_IM, &cpuZX[IM], nullptr, 0x3},
+	{L"VID", IDC_EDIT_VID, IDC_STATIC_VID, &cpuZX[VID], nullptr, 0x7},
+	{L"SCAN", IDC_EDIT_SCAN, IDC_STATIC_SCAN, &cpuZX[SCAN], nullptr, 0xff},
+	{L" I ", IDC_EDIT_I, IDC_STATIC_I, &cpuZX[RI], nullptr, 0xff},
+	{L" R ", IDC_EDIT_R, IDC_STATIC_R, &cpuZX[RR], nullptr, 0xff},
+	{L" S ", IDC_EDIT_S, IDC_STATIC_S, &cpuZX[RF], nullptr, FS, 7},
+	{L" Z ", IDC_EDIT_Z, IDC_STATIC_Z, &cpuZX[RF], nullptr, FZ, 6},
+	{L" 5 ", IDC_EDIT_5, IDC_STATIC_5, &cpuZX[RF], nullptr, 32, 5},
+	{L" H ", IDC_EDIT_H, IDC_STATIC_H, &cpuZX[RF], nullptr, FH, 4},
+	{L" 3 ", IDC_EDIT_3, IDC_STATIC_3, &cpuZX[RF], nullptr, 8,  3},
+	{L" P ", IDC_EDIT_P, IDC_STATIC_P, &cpuZX[RF], nullptr, FPV,2},
+	{L" N ", IDC_EDIT_N, IDC_STATIC_N, &cpuZX[RF], nullptr, FN, 1},
+	{L" C ", IDC_EDIT_C, IDC_STATIC_C, &cpuZX[RF], nullptr, FC, 0}
 };
 
 void zxDebugger::onPrevBreakpoint() {
@@ -140,7 +140,7 @@ void zxDebugger::onStepInto() {
 	da->getCmdOperand(da->indexFromAddress(*_PC), true, true, true, &addr1, &addr2);
 	if(addr1 == -1) addr1 = addr2 = da->move(*_PC, 1);
 	while(true) {
-		theApp->bus.step(true);
+		theApp->bus.step(true, true);
 		if(*_PC == addr1 || *_PC == addr2) break;
 	}
 	updateRegisters(*_PC, U_REGS | U_PC | U_SP | U_SEL);
@@ -152,7 +152,7 @@ void zxDebugger::onStepOver() {
 	da->getCmdOperand(da->indexFromAddress(*_PC), true, false, true, &addr1, &addr2);
 	if(addr1 == -1) addr1 = addr2 = da->move(*_PC, 1);
 	while(true) {
-		theApp->bus.step(true);
+		theApp->bus.step(true, true);
 		if(*_PC == addr1 || *_PC == addr2) break;
 	}
 	updateRegisters(*_PC, U_REGS | U_PC | U_SP | U_SEL);
@@ -163,7 +163,7 @@ void zxDebugger::onPause() {
 }
 
 void zxDebugger::onRun() {
-	theApp->bus.step(true);
+	theApp->bus.step(true, true);
 	setProgrammPause(false, false);
 }
 
@@ -187,7 +187,7 @@ void zxDebugger::onHexDec() {
 
 void zxDebugger::onOverProc() {
 	auto exit_pc = *_PC_EXIT_CALL;
-	while(*_PC != exit_pc) theApp->bus.step(true);
+	while(*_PC != exit_pc) theApp->bus.step(true, true);
 	updateRegisters(*_PC, U_REGS | U_PC | U_SP | U_SEL);
 }
 
@@ -218,7 +218,8 @@ void zxDebugger::onSetCmd() {
 	if(len) {
 		// вставить комманду
 		int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
-		memcpy(&memZX[da->getCmdAddress(sel)], assm->code, len);
+		auto address = da->getCmdAddress(sel);
+		for(int i = 0 ; i < len; i++) *get_mem(address++) = assm->code[i];
 		da->decode(_pc, countVisibleItems);
 		InvalidateRect(hWndDA, nullptr, false);
 	} else {
@@ -246,7 +247,7 @@ void zxDebugger::onDblkClkListDA() {
 }
 
 void zxDebugger::onDblkClkListSP() {
-	ssh_w newPC = *(ssh_w*)(memZX + SendMessage(hWndSP, LB_GETCURSEL, 0, 0) * 2);
+	ssh_w newPC = read_mem16((ssh_w)(SendMessage(hWndSP, LB_GETCURSEL, 0, 0) * 2));
 	updateRegisters(newPC, U_PC | U_STORY | U_SEL | U_TOP);
 }
 
@@ -297,10 +298,10 @@ void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
 	} else if(id == IDC_LIST_SP) {
 		// stack
 		auto idx = item * 2;
-		auto val = *(ssh_w*)(memZX + idx);
+		auto val = read_mem16(idx);
 		zxString chars;
 		for(int i = 0; i < 4; i++) {
-			ssh_w v = (ssh_w)memZX[val + i];
+			ssh_w v = (ssh_w)read_mem16(val + i);
 			if(v < 32) v = 32;
 			chars += (ssh_ws)v;
 		}
@@ -315,7 +316,7 @@ void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
 		zxString chars;
 		for(int i = 0; i < 16; i++) {
 			if(idx > 65535) break;
-			ssh_w v = (ssh_w)memZX[idx++];
+			ssh_w v = read_mem16(idx++);
 			fromNum(v, radix[dec + 2]);
 			vals += tmpBuf;
 			if(v < 32) v = 32;
@@ -537,7 +538,7 @@ void zxDebugger::setProgrammPause(bool pause, bool activate) {
 		res = true;
 		if(flags == FBP_MEM) {
 			if(bp.flags & FBP_VAL) {
-				ssh_b v1 = memZX[address];
+				ssh_b v1 = read_mem8(address);
 				if(bp.flags & FBP_MASK) v1 &= bp.mask;
 				ssh_b v2 = (ssh_b)bp.value;
 				switch((bp.flags & FBP_COND)) {

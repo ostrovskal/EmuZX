@@ -7,15 +7,12 @@ static SHEET_DATA sheetCommon[] = {
 	{IDC_SLIDER_PERIOD_GPU, OPT_DELAY_GPU, (ssh_cws)0x0a28},
 	{IDC_SLIDER_PERIOD_BORDER, OPT_PERIOD_BORDER, (ssh_cws)0x0820},
 	{IDC_SLIDER_PERIOD_BLINK, OPT_PERIOD_BLINK, (ssh_cws)0x0309},
-	{IDC_CHECK_WRITE_ROM, OPT_WRITE_ROM},
+	{IDC_CHECK_WRITE_ROM, OPT_INTERLEAVED},
 	{IDC_CHECK_AUTO_SAVE, OPT_AUTO_SAVE},
 };
 
 static SHEET_DATA sheetSnd[] = {
 	{IDC_SLIDER_VOL_BEEPER, OPT_SND_BEEPER_VOL},
-	{IDC_SLIDER_VOL_COVOX, OPT_SND_COVOX_VOL},
-	{IDC_SLIDER_VOL_AY, OPT_SND_AY_VOL},
-	{IDC_SLIDER_VOL_SPECDRUM, OPT_SND_SPECDRUM_VOL},
 
 	{IDC_CHECK_AY, OPT_SND_AY},
 	{IDC_CHECK_COVOX, OPT_SND_COVOX},
@@ -129,12 +126,12 @@ int zxDlgSheetSound::onInitDialog(HWND hWnd) {
 		auto val = theApp->getOpt(k->index)->dval;
 		auto h = GetDlgItem(hWnd, k->id);
 		k->hWnd = h;
-		if(i < 4) {
-			SendMessage(h, TBM_SETRANGE, 0, MAKELONG(0, 100));
+		if(i == 0) {
+			SendMessage(h, TBM_SETRANGE, 0, MAKELONG(0, 15));
 			SendMessage(h, TBM_SETPOS, TRUE, val);
-			SendMessage(h, TBM_SETTICFREQ, 4, 0);
+//			SendMessage(h, TBM_SETTICFREQ, 4, 0);
 
-		} else if(i < 10) {
+		} else if(i < 7) {
 			SendMessage(h, BM_SETCHECK, (val ? BST_CHECKED : BST_UNCHECKED), 0);
 		} else {
 			int count;

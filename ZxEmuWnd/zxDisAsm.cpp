@@ -177,7 +177,7 @@ void zxDisAsm::ops11() {
 				case 1: _DA(C_CALL); _DA(C_NN); put16(read16()); break;
 					// prefix DD/FD
 				case 3: case 7:
-					n = memZX[_pc];
+					n = read_mem8(_pc);
 					if(n == 0xDD || n == 0xFD || n == 0xED) _DA(C_IX_NONI + prefix);
 					else execute(((codeOps & 4) >> 2) + 1, (n == 0xCB ? PREFIX_CB : 0));
 					break;
@@ -364,24 +364,23 @@ zxString zxDisAsm::makeCommand(ssh_d num, int flags) {
 zxString zxDisAsm::makeCode(ssh_w address, int length, ssh_b dec) const {
 	zxString code;
 	for(int i = 0; i < length; i++) {
-		code += fromNum(memZX[address++], radix[dec + ((i != (length - 1)) * 2)]);
+		code += fromNum(read_mem8(address++), radix[dec + ((i != (length - 1)) * 2)]);
 	}
 	return code;
 }
 
 ssh_w zxDisAsm::cmdJump(ssh_w pc) {
-	auto b = memZX[pc];
+	auto b = read_mem8(pc);
 	if(b == 0xdd || b == 0xfd || b == 0xed) pc++;
 	readOps();
 	pc++; _pc--;
 	if(groupOps == 3) {
 		if((typeOps == 4 || (typeOps == 5 && codeOps == 1) || typeOps == 2 || typeOps == 7 || 
 			(typeOps == 3 && codeOps == 0) || (typeOps == 1 && codeOps == 5))) {
-			return *(ssh_w*)(memZX + pc);
+			return read_mem16(pc);
 		}
 	} else if(groupOps == 0 && typeOps == 0 && codeOps > 1) {
-		char d = (char)memZX[pc++];
-		return (pc + d);
+		return pc + (char)read_mem8(pc++);
 	}
 	return pc;
 }
@@ -394,6 +393,8 @@ ssh_w zxDisAsm::move(ssh_w pc, int count) {
 			execute(0, 0);
 		}
 	} else if(count < 0) {
+		_pc += count;
+		return _pc;
 		int cc = 200;
 		int mn_diff = 1000000;
 		int mn_addr = 0;
@@ -432,7 +433,7 @@ void zxDisAsm::getCmdOperand(ssh_d num, bool isPC, bool isCall, bool isRet, int*
 	*addr1 = *addr2 = -1;
 	if(adrs && num < cmdCount) {
 		_pc = adrs[num];
-		auto b = memZX[_pc];
+		auto b = read_mem8(_pc);
 		if(b == 0xdd || b == 0xfd || b == 0xed) _pc++;
 		if(isPC) {
 			// JP			type = 3 code = 0
@@ -459,31 +460,30 @@ void zxDisAsm::getCmdOperand(ssh_d num, bool isPC, bool isCall, bool isRet, int*
 					}
 					else if((typeOps == 1 && codeOps == 1) || typeOps == 0) {
 						// ret
-						*addr1 = *(ssh_w*)(memZX + (*_SP));
+						*addr1 = read_mem16(*_SP);
 						*addr2 = _pc;
 					} else if(typeOps == 1 && codeOps == 5) {
 						// jp hl/ix/iy
 						ssh_w* reg = (b == 0xdd ? _IX : (b == 0xfd ? _IY : _HL));
 						*addr1 = *addr2 = *reg;
 					} else {
-						*addr1 = *(ssh_w*)(memZX + _pc);
+						*addr1 = read_mem16(_pc);
 						*addr2 = (_pc + 2);
 					}
 				}
 			} else if(groupOps == 0 && typeOps == 0 && codeOps > 1) {
-				char d = (char)memZX[_pc++];
-				*addr1 = (_pc + d);
+				*addr1 = (_pc + (char)read_mem8(_pc++));
 				*addr2 = _pc;
 			}
 		} else {
 			// LD RP, (NN)/LD A,(NN)/LD (NN), RP/LD (NN), A
-			auto b1 = memZX[_pc++];
+			auto b1 = read_mem8(_pc++);
 			bool is = (b1 == 0x01 || b1 == 0x11 || b1 == 0x21 || b1 == 0x31 || b1 == 0x22 || b1 == 0x2a || b1 == 0x32 || b1 == 0x3a);
 			if(b == 0xed) {
 				b1 &= 0b01'001'011;
 				is = (b1 == 0b01'000'011 || b1 == 0b01'001'011);
 			}
-			*addr1 = *addr2 = (is ? *(ssh_w*)(memZX + _pc) : -1);
+			*addr1 = *addr2 = (is ? read_mem16(_pc) : -1);
 		}
 	}
 }

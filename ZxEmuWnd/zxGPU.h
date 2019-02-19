@@ -8,7 +8,7 @@ class zxGPU {
 public:
 	zxGPU();
 	virtual ~zxGPU();
-	void execute(bool screen);
+	void execute();
 	bool saveScreen(ssh_cws path);
 	void showScreen();
 	void updateData();
