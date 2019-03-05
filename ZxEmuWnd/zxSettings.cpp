@@ -71,6 +71,7 @@ static ZX_OPTION opt[] = {
 	{OPTT_BOOL, L"executeEnable", 1},
 	{OPTT_BOOL, L"soundEnable", 1},
 	{OPTT_BOOL, L"joyEnable", 0},
+	{OPTT_BOOL, L"tapeTrap", 0},
 
 	{OPTT_DWORD, L"model", MODEL_48K},
 	{OPTT_DWORD, L"filter", FILTER_NONE},

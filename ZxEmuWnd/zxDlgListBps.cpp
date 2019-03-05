@@ -66,10 +66,10 @@ void zxDlgListBps::onNewEdit() {
 			bool is1 = (_bp->address1 <= bp->address1) && (_bp->address2 >= bp->address1);
 			bool is2 = (_bp->address1 <= bp->address2) && (_bp->address2 >= bp->address2);
 			if(is1 || is2) {
-				zxString s1(fromNum(_bp->address1, radix[HEX + 22]));
-				zxString s2(fromNum(_bp->address2, radix[HEX + 22]));
-				zxString d1(fromNum(bp->address1, radix[HEX + 22]));
-				zxString d2(fromNum(bp->address2, radix[HEX + 22]));
+				zxString s1(_bp->address1, RFMT_OPS16, true);
+				zxString s2(_bp->address2, RFMT_OPS16, true);
+				zxString d1(bp->address1, RFMT_OPS16, true);
+				zxString d2(bp->address2, RFMT_OPS16, true);
 				MessageBox(hWnd, zxString::fmt(L"Перекрытие точек останова <%s - %s>/<%s - %s>!", s1, s2, d1, d2), L"Ошибка", MB_ICONERROR);
 				break;
 			}
@@ -154,12 +154,12 @@ void zxDlgListBps::setItems() {
 		lvi.iItem = i;
 
 		lvi.iSubItem = 0;
-		lvi.pszText = (ssh_ws*)fromNum(i + 1, radix[19]);
+		lvi.pszText = zxString(i + 1, RFMT_NUM, false).buffer();
 		SendMessage(hWndList, LVM_INSERTITEM, i, (LPARAM)&lvi);
 
 		lvi.iSubItem = 1;
 	
-		auto txt = zxString::fmt(L"%s - %s", zxString(fromNum(bp->address1, radix[HEX + 22])), zxString(fromNum(bp->address2, radix[HEX + 22])));
+		auto txt = zxString::fmt(L"%s - %s", zxString(bp->address1, RFMT_OPS16, true), zxString(bp->address2, RFMT_OPS16, true));
 		lvi.pszText = txt.buffer();
 		SendMessage(hWndList, LVM_SETITEM, 1, (LPARAM)&lvi);
 
@@ -168,11 +168,11 @@ void zxDlgListBps::setItems() {
 		SendMessage(hWndList, LVM_SETITEM, 2, (LPARAM)&lvi);
 
 		lvi.iSubItem = 3;
-		lvi.pszText = (bp->flags & FBP_VAL) ? fromNum(bp->value, radix[HEX + 16]) : L"";
+		lvi.pszText = (bp->flags & FBP_VAL) ? zxString(bp->value, RFMT_OPS8, true).buffer() : L"";
 		SendMessage(hWndList, LVM_SETITEM, 3, (LPARAM)&lvi);
 
 		lvi.iSubItem = 4;
-		lvi.pszText = (bp->flags & (FBP_VAL | FBP_MASK)) == (FBP_VAL | FBP_MASK) ? fromNum(bp->mask, radix[HEX + 16]) : L"";
+		lvi.pszText = (bp->flags & (FBP_VAL | FBP_MASK)) == (FBP_VAL | FBP_MASK) ? zxString(bp->mask, RFMT_OPS8, true).buffer() : L"";
 		SendMessage(hWndList, LVM_SETITEM, 4, (LPARAM)&lvi);
 
 		lvi.iSubItem = 5;

@@ -182,6 +182,8 @@ void zxBus::updateData() {
 	SND.beeperVolume = theApp->getOpt(OPT_SND_BEEPER_VOL)->dval;
 	// обновить звук
 	SND.setTicksPerFrame(period);
+	// перехват ленты
+	TAPE.isTraps = theApp->getOpt(OPT_TRAP_TAPE)->dval;
 }
 
 bool zxBus::changeModel(ssh_d newModel, ssh_d oldModel) {
@@ -322,7 +324,7 @@ int zxBus::signalNMI() {
 
 int zxBus::step(bool allow_int) {
 	if((*_TSTATE) & ZX_EXEC) {
-		modifyTSTATE(allow_int * ZX_INT, ZX_TR_DOS);
+		modifyTSTATE(allow_int * ZX_INT, 0);
 		if(*_TSTATE & ZX_DEBUG) {
 			if(theApp->debug->checkBPS(*_PC, false)) return 0;
 		}
@@ -340,7 +342,7 @@ int zxBus::step(bool allow_int) {
 }
 
 void zxBus::stepDebug() {
-	modifyTSTATE(0, ZX_HALT | ZX_TR_DOS);
+	modifyTSTATE(0, ZX_HALT);
 	// перехват системных процедур
 	TAPE.hookPC(*_PC);
 	// выполнение операции

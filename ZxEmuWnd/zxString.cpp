@@ -25,8 +25,9 @@ zxString::zxString(ssh_u value, int offs, bool hex) {
 	auto res = asm_ssh_ntow(&value, rdx & 1, &end);
 	auto spec = radix1[rdx];
 	auto str = (ssh_ws*)TMP_BUF;
-	auto lnum = (spec[0] - '0') - (end - res);
-	auto ll = (strlen(spec) - 2) + (lnum > 0 ? lnum : 0);
+	auto lstr = end - res;
+	auto lnum = (spec[0] - '0') - lstr;
+	auto ll = (strlen(spec) - 2) + lstr + (lnum > 0 ? lnum : 0);
 	auto buf(alloc(ll, false)), tmp = buf;
 	spec++;
 	while((ws = *spec++)) {

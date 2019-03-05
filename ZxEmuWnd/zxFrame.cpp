@@ -44,6 +44,8 @@ BEGIN_MSG_MAP(zxFrame, zxWnd)
 	ON_COMMAND(IDM_DEBUGGER, onUpdate)
 	ON_COMMAND(IDM_KEYBOARD, onUpdate)
 	ON_COMMAND(IDM_JOYSTICK, onUpdate)
+	ON_COMMAND(IDM_TRAP_TAPE, onUpdate)
+	ON_COMMAND(IDM_FULLSCREEN, onFullScreen)
 	ON_COMMAND_RANGE(IDM_48K, IDM_SCORPION_256K, onUpdate)
 	ON_COMMAND_RANGE(IDM_1X, IDM_AS_IS, onUpdate)
 	ON_COMMAND_RANGE(IDM_FILTER_NONE, IDM_FILTER_ROUND_BICUBIC, onUpdate)
@@ -86,18 +88,37 @@ void zxFrame::onRestore() {
 		modifyTSTATE(ZX_RESET, 0);
 	}
 	updateData(ST_EXECUTE | isExec * STS_EXECUTE);
-	//	checkedSubMenu(hMenu, OPT_MODEL, -1L, idsModel);
+}
+
+void zxFrame::onFullScreen() {
+	static long wndStyles = 0;
+	auto sts = GetWindowLong(hWnd, GWL_STYLE);;
+	if(!wndStyles) wndStyles = sts;
+	if(sts != wndStyles) {
+		// fullscreen
+		SetWindowLong(hWnd, GWL_STYLE, wndStyles);
+		SetWindowLong(hWnd, GWL_EXSTYLE, 0);
+		ShowWindow(hWndToolbar, SW_NORMAL);
+		ShowWindow(hWnd, SW_NORMAL);
+	} else {
+		SetWindowLong(hWnd, GWL_STYLE, WS_OVERLAPPED);
+		SetWindowLong(hWnd, GWL_EXSTYLE, WS_EX_TOPMOST);
+		//DestroyMenu(hMenu);
+		ShowWindow(hWndToolbar, SW_HIDE);
+		ShowWindow(hWnd, SW_SHOWMAXIMIZED);
+	}
+	UpdateWindow(hWnd);
 }
 
 void zxFrame::onUpdate() {
 	static int change[] = { IDM_PAUSE, ST_EXECUTE | ST_EXECUTE_GO, 
-							IDM_JOYSTICK, ST_JOYSTICK,
+							IDM_JOYSTICK, ST_JOYSTICK, IDM_TRAP_TAPE, ST_TAPE,
 							IDM_TURBO, ST_TURBO, IDM_SOUND, ST_SOUND, IDM_DEBUGGER, ST_DEBUGGER, IDM_KEYBOARD, ST_KEYBOARD,
 							IDM_FILTER_NONE, ST_FILTER, IDM_FILTER_SMOOTH, ST_FILTER, IDM_FILTER_BILINEAR, ST_FILTER, IDM_FILTER_BICUBIC, ST_FILTER,
 							IDM_FILTER_ROUND_NONE, ST_FILTER, IDM_FILTER_ROUND_SMOOTH, ST_FILTER, IDM_FILTER_ROUND_BILINEAR, ST_FILTER, IDM_FILTER_ROUND_BICUBIC, ST_FILTER,
 							IDM_1X, ST_ASPECT, IDM_2X, ST_ASPECT, IDM_3X, ST_ASPECT, IDM_4X, ST_ASPECT, IDM_AS_IS, ST_ASPECT,
 							IDM_48K, ST_MODEL, IDM_128K, ST_MODEL, IDM_PENTAGON_128K, ST_MODEL, IDM_SCORPION_256K, ST_MODEL};
-	for(int i = 0; i < 46; i += 2) {
+	for(int i = 0; i < 48; i += 2) {
 		if(change[i] == wmId) {
 			int state = change[i + 1];
 			if(wmId == IDM_PAUSE) state |= (!(*_TSTATE & ZX_EXEC) * STS_EXECUTE);
@@ -117,6 +138,7 @@ void zxFrame::updateData(ssh_d state) {
 	changeState(OPT_EXECUTE, IDM_PAUSE, false);
 	if(state & ST_EXECUTE_GO) debug->setProgrammPause(!exec, false);
 
+	changeState(OPT_TRAP_TAPE, IDM_TRAP_TAPE, state & ST_TAPE);
 	changeState(OPT_TURBO, IDM_TURBO, state & ST_TURBO);
 	changeState(OPT_JOYSTICK, IDM_JOYSTICK, state & ST_JOYSTICK);
 	changeState(OPT_SOUND, IDM_SOUND, state & ST_SOUND);
@@ -275,14 +297,18 @@ BOOL zxFrame::onEraseBkgnd(HDC) {
 }
 
 void zxFrame::onSize(UINT type, int nWidth, int nHeight) {
+	int top = 0;
 	if(hWndToolbar) {
-		SendMessage(hWndToolbar, WM_SIZE, type, MAKELONG(nWidth, nHeight));
-		GetWindowRect(hWndToolbar, &wndRect);
-		wndRect.top = (wndRect.bottom - wndRect.top) - 1;
-		wndRect.left = 0;
-		wndRect.right = nWidth;
-		wndRect.bottom = nHeight;
+		if(IsWindowVisible(hWndToolbar)) {
+			SendMessage(hWndToolbar, WM_SIZE, type, MAKELONG(nWidth, nHeight));
+			GetWindowRect(hWndToolbar, &wndRect);
+			top = (wndRect.bottom - wndRect.top) - 1;
+		}
 	}
+	wndRect.top = top;
+	wndRect.left = 0;
+	wndRect.right = nWidth;
+	wndRect.bottom = nHeight;
 }
 
 void zxFrame::onNotify(LPNMHDR nm, LRESULT*) {
@@ -389,8 +415,8 @@ int zxFrame::run() {
 
 	hMenu = GetMenu(hWnd);
 	hMenuMRU = GetSubMenu(GetSubMenu(hMenu, 0), 7);
-	hMenuModel = GetSubMenu(GetSubMenu(hMenu, 2), 6);
-	hMenuPP = GetSubMenu(GetSubMenu(hMenu, 1), 3);
+	hMenuModel = GetSubMenu(GetSubMenu(hMenu, 2), 7);
+	hMenuPP = GetSubMenu(GetSubMenu(hMenu, 1), 5);
 
 	HEX = getOpt(OPT_DECIMAL)->dval;
 

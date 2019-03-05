@@ -1,11 +1,9 @@
 #pragma once
 
-#define DA_FHEX				0
-#define DA_FDEC				1
-#define DA_FCODE			2
-#define DA_FADDRESS			4
-#define DA_FADDR			8
-#define DA_FPADDR			16
+#define DA_FCODE			1
+#define DA_FADDRESS			2
+#define DA_FADDR			4
+#define DA_FPADDR			8
 
 #define SIZE_CMD			16L
 
@@ -162,21 +160,21 @@ class zxDisAsm {
 public:
 	zxDisAsm(): cmdCount(0), cmds(nullptr), adrs(nullptr) {}
 	virtual ~zxDisAsm() { 
-		delete cmds; cmds = nullptr; 
-		delete adrs; adrs = nullptr;
+		delete[] cmds; cmds = nullptr; 
+		delete[] adrs; adrs = nullptr;
 	}
 	
 	// старт декодирования
-	ssh_w decode(ssh_w pc, ssh_d count);
+	ssh_w decode(ssh_w pc, ssh_d count, ssh_d* realCount = nullptr);
 
 	// сохранение результата в файл
-	bool save(ssh_cws path, ssh_b dec);
+	bool save(ssh_cws path);
 
 	// перемещение позиции вперед/назад
 	ssh_w move(ssh_w pc, int count);
 
 	// формирование строки кода комманды
-	zxString makeCode(ssh_w address, int length, ssh_b dec) const;
+	zxString makeCode(ssh_w address, int length) const;
 	
 	// формирование комманды
 	zxString makeCommand(ssh_d num, int flags);

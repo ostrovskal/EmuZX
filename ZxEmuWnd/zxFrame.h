@@ -21,7 +21,8 @@ public:
 		ST_ASPECT		= 0x80,
 		ST_FILTER		= 0x100,
 		STS_EXECUTE		= 0x200,
-		ST_EXECUTE_GO	= 0x400
+		ST_EXECUTE_GO	= 0x400,
+		ST_TAPE			= 0x800
 	};
 	zxFrame();
 	virtual ~zxFrame();
@@ -71,6 +72,7 @@ protected:
 	ssh_msg void onNotify(LPNMHDR nmNMHDR, LRESULT* pResult);
 	ssh_msg BOOL onEraseBkgnd(HDC hdc);
 	ssh_msg void onUpdate();
+	ssh_msg void onFullScreen();
 
 	bool changeState(int id_opt, int id, bool change);
 	bool checkedSubMenu(HMENU hMenu, int id_opt, ssh_d val, int* ids);

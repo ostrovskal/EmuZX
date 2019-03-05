@@ -16,7 +16,8 @@ public:
 		U_SP	= 4,
 		U_STORY	= 8,
 		U_SEL	= 16,
-		U_TOP	= 32
+		U_TOP	= 32,
+		U_DT	= 64
 	};
 	zxDebugger() : zxDialog(), hWndDA(nullptr), hWndSP(nullptr), hFont(nullptr), countVisibleItems(0),
 					_pc(-1), _sp(-1), _lastPC(-1), _dt(0), curIndexBP(-1), curStoryPC(-1), limitStoryPC(0) { 
@@ -58,7 +59,7 @@ protected:
 	void updateUndoRedo(bool set);
 	void updatePrevNextBP();
 	void quickBP(int adr);
-	void updateStack(int sp);
+	void updateStack();
 	void updateHexDec(bool change);
 	void onTrace();
 	int comparePredefinedNames(ssh_cws buf);

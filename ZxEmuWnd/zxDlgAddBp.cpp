@@ -72,10 +72,10 @@ void zxDlgAddBp::onOK() {
 }
 
 void zxDlgAddBp::onNotifyAddr1() {
-	auto l = GetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS1), tmpBuf, 260);
+	auto l = GetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS1), (ssh_ws*)TMP_BUF, MAX_PATH);
 	if(isAddr2) {
 		owner = true;
-		SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS2), tmpBuf);
+		SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS2), (ssh_ws*)TMP_BUF);
 		owner = false;
 	}
 	EnableWindow(GetDlgItem(hWnd, IDOK), l > 0);

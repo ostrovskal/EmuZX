@@ -38,7 +38,7 @@ int zxTape::hookPC(ssh_w pc) {
 				if(pos >= len) control(1);
 			}
 		}
-	}
+	} else modifyTSTATE(0, ZX_TR_DOS);
 	return 0;
 }
 
@@ -103,15 +103,6 @@ bool zxTape::isSkip() {
 }
 
 bool zxTape::next() {
-	bool first = false;
-
-	if(!curr) return true;
-	auto next = curr;
-	curr = curr->next;
-LR: if(next == curr) return true;
-	if(!curr) { curr = blocks.fromPos(1); first = true; }
-	if(isSkip() || curr == blocks.root()) { curr = curr->next; goto LR; }
-	return first;
 	if(curr) {
 		curr = curr->next;
 		while(isSkip()) curr = curr->next;

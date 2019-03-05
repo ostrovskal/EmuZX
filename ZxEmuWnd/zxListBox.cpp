@@ -137,6 +137,7 @@ void zxListBox::onVScroll(UINT code, UINT p, HWND hWndScroll) {
 			case SB_PAGEDOWN: pos += si.nPage; break;
 			case SB_PAGEUP: pos -= si.nPage; break;
 			case SB_THUMBTRACK: pos = p; break;
+			case SB_THUMBPOSITION: pos = p; break;
 		}
 		if(pos >= (si.nMax - countVisibleItems)) {
 			pos = si.nMax - countVisibleItems;

@@ -262,33 +262,38 @@ void zxDisAsm::execute(int prefix1, int prefix2) {
 	(this->*table_ops[groupOps * 3 + prefix2])();
 }
 
-ssh_w zxDisAsm::decode(ssh_w pc, ssh_d count) {
+ssh_w zxDisAsm::decode(ssh_w pc, ssh_d count, ssh_d* real) {
 	_pc = pc;
 	if(count > cmdCount) {
-		delete cmds; cmds = new ssh_b[count * SIZE_CMD];
-		delete adrs; adrs = new ssh_w[count + 1];
+		delete[] cmds; cmds = new ssh_b[count * SIZE_CMD];
+		delete[] adrs; adrs = new ssh_w[count + 1];
 	}
 	cmdCount = count;
 	memset(cmds, C_END, cmdCount * SIZE_CMD);
 	if(cmdCount > 0) {
-		for(ssh_d c = 0; c < count; c++) {
+		auto old_pc = _pc;
+		ssh_d c;
+		for(c = 0; c < count; c++) {
+			if(_pc < old_pc) break;
 			pos = 0;
 			adrs[c] = _pc;
 			execute(0, 0);
 			memcpy(cmds + c * SIZE_CMD, path, pos);
 		}
-		adrs[count] = _pc;
+		cmdCount = c;
+		if(real)* real = c;
+		adrs[c] = _pc;
 	}
 	return _pc;
 }
 
-bool zxDisAsm::save(ssh_cws path, ssh_b dec) {
+bool zxDisAsm::save(ssh_cws path) {
 	zxFile f(path, false);
 	for(ssh_d i = 0; i < cmdCount; i++) {
 		auto address = adrs[i];
-		zxString adr(fromNum(address, radix[dec + 10]));
-		zxString code(makeCode(address, adrs[i + 1] - address, dec));
-		zxString cmd(makeCommand(i, (dec & 1) | DA_FADDR));
+		zxString adr(address, RFMT_OPS16, true);
+		zxString code(makeCode(address, adrs[i + 1] - address));
+		zxString cmd(makeCommand(i, DA_FADDR | DA_FCODE));
 		ssh_cws tabs = (code.length() >= 8) ? L"\t\t" : L"\t\t\t";
 		zxString str(adr + L'\t' + code + tabs + cmd + L"\r\n");
 		if(!f.write(str.buffer(), (long)str.length() * 2)) return false;
@@ -300,20 +305,17 @@ zxString zxDisAsm::makeCommand(ssh_d num, int flags) {
 	zxString command;
 	if(adrs && cmds && num < cmdCount) {
 		auto address = adrs[num];
-		ssh_b dec = (flags & DA_FDEC);
 
-		if((flags & DA_FADDR)) {
-			command = zxString::fmt(radix[dec + 10], address);
+		if(flags & DA_FADDR) {
+			command = zxString(address, RFMT_OPS16, true);
 			static ZX_BREAK_POINT bp;
 			static ssh_cws type_bp[] = {L"\t", L"*\t", L"+\t", L"*+\t"};
 			int isPC = theApp->debug->check(address, bp, FBP_PC);
 			int isMEM = theApp->debug->check(address, bp, FBP_MEM);
-			if(isPC || isMEM) {
-				command += type_bp[isPC | (isMEM << 1)];
-			} else command += L'\t';
+			if(isPC || isMEM) command += type_bp[isPC | (isMEM << 1)]; else command += L'\t';
 		}
-		if((flags & DA_FCODE) == DA_FCODE) {
-			zxString code(makeCode(address, adrs[num + 1] - address, dec));
+		if(flags & DA_FCODE) {
+			zxString code(makeCode(address, adrs[num + 1] - address));
 			ssh_u l = code.length();
 			ssh_cws tabs = (l >= 8 ? L"\t" : L"\t\t");
 			command += code + tabs;
@@ -333,21 +335,16 @@ zxString zxDisAsm::makeCommand(ssh_d num, int flags) {
 					case C_ADDR:if((flags & DA_FPADDR)) r = 12; break;
 					case C_D: if(nn > 0x7f) { nn = 256 - nn; r = 20; } break;
 				}
-				if(r != -1) {
-					swprintf_s(tmpBuf, 260, radix[dec + r], nn);
-					command += tmpBuf;
-				}
+				if(r != -1) command += zxString(nn, r, true);
 			}
 		}
 	}
 	return command;
 }
 
-zxString zxDisAsm::makeCode(ssh_w address, int length, ssh_b dec) const {
+zxString zxDisAsm::makeCode(ssh_w address, int length) const {
 	zxString code;
-	for(int i = 0; i < length; i++) {
-		code += fromNum(read_mem8(address++), radix[dec + ((i != (length - 1)) * 2)]);
-	}
+	for(int i = 0; i < length; i++) code += zxString(read_mem8(address++), (i != (length - 1)) * 2, true);
 	return code;
 }
 

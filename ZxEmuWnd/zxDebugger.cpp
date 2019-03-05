@@ -161,7 +161,7 @@ void zxDebugger::onTrace() {
 			if((timeGetTime() - tm) >= 3000) break;
 		}
 	}
-	updateRegisters(*_PC, U_REGS | U_PC | U_SP | U_SEL);
+	updateRegisters(*_PC, U_REGS | U_PC | U_SP | U_SEL | U_DT);
 }
 
 void zxDebugger::onPause() {
@@ -196,15 +196,15 @@ void zxDebugger::onSetPC() {
 }
 
 void zxDebugger::onSetSP() {
-	updateStack(*_SP);
+	updateStack();
 }
 
 void zxDebugger::onSetData() {
 	HWND h = GetDlgItem(hWnd, IDC_EDIT_ADDRESS_DATA);
-	GetWindowText(h, tmpBuf, 260);
-	auto addr = comparePredefinedNames(tmpBuf);
+	GetWindowText(h, (ssh_ws*)TMP_BUF, MAX_PATH);
+	auto addr = comparePredefinedNames((ssh_ws*)TMP_BUF);
 	if(addr != -1) _dt = addr; else {
-		_dt = *(ssh_w*)asm_ssh_wton(tmpBuf, (ssh_u)Radix::_dec);
+		_dt = *(ssh_w*)asm_ssh_wton(TMP_BUF, (ssh_u)Radix::_dec);
 	}
 	SendMessage(hWndDT, LB_SETTOPINDEX, _dt / 16, 0);
 	InvalidateRect(hWndDT, nullptr, true);
@@ -212,9 +212,9 @@ void zxDebugger::onSetData() {
 
 void zxDebugger::onSetCmd() {
 	HWND h = GetDlgItem(hWnd, IDC_EDIT_CURRENT_COMMAND);
-	GetWindowText(h, tmpBuf, 260);
+	GetWindowText(h, (ssh_ws*)TMP_BUF, MAX_PATH);
 	int posErr = 0;
-	int len = assm.parseCommand(tmpBuf, FASM_LABEL, &posErr);
+	int len = assm.parseCommand((ssh_ws*)TMP_BUF, FASM_LABEL, &posErr);
 	if(len) {
 		// вставить комманду
 		int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
@@ -237,8 +237,7 @@ void zxDebugger::onDblkClkListDA() {
 	else {
 		da.getCmdOperand(sel, false, false, false, &addr1, &addr2);
 		if(addr1 != -1) {
-			fromNum(addr1, radix[HEX + 22]);
-			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS_DATA), tmpBuf);
+			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS_DATA), zxString(addr1, RFMT_OPS16, true));
 			_dt = addr1; SendMessage(hWndDT, LB_SETTOPINDEX, _dt / 16, 0);
 			InvalidateRect(hWndDT, nullptr, false);
 		}
@@ -251,22 +250,29 @@ void zxDebugger::onDblkClkListSP() {
 }
 
 void zxDebugger::onScrollListDA() {
+	ssh_d real;
+	int dy = 0, npc;
 	int delta = (int)SendMessage(hWndDA, LB_GETTOPINDEX, 0, 0) - _pc;
-	_pc = da.move(_pc, delta);
-	_lastPC = da.decode(_pc, countVisibleItems);
+	do {
+		npc = da.move(_pc, delta);
+		_lastPC = da.decode(npc, countVisibleItems, &real);
+		dy = countVisibleItems - real;
+		delta -= dy;
+	} while(dy);
+	_pc = npc;
 	SendMessage(hWndDA, LB_SETTOPINDEX, _pc, 0);
 }
 
 void zxDebugger::onSelChangeListDA() {
 	int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
-	SetWindowText(GetDlgItem(hWnd, IDC_EDIT_CURRENT_COMMAND), da.makeCommand(sel, HEX));
+	SetWindowText(GetDlgItem(hWnd, IDC_EDIT_CURRENT_COMMAND), da.makeCommand(sel, 0));
 }
 
 void zxDebugger::onChangeEditRegs() {
 	for(auto& zx : dlgElems) {
 		if(zx.idMain == wmId) {
-			GetWindowText(zx.hWndMain, tmpBuf, 256);
-			ssh_w v = *(ssh_w*)(asm_ssh_wton(tmpBuf, Radix::_dec));
+			GetWindowText(zx.hWndMain, (ssh_ws*)TMP_BUF, MAX_PATH);
+			ssh_w v = *(ssh_w*)(asm_ssh_wton(TMP_BUF, Radix::_dec));
 			if(zx.regb) {
 				if(wmId < IDC_EDIT_BC) {
 					*zx.regb &= ~(1 << zx.shift);
@@ -295,29 +301,37 @@ void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
 		txt = da.makeCommand((int)(item - top), DA_FCODE | DA_FADDR | DA_FPADDR | HEX);
 	} else if(id == IDC_LIST_SP) {
 		// stack
-		auto idx = item * 2;
-		auto val = read_mem16(idx);
+		auto addr = item * 2 + (*_SP & 1);
+		auto val = read_mem16(addr);
 		zxString chars;
 		for(int i = 0; i < 4; i++) {
 			ssh_w v = read_mem8(val + i);
-			if(v < 32) v = 32;
+			if(v < 32) v = L'.';
 			chars += (ssh_ws)v;
 		}
-		auto sp = ((idx == (*_SP)) ? L"SP " : L"   ");
-		txt = zxString::fmt(HEX ? L"%s%05d %05d %s" : L"%s%04X %04X %s", sp, idx, val, chars.buffer());
+		auto sp = ((addr == *_SP) ? L"SP " : L"   ");
+		txt = zxString::fmt(HEX ? L"%s%04X %04X %s" : L"%s%05d %05d %s", sp, addr, val, chars.buffer());
 	} else if(id == IDC_LIST_DT) {
-		// адрес 16 значений текстовое представление
-		auto idx = (_dt % 16) + (item * 16);
-		if(idx > 65535) return;
-		zxString vals(fromNum(idx, radix[HEX + 22]));
+		// адрес
+		int odd = _dt & 15;
+		int idx = (item * 16) + odd;
+		if(_dt < 16 && odd) idx -= 16;
+		// 16 значений
+		zxString vals;
+		vals = ((idx < 0 || idx > 65535) ? L"?????" : zxString(idx, RFMT_OPS16, true));
 		vals += L"  ";
+		//  текстовое представление
 		zxString chars;
-		for(int i = 0; i < 16; i++) {
-			if(idx > 65535) break;
-			ssh_w v = read_mem8(idx++);
-			fromNum(v, radix[HEX + 2]);
-			vals += tmpBuf;
-			if(v < 32) v = 32;
+		for(int i = idx; i < idx + 16; i++) {
+			ssh_w v;
+			if(i > 65535 || i < 0) {
+				vals += HEX ? L"?? " : L"??? ";
+				v = 0;
+			} else {
+				v = read_mem8(i);
+				vals += zxString(v, RFMT_CODE_, true);
+			}
+			if(v < 32) v = L'.';
 			chars += (ssh_ws)v;
 		}
 		txt = zxString::fmt(L"%s %s", vals.buffer(), chars.buffer());
@@ -415,14 +429,15 @@ void zxDebugger::updateRegisters(int newPC, int flags) {
 			DrawText(hdc, zx.text, -1, &rect, DT_SINGLELINE | DT_CENTER);
 			ReleaseDC(h, hdc);
 			zx.val = val;
-			auto fmt = (zx.msk < 255 ? L"%d" : (zx.regb ? radix[HEX + 16] : radix[HEX + 22]));
-			SetWindowText(zx.hWndMain, fromNum(val, fmt));
+			zxString v(val, zx.msk < 255 ? RFMT_NUM : (zx.regb ? RFMT_OPS8 : RFMT_OPS16), true);
+			SetWindowText(zx.hWndMain, v);
 		}
-		SetWindowText(hWndTick, fromNum(*_TICK, radix[17]));
+		SetWindowText(hWndTick, zxString(*_TICK, RFMT_NUM, false));
 		InvalidateRect(hWnd, nullptr, false);
 	}
-	if((flags & U_SP) && _SP && _sp != *_SP) updateStack(*_SP);
-	
+	if(_SP && ((flags & U_SP) && _sp != *_SP)) updateStack();
+	if(flags & U_DT) InvalidateRect(hWndDT, nullptr, false);
+
 	if(flags & U_PC) {
 		if(_pc != newPC) {
 			if(newPC < _pc || newPC >= _lastPC) {
@@ -436,7 +451,8 @@ void zxDebugger::updateRegisters(int newPC, int flags) {
 	}
 }
 
-void zxDebugger::updateStack(int sp) {
+void zxDebugger::updateStack() {
+	auto sp = *_SP;
 	sp -= 10;
 	if(sp < 0) sp = 0;
 	else if((sp + 20) > 65535) sp = 65510;
