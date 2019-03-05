@@ -3,11 +3,9 @@
 #include "zxGamePad.h"
 
 static SHEET_DATA sheetCommon[] = {
-	{IDC_SLIDER_PERIOD_CPU, OPT_DELAY_CPU, (ssh_cws)0x0210},
-	{IDC_SLIDER_PERIOD_GPU, OPT_DELAY_GPU, (ssh_cws)0x0a28},
-	{IDC_SLIDER_PERIOD_BORDER, OPT_PERIOD_BORDER, (ssh_cws)0x0820},
-	{IDC_SLIDER_PERIOD_BLINK, OPT_PERIOD_BLINK, (ssh_cws)0x0309},
-	{IDC_CHECK_WRITE_ROM, OPT_INTERLEAVED},
+	{IDC_SLIDER_PERIOD_CPU, OPT_PERIOD_CPU, (ssh_cws)0x0110},
+	{IDC_SLIDER_PERIOD_BLINK, OPT_PERIOD_BLINK, (ssh_cws)0x0106},
+	{IDC_SLIDER_SIZE_BORDER, OPT_SIZE_BORDER, (ssh_cws)0x0004},
 	{IDC_CHECK_AUTO_SAVE, OPT_AUTO_SAVE},
 };
 
@@ -21,7 +19,7 @@ static SHEET_DATA sheetSnd[] = {
 	{IDC_CHECK_MIC, OPT_SND_MIC},
 	{IDC_CHECK_8BIT, OPT_SND_8BIT},
 
-	{IDC_COMBO_STEREO_AY, OPT_SND_AY_STEREO, L"None;ABC;ACB"},
+	{IDC_COMBO_STEREO_AY, OPT_SND_AY_STEREO, L"ACB;ABC;None"},
 	{IDC_COMBO_SND_FREQ, OPT_SND_FREQUENCY, L"44100;22050;11025"},
 };
 
@@ -49,7 +47,7 @@ static SHEET_DATA sheetGpu[] = {
 };
 
 static SHEET_DATA sheetJoy[] = {
-	{IDC_COMBO_JOY_NUMBER, 0, L"¹ 1;¹ 2;¹ 3;¹ 4"},
+	{IDC_COMBO_JOY_NUMBER, 0, L"¹ 1;¹ 2"},
 	{IDC_COMBO_JOY_MAPPING, OPT_JOY1_MAPPING, L"KEMPSTON;SINCLAIR 1;SINCLAIR 2;CURSOR;KEYBOARD;CUSTOM"},
 	{IDC_COMBO_AXIS_X, 0, L"X +;X -"},
 	{IDC_COMBO_AXIS_Y, 0, L"Y +;Y -"},
@@ -103,12 +101,12 @@ BEGIN_MSG_MAP(zxDlgSettings, zxDialog)
 END_MSG_MAP()
 
 int zxDlgSheetCommon::onInitDialog(HWND hWnd) {
-	for(int i = 0; i < 6; i++) {
+	for(int i = 0; i < 4; i++) {
 		auto k = &sheetCommon[i];
 		auto val = theApp->getOpt(k->index)->dval;
 		HWND h = GetDlgItem(hWnd, k->id);
 		k->hWnd = h;
-		if(i < 4) {
+		if(i < 3) {
 			ssh_u items = (ssh_u)(k->items);
 			SendMessage(h, TBM_SETRANGE, 0, MAKELONG((items & 0xff00) >> 8, items & 0xff));
 			SendMessage(h, TBM_SETPOS, TRUE, val);
@@ -390,7 +388,7 @@ void zxDlgSettings::onDefault() {
 	int count = 0;
 	SHEET_DATA* sh = nullptr;
 	switch(SendMessage(hWndTab, TCM_GETCURSEL, 0, 0)) {
-		case 0: sh = sheetCommon; count = 6; break;
+		case 0: sh = sheetCommon; count = 4; break;
 		case 1: sh = sheetGpu; count = 16; break;
 		case 2: sh = sheetSnd; count = 12; break;
 	}
@@ -412,11 +410,10 @@ void zxDlgSettings::onOK() {
 	zxDialog::onOK();
 }
 
-
 void zxDlgSheetCommon::onOK() {
-	for(int i = 0; i < 6; i++) {
+	for(int i = 0; i < 4; i++) {
 		auto k = &sheetCommon[i];
-		theApp->getOpt(k->index)->dval = (ssh_d)SendMessage(k->hWnd, (i < 4 ? TBM_GETPOS : BM_GETCHECK), 0, 0);
+		theApp->getOpt(k->index)->dval = (ssh_d)SendMessage(k->hWnd, (i < 3 ? TBM_GETPOS : BM_GETCHECK), 0, 0);
 	}
 	zxDialog::onOK();
 }

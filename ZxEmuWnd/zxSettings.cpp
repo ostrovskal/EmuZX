@@ -1,11 +1,8 @@
 
 #include "stdafx.h"
 #include "zxSettings.h"
-#include "zxDebugger.h"
 
-extern zxDebugger* debug;
-
-ZX_OPTION opt[] = {
+static ZX_OPTION opt[] = {
 	{OPTT_STRING, L"mru0"},
 	{OPTT_STRING, L"mru1"},
 	{OPTT_STRING, L"mru2"},
@@ -28,40 +25,6 @@ ZX_OPTION opt[] = {
 	{OPTT_STRING, L"bps9"},
 	{OPTT_STRING, L"path"},
 
-	{OPTT_BOOL, L"soundEnableAY", 1},
-	{OPTT_BOOL, L"soundEnableBeeper", 1},
-	{OPTT_BOOL, L"soundEnableCovox", 1},
-	{OPTT_BOOL, L"soundEnableSpecdrum", 1},
-	{OPTT_BOOL, L"soundEnable8Bit", 0},
-	{OPTT_BOOL, L"soundEnableMic", 1},
-	{OPTT_DWORD, L"soundEnableAyStereo", AY_STEREO_ABC},
-
-	{OPTT_BOOL, L"debuggerEnable"},
-	{OPTT_BOOL, L"keyboardEnable"},
-	{OPTT_BOOL, L"turboEnable"},
-	{OPTT_BOOL, L"decimalEnable", 0},
-	{OPTT_BOOL, L"executeEnable", 1},
-	{OPTT_BOOL, L"debuggerShowPADDR", 1},
-	{OPTT_BOOL, L"debuggerShowPPADDR"},
-	{OPTT_BOOL, L"debuggerShowData"},
-	{OPTT_DWORD, L"delayCPU", 10},
-	{OPTT_DWORD, L"delayGPU", 20},
-	{OPTT_DWORD, L"periodBlink", 3},
-	{OPTT_DWORD, L"periodSound", 1},
-	{OPTT_DWORD, L"periodBorder", 16},
-	{OPTT_BOOL, L"interleavedEnable", 0},
-	{OPTT_BOOL, L"autoSave", 1},
-
-	{OPTT_DWORD, L"soundFrequency", SND_FREQ_44100},
-	{OPTT_DWORD, L"soundBeeperVolume", 50},
-	{OPTT_DWORD, L"soundDeviceID", 0},
-	{OPTT_DWORD, L"soundEnable", 1},
-	{OPTT_DWORD, L"joyEnable", 0},
-	
-	{OPTT_DWORD, L"memoryModel", MODEL_48K},
-	{OPTT_DWORD, L"postProcess", PP_BILINEAR},
-	{OPTT_DWORD, L"aspectRatio", AR_2X},
-
 	{OPTT_STRING, L"keyboardWndPos"},
 	{OPTT_STRING, L"debuggerdWndPos"},
 	{OPTT_STRING, L"mainWndPos"},
@@ -83,15 +46,41 @@ ZX_OPTION opt[] = {
 	{OPTT_HEX, L"colorLightYellow", 0xffffe850},
 	{OPTT_HEX, L"colorLightWhite", 0xffffffff},
 
+	{OPTT_DWORD, L"sizeBorder", 4},
+
+	{OPTT_DWORD, L"periodCpu", 5},
+	{OPTT_DWORD, L"periodBlink", 3},
+	{OPTT_BOOL, L"autoSave", 1},
+
+	{OPTT_BOOL, L"soundEnableAY", 1},
+	{OPTT_BOOL, L"soundEnableBeeper", 1},
+	{OPTT_BOOL, L"soundEnableCovox", 1},
+	{OPTT_BOOL, L"soundEnableSpecdrum", 1},
+	{OPTT_BOOL, L"sound8Bit", 0},
+	{OPTT_BOOL, L"soundEnableMic", 1},
+	{OPTT_DWORD, L"soundAyStereo", AY_STEREO_ABC},
+	{OPTT_DWORD, L"soundFrequency", SND_FREQ_44100},
+	{OPTT_DWORD, L"soundBeeperVolume", 50},
+	{OPTT_DWORD, L"soundAyVolume", 50},
+	{OPTT_DWORD, L"soundDeviceID", 0},
+
+	{OPTT_BOOL, L"debuggerEnable", 0},
+	{OPTT_BOOL, L"keyboardEnable", 0},
+	{OPTT_BOOL, L"turboEnable", 0},
+	{OPTT_BOOL, L"decimalEnable", 0},
+	{OPTT_BOOL, L"executeEnable", 1},
+	{OPTT_BOOL, L"soundEnable", 1},
+	{OPTT_BOOL, L"joyEnable", 0},
+
+	{OPTT_DWORD, L"model", MODEL_48K},
+	{OPTT_DWORD, L"filter", FILTER_NONE},
+	{OPTT_DWORD, L"aspectRatio", AR_2X},
+
 	{OPTT_DWORD, L"joy1Mapping", JOY_KEMPSTON},
-	{OPTT_DWORD, L"joy2Mapping", JOY_INTERFACE_I},
-	{OPTT_DWORD, L"joy3Mapping", JOY_INTERFACE_II},
-	{OPTT_DWORD, L"joy4Mapping", JOY_CURSOR},
+	{OPTT_DWORD, L"joy2Mapping", JOY_SINCLAIR_I},
 
 	{OPTT_STRING, L"joy1Status"},
-	{OPTT_STRING, L"joy2Status"},
-	{OPTT_STRING, L"joy3Status"},
-	{OPTT_STRING, L"joy4Status"}
+	{OPTT_STRING, L"joy2Status"}
 };
 
 zxSettings::zxSettings() {
@@ -114,6 +103,8 @@ bool zxSettings::readLine(FILE* hh, zxString& name, zxString& value) {
 
 void zxSettings::load(const zxString& path) {
 	zxString name, value;
+	FILE* hf;
+
 	// значения по умолчанию в фактические значения(если, например, отсутствует файл настроек)
 	for(auto& o : opt) { o.dval = o.ddef; o.sval = o.sdef; }
 	_wfopen_s(&hf, path, L"rt,ccs=UTF-16LE");
@@ -128,7 +119,7 @@ void zxSettings::load(const zxString& path) {
 						break;
 					case OPTT_DWORD:
 					case OPTT_HEX:
-						o.dval = *(ssh_d*)asm_ssh_wton(value.buffer(), (ssh_u)(o.type == OPTT_HEX ? Radix::_hex : Radix::_dec));
+						o.dval = *(ssh_d*)asm_ssh_wton(value.buffer(), o.type == OPTT_HEX);
 						break;
 					case OPTT_BOOL:
 						o.dval = value == L"true";
@@ -142,8 +133,9 @@ void zxSettings::load(const zxString& path) {
 }
 
 void zxSettings::save(const zxString& path) {
-	_wfopen_s(&hf, path, L"wt,ccs=UTF-16LE");
-	if(hf) {
+	FILE* hf;
+
+	if(!_wfopen_s(&hf, path, L"wt,ccs=UTF-16LE")) {
 		for(auto& o : opt) {
 			ssh_cws value;
 			ssh_u u;
@@ -151,7 +143,7 @@ void zxSettings::save(const zxString& path) {
 				case OPTT_DWORD:
 				case OPTT_HEX:
 					u = o.dval;
-					value = asm_ssh_ntow(&u, (ssh_u)(o.type == OPTT_HEX ? Radix::_hex : Radix::_dec));
+					value = asm_ssh_ntow(&u, o.type == OPTT_HEX);
 					break;
 				case OPTT_BOOL:
 					value = o.dval ? L"true" : L"false";

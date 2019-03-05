@@ -240,9 +240,9 @@ void zxDisAsm::opsED01() {
 }
 
 void zxDisAsm::opsED10() {
-	if(codeOps < 4) { _DA(C_ED_NONI); _pc--; }
+	if(codeOps < 4 || typeOps > 3) { _DA(C_ED_NONI); }
 	else {
-		n = (codeOps & 1) ? C_LDD : C_LDI;
+		n = ((codeOps & 1) ? C_LDD : C_LDI) + typeOps;
 		_DA(n + ((codeOps & 2) ? 8 : 0));
 	}
 }
@@ -290,28 +290,17 @@ ssh_w zxDisAsm::decode(ssh_w pc, ssh_d count) {
 }
 
 bool zxDisAsm::save(ssh_cws path, ssh_b dec) {
-	bool result = false;
-
-	try {
-		_wsopen_s(&_hf, path, _O_CREAT | _O_TRUNC | _O_WRONLY | _O_BINARY, _SH_DENYWR, _S_IWRITE);
-		if(_hf != -1) {
-			result = true;
-			for(ssh_d i = 0; i < cmdCount; i++) {
-				auto address = adrs[i];
-				zxString adr(fromNum(address, radix[dec + 10]));
-				zxString code(makeCode(address, adrs[i + 1] - address, dec));
-				zxString cmd(makeCommand(i, (dec & 1) | DA_FADDR));
-				ssh_cws tabs = (code.length() >= 8) ? L"\t\t" : L"\t\t\t";
-				zxString str(adr + L'\t' + code + tabs + cmd + L"\r\n");
-				int sz = (int)str.length() * 2;
-				if(_write(_hf, str.buffer(), sz) != sz) throw(0);
-			}
-		}
-	} catch(...) {
-		result = false;
+	zxFile f(path, false);
+	for(ssh_d i = 0; i < cmdCount; i++) {
+		auto address = adrs[i];
+		zxString adr(fromNum(address, radix[dec + 10]));
+		zxString code(makeCode(address, adrs[i + 1] - address, dec));
+		zxString cmd(makeCommand(i, (dec & 1) | DA_FADDR));
+		ssh_cws tabs = (code.length() >= 8) ? L"\t\t" : L"\t\t\t";
+		zxString str(adr + L'\t' + code + tabs + cmd + L"\r\n");
+		if(!f.write(str.buffer(), (long)str.length() * 2)) return false;
 	}
-	SAFE_CLOSE1(_hf);
-	return result;
+	return true;
 }
 
 zxString zxDisAsm::makeCommand(ssh_d num, int flags) {

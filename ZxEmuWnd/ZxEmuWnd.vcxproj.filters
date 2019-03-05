@@ -27,9 +27,6 @@
     <ClInclude Include="zxDisAsm.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="Z80.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="zxDebugger.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
@@ -78,18 +75,24 @@
     <ClInclude Include="zxString.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="zxBlipBuffer.h">
+    <ClInclude Include="zxSND.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="zxSND.h">
+    <ClInclude Include="zxFile.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="zxTape.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="zxDisk.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="zxList.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="Z80.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="zxDisAsm.cpp">
@@ -155,10 +158,13 @@
     <ClCompile Include="zxString.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="zxBlipBuffer.cpp">
+    <ClCompile Include="zxSND.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="zxSND.cpp">
+    <ClCompile Include="zxTape.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="zxDisk.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

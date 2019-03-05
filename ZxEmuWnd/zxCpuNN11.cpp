@@ -15,14 +15,14 @@ int zxCPU::funcN11_000() {
 	}
 	switch(typeOps) {
 		// RET CCC; 11/5
-		case 0: (*_PC) = read_mem16(*_SP); (*_SP) += 2; return 11;
+		case 0: *_PC = read_mem16(*_SP); (*_SP) += 2; return 11;
 		// JP CCC, nn 10/10
-		case 2:  (*_PC) = nn; return 10;
+		case 2: *_PC = nn; return 10;
 		// CALL ССС, nn 17/10
 		// RST NNN 11
 		// запомнить ПС для операции отладчика шаг с выходом
-		case 4: *_PC_EXIT_CALL = (*_PC);
-		case 7: (*_SP) -= 2; write_mem16(*_SP, (*_PC)); (*_PC) = (typeOps == 4 ? nn : ops * 8); return (typeOps == 4 ? 17 : 11);
+		case 4: RET_CALL = *_PC;
+		case 7: (*_SP) -= 2; write_mem16(*_SP, *_PC); *_PC = (typeOps == 4 ? nn : ops * 8); return (typeOps == 4 ? 17 : 11);
 		case 6: return opsAccum(read_mem8PC());
 	}
 	return 0;
@@ -39,7 +39,7 @@ int zxCPU::funcN11_001() {
 	switch(ops) {
 		// RET 10
 		// JP [HL/IX] 4
-		case 1:	case 5: (*_PC) = reg; return (ops == 1 ? 10 : 4);
+		case 1:	case 5: *_PC = reg; return (ops == 1 ? 10 : 4);
 		// EXX 4
 		case 3: swapReg(_BC, _BC + 4); swapReg(_DE, _DE + 4); swapReg(_HL, _HL + 4); return 4;
 		// LD SP, HL 6
@@ -58,11 +58,11 @@ int zxCPU::funcN11_101() {
 		case 3: case 7: {
 			ssh_b n = read_mem8((*_PC));
 			if(n == 0xDD || n == 0xFD || n == 0xED) return noni();
-			else execOps(((ops & 4) >> 2) + 1, (n == 0xCB ? PREFIX_CB : 0));
-			break;
+			auto ticks = execOps(((ops & 4) >> 2) + 1, (n == 0xCB ? PREFIX_CB : 0));
+			return ticks + (typeOps == 6 ? 8 : 4);
 		}
 		// prefix ED
-		case 5: execOps(0, PREFIX_ED); break;
+		case 5: return execOps(0, PREFIX_ED);
 	}
 	// PUSH RP
 	(*_SP) -= 2; write_mem16(*_SP, *fromRP_AF(ops));
@@ -75,7 +75,7 @@ int zxCPU::funcN11_011() {
 		// JP nn
 		case 0: (*_PC) = read_mem16PC(); return 10;
 		// prefix CB
-		case 1: execOps(0, PREFIX_CB); break;
+		case 1: return execOps(0, PREFIX_CB);
 		// OUT(d), A
 		case 2: theApp->bus.writePort(read_mem8PC(), a, a); return 11;
 		// IN A, (d)
@@ -92,6 +92,6 @@ int zxCPU::funcN11_011() {
 		case 5: swapReg(_DE, _HL); return 4;
 	}
 	// EI/DI
-	*_IFF1 = *_IFF2 = (ops & 1); modifyTSTATE(!(ops & 1), ZX_INT);
+	*_IFF1 = *_IFF2 = (ops & 1); modifyTSTATE(!(ops & 1) * ZX_INT, ZX_INT);
 	return 4;
 }

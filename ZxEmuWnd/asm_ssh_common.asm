@@ -57,9 +57,11 @@ is_valid	dw 0, 10, 11, 12, 13, 14, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4,
 base64_chars	dw 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90
 				dw 97, 98, 99, 100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122
 				dw 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 43, 47, 0
+blink		db 0
 ALIGN 16
 _fp255x4			dd 255.0, 255.0, 255.0, 255.0
-_blur				dd 0.25, 0.25, 0.25, 0.25
+_fp3_0x4			dd 3.0, 3.0, 3.0, 3.0
+_fp1_0x4			dd 1.0, 1.0, 1.0, 1.0
 length_last_number	dq 0
 fc					db 0
 .code
@@ -309,7 +311,7 @@ asm_ssh_ntow proc public
 		pop r10
 		ret
 str_bool db 'f', 0, 'a', 0, 'l', 0, 's', 0, 'e', 0, 0, 0, 't', 0, 'r', 0, 'u', 0, 'e', 0, 0, 0, 0, 0
-tbl_radix dq nto_dec, 0, 10, nto_ohb, 1, 1, nto_ohb, 7, 3, nto_ohb, 15, 4, nto_dbl, 0, 10, nto_flt, 0, 10, nto_bool, offset str_bool, 12
+tbl_radix dq nto_dec, 0, 10, nto_ohb, 15, 4, nto_ohb, 1, 1, nto_ohb, 7, 3, nto_dbl, 0, 10, nto_flt, 0, 10, nto_bool, offset str_bool, 12
 nto_bool:
 		test rax, rax
 		cmovnz rax, rcx
@@ -579,12 +581,11 @@ asm_ssh_wton proc public
 		setz r12b
 		lea rcx, [rcx + r13 * 2]
 		lea rcx, [rcx + r12 * 2]
-		mov r10, 3
 		cmp word ptr [rcx], '#'
 		setz r13b
 		lea rcx, [rcx + r13 * 2]
 		mov r15, rcx
-		cmovz rdx, r10
+		cmovz rdx, r13
 		mov r10, rcx
 		xor r13, r13
 		mov r9, offset radix
@@ -616,9 +617,9 @@ _BIN	= 1
 _OCT	= 2
 _HEX	= 4
 _DEC	= 8
-tbl_hex dw 0, _HEX, _HEX, _HEX, _HEX, _HEX, _HEX, 0, 0, 0, 0, 0, 0, 0, 0, 0, _DEC + _BIN + _OCT + _HEX, _DEC + _BIN + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _OCT + _HEX
-		dw _DEC + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _HEX, _DEC + _HEX
-radix	dq wto_obh, 10, _DEC, wto_obh, 2, _BIN, wto_obh, 8, _OCT, wto_obh, 16, _HEX, wto_dbl, 10, _DEC, wto_flt, 10, _DEC, wto_bool, 0, 0
+tbl_hex dw 0, _HEX, _HEX, _HEX, _HEX, _HEX, _HEX, 0, 0, 0, 0, 0, 0, 0, 0, 0, _DEC + _BIN + _OCT + _HEX, _DEC + _BIN + _OCT + _HEX
+		dw _DEC + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _OCT + _HEX, _DEC + _HEX, _DEC + _HEX
+radix	dq wto_obh, 10, _DEC, wto_obh, 16, _HEX, wto_obh, 2, _BIN, wto_obh, 8, _OCT, wto_dbl, 10, _DEC, wto_flt, 10, _DEC, wto_bool, 0, 0
 wto_bool:
 		xor rax, rax
 		cmp dword ptr [rcx], 00720074h
@@ -969,82 +970,6 @@ ssh_asm_encode_ari proc
 		ret
 ssh_asm_encode_ari endp
 
-; (void* pix, int ofs, int width);
-asm_ssh_mixed proc
-		pxor mm4, mm4
-		movd mm0, dword ptr [rcx]
-		movd mm1, dword ptr [rcx + 4]
-		movd mm2, dword ptr [rdx]
-		movd mm3, dword ptr [rdx + 4]
-		punpcklbw mm0, mm4
-		punpcklbw mm1, mm4
-		paddusw mm0, mm1
-		punpcklbw mm2, mm4
-		punpcklbw mm3, mm4
-		paddusw mm2, mm3
-		paddusw mm0, mm2
-		psraw mm0, 2
-		packuswb mm0, mm2
-		movd eax, mm0
-		emms
-		ret
-asm_ssh_mixed endp
-
-; rcx = x, rdx = y, r8 - pitch, r9 - pix
-asm_ssh_bilinear proc
-		lea r10, [r9 + r8 * 4]
-		xorps xmm15, xmm15
-		movaps xmm14, _fp255x4
-		movaps xmm13, _blur
-		movd xmm0, dword ptr [r9]
-		movd xmm1, dword ptr [r9 + 4]
-		movd xmm2, dword ptr [r10]
-		movd xmm3, dword ptr [r10 + 4]
-		punpcklbw xmm0, xmm15
-		punpcklbw xmm1, xmm15
-		punpcklbw xmm2, xmm15
-		punpcklbw xmm3, xmm15
-		punpcklwd xmm0, xmm15
-		punpcklwd xmm1, xmm15
-		punpcklwd xmm2, xmm15
-		punpcklwd xmm3, xmm15
-		cvtdq2ps xmm0, xmm0
-		cvtdq2ps xmm1, xmm1
-		cvtdq2ps xmm2, xmm2
-		cvtdq2ps xmm3, xmm3
-
-		divps xmm0, xmm14
-		divps xmm1, xmm14
-		divps xmm2, xmm14
-		divps xmm3, xmm14
-
-		movaps xmm10, xmm0
-		movaps xmm12, xmm2
-		
-		subps xmm1, xmm0
-		subps xmm3, xmm2
-
-		mulps xmm1, xmm13
-		mulps xmm3, xmm13
-
-		addps xmm1, xmm10
-		addps xmm3, xmm12
-
-		subps xmm3, xmm1
-		mulps xmm3, xmm13
-
-		addps xmm3, xmm1
-		mulps xmm3, xmm14
-
-		cvtps2dq xmm3, xmm3
-		packssdw xmm3, xmm3
-		packuswb xmm3, xmm3
-
-		movd rax, xmm3
-
-		ret
-asm_ssh_bilinear endp
-
 ;(ssh_w op1, ssh_w op2, ssh_u fn, ssh_b* fl);
 asm_ssh_accum2 proc
 		push rbx
@@ -1176,5 +1101,373 @@ _sra:	and cl, 128
 _sli:	mov cl, 1
 		ret
 asm_ssh_rotate endp
+
+;ecx - filter, edx - rect, r8 - buffer, r9 - screen
+asm_ssh_post_process proc
+		push r10
+		push r11
+		push r12
+		push r14
+		push r15
+		push rbx
+		push rsi
+		push rdi
+		xorps xmm15, xmm15
+		movaps xmm8, _fp3_0x4
+		mov rbx, rdx
+		mov rsi, rcx
+		movsxd r10, dword ptr [rbx + 0]
+		shl r10, 2						; pitch buffer
+		cmp rsi, 4
+		jl no_buf
+		mov r11, r8
+		movsxd rdx, dword ptr [rbx + 4]
+		dec rdx
+loop1:	movsxd rcx, dword ptr [rbx + 0]
+		dec rcx
+loop0:	movd xmm0, dword ptr [r11]
+		movd xmm1, dword ptr [r11 + 4]
+		movd xmm2, dword ptr [r11 + r10]
+		call _mix
+		dec rcx
+		jg loop0
+		movd xmm0, dword ptr [r11]
+		movss xmm1, xmm0
+		movd xmm2, dword ptr [r11 + r10]
+		call _mix
+		dec rdx
+		jg loop1
+		movsxd rcx, dword ptr [rbx + 0]
+		dec rcx
+loop2:	movd xmm0, dword ptr [r11]
+		movd xmm1, dword ptr [r11 + 4]
+		movss xmm2, xmm0
+		call _mix
+		dec rcx
+		jg loop2
+no_buf:	movaps xmm14, _fp1_0x4
+		movsxd r12, dword ptr [rbx + 8]
+		movsxd r14, dword ptr [rbx + 0]
+		cvtsi2ss xmm2, r14
+		cvtsi2ss xmm3, r12
+		divss xmm2, xmm3					; dx
+		movsxd r14, dword ptr [rbx + 4]		; limit h
+		movsxd r15, dword ptr [rbx + 12]
+		cvtsi2ss xmm3, r14
+		cvtsi2ss xmm4, r15
+		divss xmm3, xmm4					; dy
+		pshufd xmm2, xmm2, 0
+		pshufd xmm3, xmm3, 0
+		xorps xmm0, xmm0					; y
+		shl r12, 2							; pitch screen
+		mov rax, offset _flt
+		mov rsi, [rsi * 8 + rax]			; address proc filter
+		dec r14
+		dec r15
+loop3:	push r9
+		cvttss2si r11, xmm0
+		mov rdx, r11
+		imul r11, r10
+		add r11, r8							; local addr buffer
+		movsxd rcx, dword ptr [rbx + 8]
+		dec rcx
+		xorps xmm1, xmm1					; x
+
+		movaps xmm4, xmm0
+		roundps xmm5, xmm0, 3
+		subps xmm4, xmm5					; dv
+		movaps xmm5, xmm14
+		subps xmm5, xmm4					; 1 - dv
+loop4:	
+		movaps xmm6, xmm1
+		roundps xmm7, xmm1, 3
+		subps xmm6, xmm7					; du
+		movaps xmm7, xmm14
+		subps xmm7, xmm6					; 1 - du
+
+		cvttss2si rax, xmm1
+		lea rdi, [r11 + rax * 4]			; current addr buffer
+		movd xmm10, dword ptr [rdi]
+		movd xmm11, dword ptr [rdi + 4]
+		movss xmm12, xmm10
+		movss xmm13, xmm11
+		cmp rdx, r14
+		jge @f
+		movd xmm12, dword ptr [rdi + r10]
+		movd xmm13, dword ptr [rdi + r10 + 4]
+@@:		call rsi
+		movss dword ptr [r9], xmm10
+		add r9, 4
+		addps xmm1, xmm2					; x += dx
+		dec rcx
+		jg loop4
+		movd xmm10, dword ptr [rdi]
+		movss xmm12, xmm10
+		cmp rdx, r14
+		jge @f
+		movd xmm12, dword ptr [rdi + r10]
+@@:		movss xmm11, xmm10
+		movss xmm13, xmm12
+		call rsi
+		pop r9
+		add r9, r12
+		addps xmm0, xmm3					; y += dy
+		dec r15
+		jnz loop3
+		pop rdi
+		pop rsi
+		pop rbx
+		pop r15
+		pop r14
+		pop r12
+		pop r11
+		pop r10
+		ret
+_flt	dq _none, _smooth1, _bilinear, _bicubic, _none, _smooth2, _bilinear, _bicubic
+_smooth1:
+		punpcklbw xmm10, xmm15
+		punpcklbw xmm11, xmm15
+		punpcklbw xmm12, xmm15
+		punpcklbw xmm13, xmm15
+		paddw xmm10, xmm11
+		paddw xmm12, xmm13
+		paddw xmm10, xmm12
+		psraw xmm10, 2
+		packuswb xmm10, xmm10
+_none:	ret
+_smooth2:
+		punpcklbw xmm10, xmm15
+		punpcklbw xmm11, xmm15
+		punpcklbw xmm12, xmm15
+		paddw xmm10, xmm11
+		paddw xmm10, xmm12
+		punpcklwd xmm10, xmm15
+		cvtdq2ps xmm10, xmm10
+		divps xmm10, xmm8
+		cvtps2dq xmm10, xmm10
+		packssdw xmm10, xmm10
+		packuswb xmm10, xmm10
+		ret
+_bilinear:	
+		punpcklbw xmm10, xmm15
+		punpcklbw xmm11, xmm15
+		punpcklbw xmm12, xmm15
+		punpcklwd xmm10, xmm15
+		punpcklwd xmm11, xmm15
+		punpcklwd xmm12, xmm15
+		cvtdq2ps xmm10, xmm10
+		cvtdq2ps xmm11, xmm11
+		cvtdq2ps xmm12, xmm12
+		mulps xmm10, xmm7
+		mulps xmm11, xmm6
+		addps xmm10, xmm11
+		mulps xmm10, xmm5
+		mulps xmm12, xmm4
+		addps xmm10, xmm12
+		cvtps2dq xmm10, xmm10
+		packssdw xmm10, xmm10
+		packuswb xmm10, xmm10
+		ret
+_bicubic:
+		punpcklbw xmm10, xmm15
+		punpcklbw xmm11, xmm15
+		punpcklbw xmm12, xmm15
+		punpcklbw xmm13, xmm15
+		punpcklwd xmm10, xmm15
+		punpcklwd xmm11, xmm15
+		punpcklwd xmm12, xmm15
+		punpcklwd xmm13, xmm15
+		cvtdq2ps xmm10, xmm10
+		cvtdq2ps xmm11, xmm11
+		cvtdq2ps xmm12, xmm12
+		cvtdq2ps xmm13, xmm13
+		mulps xmm10, xmm7
+		mulps xmm12, xmm7
+		mulps xmm11, xmm6
+		mulps xmm13, xmm6
+		addps xmm10, xmm11
+		addps xmm12, xmm13
+		mulps xmm10, xmm5
+		mulps xmm12, xmm4
+		addps xmm10, xmm12
+		cvtps2dq xmm10, xmm10
+		packssdw xmm10, xmm10
+		packuswb xmm10, xmm10
+		ret
+_mix:	punpcklbw xmm0, xmm15
+		punpcklbw xmm1, xmm15
+		punpcklbw xmm2, xmm15
+		paddw xmm0, xmm1
+		paddw xmm0, xmm2
+		punpcklwd xmm0, xmm15
+		cvtdq2ps xmm0, xmm0
+		divps xmm0, xmm8
+		cvtps2dq xmm0, xmm0
+		packssdw xmm0, xmm0
+		packuswb xmm0, xmm0
+		movss dword ptr [r11], xmm0
+		add r11, 4
+		ret
+asm_ssh_post_process endp
+
+; rcx - sizeBorder, rdx - blink, r8 - dest, r9 - colors, ?? - this, ?? - updateCPU, pageVRAM
+asm_ssh_update_frame proc
+		push rbp
+		push rbx
+		push rsi
+		push rdi
+		push r10
+		push r11
+		push r12
+		push r13
+		push r14
+		push r15
+		mov blink, dl
+		mov r10, rcx
+		mov rbx, [rsp + 120]				; bus
+		mov rsi, [rsp + 128]				; func - updateCPU
+		mov rdi, [rsp + 136]				; &vram
+		mov ecx, [rbx + 16]				; stateUP
+		mov rdx, 1
+		call updateCPU
+		call udBorder					; верхн€€ граница
+		xor r13, r13
+loop4:	mov ecx, [rbx + 20]
+		call updateCPU2
+		call lrBorder					; лева€ граница
+		mov rax, r13
+		mov rcx, rax
+		mov r14, rax
+		and rax, 192
+		and rcx, 7
+		and r14, 56
+		shl rax, 5
+		shl rcx, 8
+		shl r14, 2
+		add r14, rcx
+		add r14, rax					; rb
+		xor r12, r12
+loop5:	mov rax, r13
+		shr rax, 3
+		shl rax, 5
+		add rax, r12					; rc
+		mov rcx, [rdi]
+		movzx rax, byte ptr [rcx + rax + 6144]	; attribute
+		mov [rbx + 8], eax				; nRetPort
+		mov r11, rax
+		mov rcx, rax
+		mov r15, rax
+		and r11, 120
+		shr r11, 3
+		and rcx, 64
+		and r15, 7
+		shr rcx, 3
+		or rcx, r15	
+		mov r11d, [r9 + r11 * 4]		; paper
+		mov r15d, [r9 + rcx * 4]		; ink
+		test rax, 128
+		jz @f
+		cmp blink, 0
+		jz @f
+		mov rax, r15
+		mov r15, r11
+		mov r11, rax
+@@:		mov rbp, 128
+loop6:	test r8, 4
+		jz @f
+		call updateCPU1
+@@:		mov rcx, [rdi]					; pageVRAM
+		mov al, [rcx + r14]
+		and al, bpl
+		mov eax, r11d
+		cmovnz eax, r15d
+		mov [r8], eax
+		add r8, 4
+		shr bpl, 1
+		jnz loop6
+		inc r14
+		inc r12
+		cmp r12, 32
+		jb loop5
+		call lrBorder					; права€ граница
+		mov ecx, [rbx + 24]
+		call updateCPU2
+		inc r13
+		cmp r13, 192
+		jb loop4
+		call udBorder					; нижн€€ граница
+		mov ecx, [rbx + 28]				; stateDP
+		call updateCPU2
+		pop r15
+		pop r14
+		pop r13
+		pop r12
+		pop r11
+		pop r10
+		pop rdi
+		pop rsi
+		pop rbx
+		pop rbp
+		ret
+updateCPU1:
+		mov rcx, 1
+updateCPU2:
+		xor rdx, rdx
+updateCPU:
+		push r8
+		push r9
+		push r10
+		mov r8, rdx
+		mov rdx, rcx
+		mov rcx, rbx
+		sub rsp, 32
+		call rsi
+		add rsp, 32
+		pop r10
+		pop r9
+		pop r8
+		ret
+lrBorder:
+		mov r11, r10
+		shr r11, 1
+		xor r12, r12
+loop2:	call updateCPU1
+		cmp r12, r11
+		jae @f
+		movzx rax, byte ptr [rbx + 12]
+		mov eax, dword ptr [r9 + rax * 4]
+		mov [r8], eax
+		mov [r8 + 4], eax
+		add r8, 8
+@@:		inc r12
+		cmp r12, 16
+		jb loop2
+		ret
+udBorder:
+		xor r12, r12
+		lea r11, [r10 + 128]
+loop0:	mov ecx, [rbx + 20]				; stateLP
+		call updateCPU2
+		xor r13, r13
+loop1:	call updateCPU1
+		cmp r12, r10
+		jae @f
+		cmp r13, r11
+		jae @f
+		movzx rax, byte ptr [rbx + 12]
+		mov eax, dword ptr [r9 + rax * 4]
+		mov [r8], eax
+		mov [r8 + 4], eax
+		add r8, 8
+@@:		inc r13
+		cmp r13, 160
+		jb loop1
+		mov ecx, [rbx + 24]
+		call updateCPU2
+		inc r12
+		cmp r12, 32
+		jb loop0
+		ret
+asm_ssh_update_frame endp
 
 end

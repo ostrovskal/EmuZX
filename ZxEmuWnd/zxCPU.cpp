@@ -10,8 +10,6 @@ extern funcCPU table_opsN11_XXX[];
 extern funcCPU table_opsED01_XXX[];
 extern funcCPU table_opsED10_XXX[];
 
-int ticks;
-
 ssh_b flags_cond[4] = {FZ, FC, FPV, FS};
 ssh_b tbl_hcarry[16] = {0, 0, 1, 0, 1, 0, 1, 1,		0, 1, 1, 1, 0, 0, 0, 1};
 ssh_b tbl_overflow[16] = {0, 1, 0, 0, 0, 0, 1, 0,	0, 0, 0, 1, 1, 0, 0, 0};
@@ -27,14 +25,14 @@ void makeTblParity() {
 		val = ((a >> 1) & 0x55) + (val & 0x55);
 		val = ((val >> 2) & 0x33) + (val & 0x33);
 		val = ((val >> 4) & 0x0F) + (val & 0x0F);
-		tbl_parity[a] = val;
+		tbl_parity[a] = !(val & 1) << 2;
 	}
 }
 
 // пишем в память 8 битное значение
 void zxCPU::write_mem8(ssh_w address, ssh_b val) {
 	if((*_TSTATE) & ZX_DEBUG) theApp->debug->checkBPS(address, true);
-	write_mem8(get_mem(address), val);
+	::write_mem8(get_mem(address), val);
 }
 
 // пишем в память 8 битное значение
@@ -50,9 +48,9 @@ int zxCPU::noni() {
 }
 
 int zxCPU::execCALL(ssh_w address) {
-	*_PC_EXIT_CALL = (*_PC);
+	RET_CALL = *_PC;
 	(*_SP) -= 2;
-	write_mem16(*_SP, (*_PC));
+	write_mem16(*_SP, *_PC);
 	(*_PC) = address;
 	return 17;
 }
@@ -89,6 +87,7 @@ int zxCPU::opsNN01() {
 	if(typeOps == ops && ops == 6) {
 		// halt
 		modifyTSTATE(ZX_HALT, 0);
+		typeOps = 0;
 		return 4;
 	}
 	if(typeOps == 6) {
@@ -96,18 +95,19 @@ int zxCPU::opsNN01() {
 		cpuZX[cnvPrefRON[ops]] = *fromPrefRON(typeOps);
 	} else if(ops == 6) {
 		// LD [HL/IX], SSS
-		write_mem8(fromPrefRON(ops), cpuZX[cnvPrefRON[typeOps]]);
+		::write_mem8(fromPrefRON(ops), cpuZX[cnvPrefRON[typeOps]]);
+		typeOps = ops;
 	} else {
 		// LD DDD, SSS
-		write_mem8(fromPrefRON(ops), *fromPrefRON(typeOps));
+		::write_mem8(fromPrefRON(ops), *fromPrefRON(typeOps));
 		return 4;
 	}
-	return (prefix ? 15 : 7);
+	return 7;
 }
 
 int zxCPU::opsNN10() {
 	opsAccum(*fromPrefRON(typeOps));
-	return (prefix ? 15 : (typeOps == 6 ? 7 : 4));
+	return (typeOps == 6 ? 7 : 4);
 }
 
 int zxCPU::opsNN11() {
@@ -130,14 +130,11 @@ funcCPU table_ops[] = {
 };
 
 int zxCPU::execOps(int prefix1, int prefix2) {
-	if(!(*_TSTATE & ZX_HALT)) {
-		incrementR();
-		// читаем операцию
-		ssh_b group = readOps();
-		prefix = (prefix1 << 3);
-		if(prefix) ticks += 4;
-		if(prefix2 == 1 && prefix) { fromPrefRON(6); group = readOps(); }
-		ticks += (this->*table_ops[group * 3 + prefix2])();
-	} else ticks += 4;
-	return ticks;
+	if(*_TSTATE & ZX_HALT) return 4;
+	incrementR();
+	// читаем операцию
+	ssh_b group = readOps();
+	prefix = (prefix1 << 3);
+	if(prefix2 == 1 && prefix) { fromPrefRON(6); group = readOps(); }
+	return (this->*table_ops[group * 3 + prefix2])();
 }

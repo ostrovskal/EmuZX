@@ -1,7 +1,7 @@
 
 #pragma once
 
-ssh_u ssh_pow2(ssh_u val, bool nearest);
+enum Radix { _dec, _hex, _bin, _oct, _dbl, _flt, _bool };
 
 class zxString {
 	static const int SSH_BUFFER_LENGTH = 18;
@@ -14,35 +14,24 @@ public:
 	zxString(ssh_ws* ws, ssh_l len = -1) : zxString((ssh_cws)ws, len) {}
 	zxString(ssh_b* b, ssh_l len = -1) : zxString((ssh_ccs)b, len) {}
 	zxString(const zxString& str) { init(); *this = str; }
-	zxString(std::nullptr_t) {} //-V730
 	zxString(ssh_ws ws, ssh_l rep);
-//	template <typename T> zxString(T v, Radix r = Radix::_dec) { init(); num(v, r); }
 	// деструктор
 	~zxString() { empty(); }
 	// привидение типа
 	operator ssh_cws() const { return str(); }
 
-//	template <typename T, typename = std::enable_if_t < std::is_arithmetic<T>::value, T>>
-//	T to_num(ssh_l idx, Radix R = Radix::_dec) const { return *(T*)asm_ssh_wton(str() + idx, (ssh_u)R, nullptr); }
-//	template <typename T, typename = std::enable_if_t < std::is_arithmetic<T>::value, T>>
-//	void num(T v, Radix R = Radix::_dec) { ssh_u tmp(0); *(T*)&tmp = v; *this = asm_ssh_ntow(&tmp, (ssh_u)R, nullptr); }
-
-//	explicit operator double() const { return to_num<double>(0, Radix::_dbl); }
-//	explicit operator float() const { return to_num<float>(0, Radix::_flt); }
-//	explicit operator bool() const { return to_num<bool>(0, Radix::_bool); }
-//	template<typename T> operator T() const { return to_num<T>(0, Radix::_dec); }
 	// вернуть по индексу
 	ssh_ws operator[](ssh_u idx) const { return buffer()[idx]; }
 	// операторы сравнения
 	friend bool operator == (const zxString& str1, const zxString& str2) { return (wcscmp(str1, str2) == 0); }
-	friend bool operator == (const zxString& str, ssh_cws wcs) { return (wcscmp(str, wcs) == 0); }
-	friend bool operator == (ssh_cws wcs, const zxString& str) { return (wcscmp(wcs, str) == 0); }
-	friend bool operator < (const zxString& str1, const zxString& str2) { return wcscmp(str1, str2); }
-	friend bool operator < (const zxString& str, ssh_cws wcs) { return (wcscmp(str, wcs) < 0); }
-	friend bool operator < (ssh_cws wcs, const zxString& str) { return (wcscmp(wcs, str) < 0); }
-	friend bool operator > (const zxString& str1, const zxString& str2) { return wcscmp(str1, str2); }
-	friend bool operator > (const zxString& str, ssh_cws wcs) { return (wcscmp(str, wcs) > 0); }
-	friend bool operator > (ssh_cws wcs, const zxString& str) { return (wcscmp(wcs, str) > 0); }
+	friend bool operator == (const zxString& str, ssh_cws wcs) { return wcscmp(str, wcs) == 0; }
+	friend bool operator == (ssh_cws wcs, const zxString& str) { return wcscmp(wcs, str) == 0; }
+	friend bool operator < (const zxString& str1, const zxString& str2) { return wcscmp(str1, str2) < 0; }
+	friend bool operator < (const zxString& str, ssh_cws wcs) { return wcscmp(str, wcs) < 0; }
+	friend bool operator < (ssh_cws wcs, const zxString& str) { return wcscmp(wcs, str) < 0; }
+	friend bool operator > (const zxString& str1, const zxString& str2) { return wcscmp(str1, str2) > 0; }
+	friend bool operator > (const zxString& str, ssh_cws wcs) { return wcscmp(str, wcs) > 0; }
+	friend bool operator > (ssh_cws wcs, const zxString& str) { return wcscmp(wcs, str) > 0; }
 	friend bool operator != (const zxString& str1, const zxString& str2) { return !(operator == (str1, str2)); }
 	friend bool operator != (const zxString& str, ssh_cws wcs) { return !(operator == (str, wcs)); }
 	friend bool operator != (ssh_cws wcs, const zxString& str) { return !(operator == (wcs, str)); }
@@ -98,10 +87,6 @@ public:
 	zxString left(ssh_u idx) const { return substr(0, idx); }
 	zxString right(ssh_u idx) const { return substr(length() - idx); }
 	ssh_cws str() const { return (_str.len_buf > SSH_BUFFER_LENGTH ? _str.ptr : _str.str); }
-#ifdef _DEBUG
-	// тест
-	static void unit_test();
-#endif
 protected:
 #pragma pack(push, 1)
 	struct STRING_BUFFER {

@@ -34,7 +34,7 @@ void zxSND::play(char* buffer, int len) {
 	waveOutPrepareHeader(hsnd, curBuf, sizeof(WAVEHDR));
 	waveOutWrite(hsnd, curBuf, sizeof(WAVEHDR));
 	while(waveOutUnprepareHeader(hsnd, oldBuf, sizeof(WAVEHDR)) == WAVERR_STILLPLAYING) Sleep(15);
-	SAFE_DELETE(oldBuf);
+	SAFE_A_DELETE(oldBuf);
 	nCurrent++;
 	if(nCurrent >= NUM_BUFFERS) nCurrent = 0;
 }
@@ -52,7 +52,7 @@ bool zxSND::init(int nID) {
 	countDevices = waveOutGetNumDevs();
 
 	for(int i = 0; i <= countDevices; i++) {
-		SAFE_DELETE(sndDevices[i].name);
+		SAFE_A_DELETE(sndDevices[i].name);
 		sndDevices[i].name = new ssh_ws[MAXPNAMELEN];
 		if(i == 0) {
 			wcscpy_s(sndDevices[i].name, MAXPNAMELEN, L"По умолчанию");
@@ -86,75 +86,73 @@ void zxSND::setTicksPerFrame(int delayCpu) {
 	}
 }
 
-void zxSND::writeNVRegAY(int reg, int val) {
+void zxSND::writeValue(int reg, int val) {
 	if(PSGcounter < SND_ARRAY_LEN) {
-		PSGARRAY[PSGcounter].tcounter = theApp->bus.tCounter;
+		PSGARRAY[PSGcounter].tcounter = *_TICK;
 		PSGARRAY[PSGcounter].reg = reg;
 		PSGARRAY[PSGcounter].val = val;
 		PSGcounter++;
 	}
 }
 
-void zxSND::writeRegAY(int reg, int val) {
-	if(reg < 16) {
-		curRegsAY[reg] = val;
-		writeNVRegAY(reg, val);
-	}
+void zxSND::writeAY(int reg, int val) {
+	ayRegs[reg] = val;
+	writeValue(reg, val);
 }
 
 void zxSND::applyRegisterAY(int reg, int val) {
-	if(reg <= AY_ESHAPE) origRegsAY[reg] = val;
+	if(reg <= AY_ESHAPE) _AY[reg] = val;
 	switch(reg) {
 		case AY_AFINE:
 		case AY_ACOARSE:
-			origRegsAY[AY_ACOARSE] &= 0x0f;
-			channelA.genPeriod = (origRegsAY[AY_AFINE] + 256 * origRegsAY[AY_ACOARSE]) * updateStep / SND_STEP;
+			_AY[AY_ACOARSE] &= 0x0f;
+			channelA.genPeriod = (_AY[AY_AFINE] + 256 * _AY[AY_ACOARSE]) * updateStep / SND_STEP;
 			if(!channelA.genPeriod) channelA.genPeriod = updateStep / SND_STEP;
 			break;
 		case AY_BFINE:
 		case AY_BCOARSE:
-			origRegsAY[AY_BCOARSE] &= 0x0f;
-			channelB.genPeriod = (origRegsAY[AY_BFINE] + 256 * origRegsAY[AY_BCOARSE]) * updateStep / SND_STEP;
+			_AY[AY_BCOARSE] &= 0x0f;
+			channelB.genPeriod = (_AY[AY_BFINE] + 256 * _AY[AY_BCOARSE]) * updateStep / SND_STEP;
 			if(!channelB.genPeriod) channelB.genPeriod = updateStep / SND_STEP;
 			break;
 		case AY_CFINE:
 		case AY_CCOARSE:
-			origRegsAY[AY_CCOARSE] &= 0x0f;
-			channelC.genPeriod = (origRegsAY[AY_CFINE] + 256 * origRegsAY[AY_CCOARSE]) * updateStep / SND_STEP;
+			_AY[AY_CCOARSE] &= 0x0f;
+			channelC.genPeriod = (_AY[AY_CFINE] + 256 * _AY[AY_CCOARSE]) * updateStep / SND_STEP;
 			if(!channelC.genPeriod) channelC.genPeriod = updateStep / SND_STEP;
 			break;
 		case AY_AVOL:
-			origRegsAY[AY_AVOL] &= 0x1f;
+			_AY[AY_AVOL] &= 0x1f;
 			break;
 		case AY_BVOL:
-			origRegsAY[AY_BVOL] &= 0x1f;
+			_AY[AY_BVOL] &= 0x1f;
 			break;
 		case AY_CVOL:
-			origRegsAY[AY_CVOL] &= 0x1f;
+			_AY[AY_CVOL] &= 0x1f;
 			break;
 		case AY_ENABLE:
-			channelA.isChannel = (origRegsAY[AY_ENABLE] & 1);
-			channelB.isChannel = (origRegsAY[AY_ENABLE] & 2);
-			channelC.isChannel = (origRegsAY[AY_ENABLE] & 4);
-			channelA.isNoise =	 (origRegsAY[AY_ENABLE] & 8);
-			channelB.isNoise =	 (origRegsAY[AY_ENABLE] & 16);
-			channelC.isNoise =	 (origRegsAY[AY_ENABLE] & 32);
+			channelA.isChannel = (_AY[AY_ENABLE] & 1);
+			channelB.isChannel = (_AY[AY_ENABLE] & 2);
+			channelC.isChannel = (_AY[AY_ENABLE] & 4);
+			channelA.isNoise =	 (_AY[AY_ENABLE] & 8);
+			channelB.isNoise =	 (_AY[AY_ENABLE] & 16);
+			channelC.isNoise =	 (_AY[AY_ENABLE] & 32);
 			break;
 		case AY_NOISEPER:
-			origRegsAY[AY_NOISEPER] &= 0x1f;
-			periodN = origRegsAY[AY_NOISEPER] * updateStep / SND_STEP;
+			_AY[AY_NOISEPER] &= 0x1f;
+			periodN = _AY[AY_NOISEPER] * updateStep / SND_STEP;
 			if(periodN == 0) periodN = updateStep / SND_STEP;
 			break;
 		case AY_EFINE:
 		case AY_ECOARSE:
-			periodE = ((origRegsAY[AY_EFINE] + 256 * origRegsAY[AY_ECOARSE])) * updateStep / SND_STEP;
+			periodE = ((_AY[AY_EFINE] + 256 * _AY[AY_ECOARSE])) * updateStep / SND_STEP;
 			if(periodE == 0) periodE = updateStep / SND_STEP / 2;
 			break;
 		case AY_ESHAPE: {
-			origRegsAY[AY_ESHAPE] &= 0x0f;
-			auto pshape = &eshape[origRegsAY[AY_ESHAPE] * 4];
+			_AY[AY_ESHAPE] &= 0x0f;
+			auto pshape = &eshape[_AY[AY_ESHAPE] * 4];
 			cont = pshape[0]; att = pshape[1];
-			if(origRegsAY[AY_ESHAPE] > 7) { alt = pshape[2]; hold = pshape[3]; }
+			if(_AY[AY_ESHAPE] > 7) { alt = pshape[2]; hold = pshape[3]; }
 			envelopeCounter = 0;
 			envVolume = (att ? 0 : 15);
 			up = att;
@@ -202,8 +200,8 @@ void zxSND::execute() {
 	if(!hsnd) init(0);
 
 	if(PSGcounter > 0) {
-		if(theApp->bus.tCounter == 0) theApp->bus.tCounter++;
-		for(int i = 0; i < PSGcounter; i++) PSGARRAY[i].pos = (SND_TICKS_PER_FRAME[0] - 1) * PSGARRAY[i].tcounter / theApp->bus.tCounter;
+		if(*_TICK == 0) *_TICK = 1;
+		for(int i = 0; i < PSGcounter; i++) PSGARRAY[i].pos = (SND_TICKS_PER_FRAME[0] - 1) * PSGARRAY[i].tcounter / *_TICK;
 	}
 	// Генерим звук
 	int j = 0;
@@ -217,9 +215,9 @@ void zxSND::execute() {
 			}
 		}
 		envelopeStep();
-		channelA.gen(i, this);
-		channelB.gen(i, this);
-		channelC.gen(i, this);
+		channelA.gen(i, periodN, envVolume, AY_AVOL);
+		channelB.gen(i, periodN, envVolume, AY_BVOL);
+		channelC.gen(i, periodN, envVolume, AY_CVOL);
 		beeperBuffer[i] = beepVal;
 	}
 	// Микшируем и записываем
@@ -228,67 +226,22 @@ void zxSND::execute() {
 	auto bufA = channelA.channelData;
 	auto bufB = channelB.channelData;
 	auto bufC = channelC.channelData;
-//	unsigned char stereo_mode = 0; /* 2=Mono 1=ABC 0=ACB*/
-	/*
-	if (sound_fil!=-1)
-	{
-	if (stereo_mode==2)
-	{
-	Mix(sound_bufferD, 44100, 0,4,soundA,soundB,soundC,beeper_buffer);
-	Mix(sound_bufferD, 44100, 1,4,soundA,soundB,soundC,beeper_buffer);
-	}
-
-	if (stereo_mode==1)
-	{
-	Mix(sound_bufferD, 44100, 0,3,soundA,soundB,beeper_buffer);
-	Mix(sound_bufferD, 44100, 1,3,soundC,soundB,beeper_buffer);
-	}
-
-	if (stereo_mode==0)
-	{
-	Mix(sound_bufferD, 44100, 0,3,soundA,soundC,beeper_buffer);
-	Mix(sound_bufferD, 44100, 1,3,soundB,soundC,beeper_buffer);
-	}
-
-	TODO ("io_write(sound_fil, sound_bufferD, SOUND_TICKS_PER_FRAME*4);");
-	}
-
-	if (stereo_mode==2)
-	{
-	Mix(sound_buffer, 44100, 0,4,soundA,soundB,soundC,beeper_buffer);
-	Mix(sound_buffer, 44100, 1,4,soundA,soundB,soundC,beeper_buffer);
-	}
-
-	if (stereo_mode==1)
-	{
-	Mix(sound_buffer, 44100, 0,3,soundA,soundB,beeper_buffer);
-	Mix(sound_buffer, 44100, 1,3,soundC,soundB,beeper_buffer);
-	}
-
-	if (stereo_mode==0)
-	{
-	Mix(sound_buffer, 44100, 0,3,soundA,soundC,beeper_buffer);
-	Mix(sound_buffer, 44100, 1,3,soundB,soundC,beeper_buffer);
-	}
-
-	*/
-
 	switch(stereoAY) {
 		case AY_STEREO_NONE:
-			mix(sndBuf, freq, 0, 3, bufA, bufC, beeperBuffer);
-			mix(sndBuf, freq, 1, 3, bufB, bufC, beeperBuffer);
-			break;
-		case AY_STEREO_ABC:
 			mix(sndBuf, freq, 0, 4, bufA, bufB, bufC, beeperBuffer);
 			mix(sndBuf, freq, 1, 4, bufA, bufB, bufC, beeperBuffer);
 			break;
-		case AY_STEREO_ACB:
+		case AY_STEREO_ABC:
 			mix(sndBuf, freq, 0, 3, bufA, bufB, beeperBuffer);
 			mix(sndBuf, freq, 1, 3, bufC, bufB, beeperBuffer);
 			break;
+		case AY_STEREO_ACB:
+			mix(sndBuf, freq, 0, 3, bufA, bufC, beeperBuffer);
+			mix(sndBuf, freq, 1, 3, bufB, bufC, beeperBuffer);
+			break;
 	}
 	PSGcounter = 0;
-	theApp->bus.tCounter = 0;
+	*_TICK = 0;
 }
 
 void zxSND::mix(ssh_w* buf, int num, int offs, int count, ...) {
@@ -300,20 +253,21 @@ void zxSND::mix(ssh_w* buf, int num, int offs, int count, ...) {
 		buf[i * 2 + offs] = 0;
 		for(int j = 0; j < count; j++) buf[i * 2 + offs] += mixing_ch[j][i << num] / count;
 	}
+	va_end(ap);
 }
 
-void zxSND::AY_CHANNEL::gen(int i, zxSND* snd) {
+void zxSND::AY_CHANNEL::gen(int i, ssh_i period, ssh_b volume, int ch_vol) {
 	if(genCounter >= genPeriod) genCounter = 0;
 	bool tone = genCounter < (genPeriod / 2);
 	genCounter++;
-	if(noiseCounter >= snd->periodN) { noiseCounter = 0; rnd = rand(); }
+	if(noiseCounter >= period) { noiseCounter = 0; rnd = rand(); }
 	bool noise = rnd & 1;
 	noiseCounter++;
 	channelData[i] = (((tone | isChannel) & (noise | isNoise)) | !genPeriod);
-	channelData[i] = (channelData[i]) ? (snd->origRegsAY[AY_AVOL] & 0x10) ? volTable[snd->envVolume] : volTable[snd->origRegsAY[AY_AVOL]] : 0;
+	channelData[i] = (channelData[i]) ? (_AY[ch_vol] & 0x10) ? volTable[volume] : volTable[_AY[ch_vol]] : 0;
 }
 
 void zxSND::stop() {
 	PSGcounter = 0;
-	origRegsAY[AY_AVOL] = origRegsAY[AY_BVOL] = origRegsAY[AY_CVOL] = 0;
+	_AY[AY_AVOL] = _AY[AY_BVOL] = _AY[AY_CVOL] = 0;
 }

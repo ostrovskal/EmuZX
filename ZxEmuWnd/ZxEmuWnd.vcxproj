@@ -23,32 +23,32 @@
     <ProjectGuid>{23F93F2C-5092-427C-811A-B1A7EAA0E72F}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>ZxEmuWnd</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -163,16 +163,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="zxBlipBuffer.h" />
     <ClInclude Include="zxCPU.h" />
     <ClInclude Include="zxAssembler.h" />
     <ClInclude Include="zxBus.h" />
+    <ClInclude Include="zxDisk.h" />
     <ClInclude Include="zxDlgAddBp.h" />
     <ClInclude Include="zxDlgSettings.h" />
+    <ClInclude Include="zxFile.h" />
     <ClInclude Include="zxGamePad.h" />
+    <ClInclude Include="zxList.h" />
     <ClInclude Include="zxListBox.h" />
     <ClInclude Include="zxMsgMap.h" />
     <ClInclude Include="zxSND.h" />
+    <ClInclude Include="zxTape.h" />
     <ClInclude Include="zxWnd.h" />
     <ClInclude Include="zxGPU.h" />
     <ClInclude Include="Resource.h" />
@@ -180,7 +183,6 @@
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="zxString.h" />
     <ClInclude Include="targetver.h" />
-    <ClInclude Include="Z80.h" />
     <ClInclude Include="zxDebugger.h" />
     <ClInclude Include="zxDisAsm.h" />
     <ClInclude Include="zxDlgListBps.h" />
@@ -188,7 +190,6 @@
     <ClInclude Include="zxKeyboard.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="zxBlipBuffer.cpp" />
     <ClCompile Include="zxBus.cpp" />
     <ClCompile Include="zxCPU.cpp" />
     <ClCompile Include="zxCpuCBXX.cpp" />
@@ -197,11 +198,13 @@
     <ClCompile Include="zxCpuNN00.cpp" />
     <ClCompile Include="zxCpuNN11.cpp" />
     <ClCompile Include="zxAssembler.cpp" />
+    <ClCompile Include="zxDisk.cpp" />
     <ClCompile Include="zxDlgAddBp.cpp" />
     <ClCompile Include="zxDlgSettings.cpp" />
     <ClCompile Include="zxGamePad.cpp" />
     <ClCompile Include="zxListBox.cpp" />
     <ClCompile Include="zxSND.cpp" />
+    <ClCompile Include="zxTape.cpp" />
     <ClCompile Include="zxWnd.cpp" />
     <ClCompile Include="zxGPU.cpp" />
     <ClCompile Include="zxSettings.cpp" />
@@ -212,7 +215,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="zxString.cpp" />
-    <ClCompile Include="Z80.cpp" />
     <ClCompile Include="zxDebugger.cpp" />
     <ClCompile Include="zxDisAsm.cpp" />
     <ClCompile Include="zxDlgListBps.cpp" />

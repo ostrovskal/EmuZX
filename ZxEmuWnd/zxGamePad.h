@@ -16,9 +16,7 @@ public:
 		xAxis = 0, yAxis, zAxis, RxAxis, RyAxis, RzAxis, Slider, POV, Button, countTypes
 	};
 	// конструктор
-	zxGamepad() { }
-	// деструктор
-	virtual ~zxGamepad() { }
+	zxGamepad();
 	// проверка на вновь нажатую кнопку
 	bool is_once_pressed(bool second, Buttons but) const { return ((wNowButtons[second] & (1 << but)) != 0); }
 	// вернуть статус кнопки
@@ -42,11 +40,11 @@ public:
 	// вернуть оригинальную раскладку кнопок
 	ssh_b* getOrigMap(bool second) { return mapOrig[second]; }
 	// режим маппинга
-	ssh_b getMode(bool second) const { return modes[second]; }
+	int getMode(bool second) const { return modes[second]; }
 	// ремапинг кнопок
 	void remap(bool second);
 	// предопределенные раскладки
-	static ssh_b* zxGamepad::getPredefinedMode(int mode, int& count);
+	static ssh_b* getPredefinedMode(int mode, int& count);
 protected:
 	// обновление статуса кнопки
 	void updateKey(bool pressed, int k);

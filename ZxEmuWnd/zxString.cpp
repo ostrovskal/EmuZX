@@ -2,6 +2,14 @@
 #include "stdafx.h"
 #include "zxString.h"
 
+// преобразовать значение в ближайшую степень двойки
+static ssh_u ssh_pow2(ssh_u val, bool nearest) {
+	ssh_d idx;
+	_BitScanReverse64(&idx, val);
+	ssh_u _val((1ULL << idx));
+	return ((_val == val || nearest) ? _val : _val << 1ULL);
+}
+
 zxString::zxString(ssh_cws cws, ssh_l len) {
 	init();
 	ssh_l t(wcslen(cws));

@@ -7,7 +7,7 @@
 #define DA_FADDR			8
 #define DA_FPADDR			16
 
-#define SIZE_CMD			16
+#define SIZE_CMD			16L
 
 #define C_RB				0
 #define C_RC				1

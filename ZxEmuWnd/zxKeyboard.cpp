@@ -113,7 +113,7 @@ ZX_KEY keys[] = {
 	{IDC_BUTTON_ENTER1, 6, 0x1, 0, 0, VK_RETURN, L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER", L"ENTER"},
 };
 
-int zxKeyboard::onInitDialog(HWND hWnd) {
+int zxKeyboard::onInitDialog(HWND h) {
 	hFont = CreateFont(-8, 0, 0, 0, FW_THIN, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_TT_PRECIS,
 					   CLIP_DEFAULT_PRECIS, PROOF_QUALITY, FF_ROMAN, L"Ms Shell Dlg");
 
@@ -121,7 +121,7 @@ int zxKeyboard::onInitDialog(HWND hWnd) {
 	hbrUnsel = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
 
 	for(auto& k : keys) {
-		k.hWndKey = GetDlgItem(hWnd, k.butID);
+		k.hWndKey = GetDlgItem(h, k.butID);
 		SendMessage(k.hWndKey, WM_SETFONT, (WPARAM)hFont, true);
 	}
 
@@ -168,7 +168,7 @@ void zxKeyboard::processKeys() {
 	// проверить режим клавиатуры
 	int nmode = KM_K;
 	int val = read_mem8(23617), val1 = 0, val2 = 0;
-	if(!(*_TSTATE & ZX_128K)) {
+	if((*_7FFD & 32) || (*_MODEL == MODEL_48K)) {
 		switch(val) {
 			case 0:
 				val1 = read_mem8(23658);
@@ -216,7 +216,7 @@ void zxKeyboard::highlightKey(ssh_cws name, ZX_KEY* k, int isVirt) {
 	}
 	if(is) {
 		auto hdc = GetDC(h);
-		auto hfont = SelectObject(hdc, hFont);
+		SelectObject(hdc, hFont);
 		SetTextColor(hdc, RGB(255, 255, 255));
 		GetClientRect(h, &rect);
 		SetBkMode(hdc, TRANSPARENT);
@@ -229,12 +229,8 @@ void zxKeyboard::highlightKey(ssh_cws name, ZX_KEY* k, int isVirt) {
 }
 
 void zxKeyboard::processJoystick() {
-	if(theApp->getOpt(OPT_JOYSTICK_ALL)->dval) {
-		auto pad = theApp->gamepad;
-		pad->update();
-		if(pad->is_connected(0)) pad->remap(0);
-//		if(pad->is_connected(1)) pad->remap(1);
-	//	if(pad->is_connected(2)) pad->remap(2);
-		//if(pad->is_connected(3)) pad->remap(3);
-	}
+	auto pad = theApp->gamepad;
+	pad->update();
+	if(pad->is_connected(0)) pad->remap(0);
+	if(pad->is_connected(1)) pad->remap(1);
 }

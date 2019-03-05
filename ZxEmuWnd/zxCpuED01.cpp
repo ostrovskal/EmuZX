@@ -41,7 +41,7 @@ int zxCPU::funcED01_000() {
 		// RETI/RETN; IFF1 <- IFF2; SP += 2; PC <- [SP - 2];	Возврат из INT
 		case 5:
 			*_IFF1 = *_IFF2;
-			(*_PC) = read_mem16(*_SP);
+			*_PC = read_mem16(*_SP);
 			(*_SP) += 2;
 			return 14;
 		// IM X

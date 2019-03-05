@@ -3,84 +3,68 @@
 #include "zxCPU.h"
 #include "zxGPU.h"
 #include "zxSND.h"
+#include "zxDisk.h"
+#include "zxTape.h"
 
 class zxBus {
-	friend ssh_d WINAPI ProcBus(void* params);
 public:
-	enum TypeSwap {
-		SWAP_ROM, SWAP_RAM, SWAP_VRAM
-	};
-	
-	zxBus() :	ROMs(nullptr), RAMs(nullptr), divFreq(35),
-				isSound(false), delayCPU(10), delayGPU(20), periodSND(1), periodBORDER(16), periodBLINK(15), isInterleaved(false),
-				lastFE16(0), lastFE8(0), tapePos(0), tapeLen(0), tapePause(1), lastTapeOut(0), tCounter(0), z80NTtodo(0), nRetPort(255) {
-	}
-	
+	zxBus();
 	virtual ~zxBus();
-
-	int step(bool run_debugger, bool allow_int);
+	void stepDebug();
 	void updateData();
 	void execute();
-	void z80NT(int todo, int interrupt);
-	bool loadState(int hf);
-	bool saveState(int hf);
-	bool changeModel(int newModel, int oldModel, int divFreq = 35);
+	void updateFrame(ssh_d* vs, ssh_d* colors, int sizeBorder, bool blink);
+	void updateCPU(int todo, int interrupt);
+	void writePort(ssh_b A0A7, ssh_b A8A15, ssh_b val);
+	bool loadState(ssh_cws path);
+	bool saveState(ssh_cws path);
+	bool changeModel(ssh_d newModel, ssh_d oldModel);
+	bool loadZ80(ssh_cws path);
+	bool loadTAP(ssh_cws path) { return TAPE.loadTAP(path); }
+	bool loadTZX(ssh_cws path) { return TAPE.loadTZX(path); }
+	bool loadWAV(ssh_cws path) { return TAPE.loadWAV(path); }
+	bool selectTRD(ssh_cws path, int slot) { return DISK.selectTRD(path, slot); }
+	bool saveZ80(ssh_cws path);
+	bool saveTAP(ssh_cws path) { return TAPE.saveTAP(path); }
+	bool saveTZX(ssh_cws path) { return TAPE.saveTZX(path); }
+	bool saveWAV(ssh_cws path) { return TAPE.saveWAV(path); }
+	bool saveTRD(ssh_cws path) { return false; }
 	bool saveScreen(ssh_cws path) { return GPU.saveScreen(path); }
-	inline int countPages(bool rom) const {
-		static int banks[] = {8, 1, 8, 2, 6, 8, 16, 4};
+	int countPages(bool rom) const {
+		static int banks[] = {8, 1, 8, 2, 8, 2, 16, 4};
 		return banks[*_MODEL * 2 + rom];
 	}
-	inline ssh_b* getPage(ssh_b page, bool rom, bool isScorpionPage) const {
-		if(rom) return &ROMs[page * 16384];
-		return PAGE_RAM[page + (isScorpionPage << 3)];
-	}
-
-	void swapPage(ssh_b page, TypeSwap type, bool isScorpionPage);
 	ssh_b readPort(ssh_b A0A7, ssh_b A8A15);
-	void writePort(ssh_b A0A7, ssh_b A8A15, ssh_b val);
-	void screenOutNT(ssh_d* vs, ssh_d* colors, bool blink);
-
-	// счетчик тактов процессора
-	ssh_d tCounter;
+	void setPages();
 protected:
 	void signalRESET();
 	int signalINT();
 	int signalNMI();
+	int step(bool allow_int);
+	ssh_d updateStates();
 
-	ssh_d delayCPU, delayGPU;
-	ssh_d periodSND, periodBLINK, periodBORDER;
+	// текущий атрибут (порт #FF)
+	int nRetPort;
 
-	bool isSound;
+	// текущий цвет границы
+	int border;
 
-	zxCPU CPU;
-	zxGPU GPU;
-	zxSND SND;
+	// параметры обновления ЦПУ
+	int stateUP, stateLP, stateRP, stateDP;
+
+	// текущее приращение ГПУ
+	ssh_d periodGPU;
+
+	// статус звука и джойстика
+	bool isSound, isJoystick;
 
 	// страницы ПЗУ и ОЗУ
 	ssh_b* ROMs;
 	ssh_b* RAMs;
-	
-	// значение возврата из порта
-	ssh_b nRetPort;
 
-	// параметры развертки
-	int NT_T_UP, NT_T_LP, NT_T_RP, NT_T_DP, NT_T_INT_LEN;
-
-	// делитель частоты
-	int divFreq;
-
-	// скорость эмулятора в процентах от основной(100)
-	int emulatorSpeed;
-
-	// задержка между выводом строк экрана
-	int z80NTtodo;
-	
-	// черестрочный вывод экрана
-	bool isInterleaved;
-
-	// последнее значение порта магнитофона/динамика
-	int lastFE16, lastFE8;
-
-	// переменные для загрузки/записи с ленты
-	int tapePos, tapeLen, tapePause, lastTapeOut;
+	zxCPU CPU;
+	zxGPU GPU;
+	zxSND SND;
+	zxDisk DISK;
+	zxTape TAPE;
 };

@@ -107,13 +107,13 @@ int zxCPU::incSSS() {
 	ssh_b op1 = *reg;
 	ssh_b op2 = (n ? -1 : 1);
 	ssh_b val = op1 + op2;
-	write_mem8(reg, val);
+	::write_mem8(reg, val);
 	update_flags(FS | FZ | FH | FPV | FN, _FS(val) | _FZ(val) | _FH(op1, op2, 0, n) | _FV1(op1, op2, 0, n) | _FN(n));
-	return (prefix ? 19 : (ops == 6 ? 11 : 4));
+	return (ops == 6 ? 11 : 4);
 }
 
 int zxCPU::ldSSS() {
 	ssh_b* reg = fromPrefRON(ops);
-	write_mem8(reg, read_mem8PC());
-	return (prefix ? 15 : 7);
+	::write_mem8(reg, read_mem8PC());
+	return 7;
 }

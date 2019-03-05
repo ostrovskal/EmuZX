@@ -2,6 +2,19 @@
 #include "stdafx.h"
 #include "zxGamePad.h"
 
+zxGamepad::zxGamepad() {
+	memset(wNowButtons, 0, sizeof(wNowButtons));
+	memset(wButtons, 0, sizeof(wButtons));
+	memset(axis, 0, sizeof(axis));
+	memset(rot, 0, sizeof(rot));
+	memset(connected, 0, sizeof(connected));
+	memset(inserted, 0, sizeof(inserted));
+	memset(removed, 0, sizeof(removed));
+	memset(mapOrig, 0, sizeof(mapOrig));
+	memset(mapOrig, 0, sizeof(mapOrig));
+	memset(modes, 0, sizeof(modes));
+}
+
 void zxGamepad::init() {
 	// установить режим
 	for(int i = 0; i < 2; i++) {
@@ -10,7 +23,6 @@ void zxGamepad::init() {
 		int count = 0;
 		auto maps = map.split(L",", count);
 		memset(&mapOrig[i], 0, countButtons);
-
 		if(count > countButtons) count = countButtons;
 		if(count < 0) count = 0;
 		for(int j = 0; j < count; j++) {
@@ -62,8 +74,8 @@ ssh_b* zxGamepad::getPredefinedMode(int mode, int& count) {
 	
 	switch(mode) {
 		case JOY_KEMPSTON: return kempston;
-		case JOY_INTERFACE_I: return sinclair1;
-		case JOY_INTERFACE_II: return sinclair2;
+		case JOY_SINCLAIR_I: return sinclair1;
+		case JOY_SINCLAIR_II: return sinclair2;
 		case JOY_CURSOR: return cursor;
 		case JOY_KEYBOARD: count = 9; return keyboard;
 	}

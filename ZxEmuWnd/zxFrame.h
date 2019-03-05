@@ -22,9 +22,6 @@ public:
 	// изменить/обновить статус меню/тулбара
 	void updateData(ssh_d change);
 	
-	// Пауза/возонобление треда
-	void pauseCPU(bool isPause);
-
 	// обновление текста заголовка окна
 	void updateCaption();
 
@@ -59,21 +56,17 @@ protected:
 	ssh_msg void onProcessMRU();
 	ssh_msg void onSize(UINT type, int nWidth, int nHeight);
 	ssh_msg void onNotify(LPNMHDR nmNMHDR, LRESULT* pResult);
-	ssh_msg int onCalcSize(bool isParams, LPARAM lParam);
 	ssh_msg BOOL onEraseBkgnd(HDC hdc);
 	ssh_msg void onUpdate();
 
 	bool changeState(int id_opt, int id, bool change);
-	bool checkedSubMenu(HMENU hMenu, int id_opt, int val, int* ids);
+	bool checkedSubMenu(HMENU hMenu, int id_opt, ssh_d val, int* ids);
 
 	void modifyMRU(zxString path);
 	void processKeys();
-	void makeWndSize(SIZE* sz);
-	bool saveState(ssh_cws path);
-	bool loadState(ssh_cws path);
+	long makeWndSize();
 
 	HMENU hMenuMRU, hMenuPP, hMenuModel;
-	HANDLE hCpuThread;
 	UINT_PTR hTimer;
 	MENUITEMINFO mii;
 

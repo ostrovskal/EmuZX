@@ -1,8 +1,6 @@
 #include "stdafx.h"
 #include "resource.h"
 #include "zxDebugger.h"
-#include "zxDisAsm.h"
-#include "zxAssembler.h"
 #include "zxCPU.h"
 #include "zxBus.h"
 #include "zxSettings.h"
@@ -27,14 +25,14 @@ BEGIN_MSG_MAP(zxDebugger, zxDialog)
 	ON_COMMAND(IDM_NEXT_BREAKPOINT, onNextBreakpoint)
 	ON_COMMAND(IDM_QUICK_BREAKPOINT, onQuckBreakpoint)
 	ON_COMMAND(IDM_LIST_BREAKPOINTS, onListBreakpoint)
-	ON_COMMAND(IDM_STEP_INTO, onStepInto)
-	ON_COMMAND(IDM_STEP_OVER, onStepOver)
+	ON_COMMAND(IDM_STEP_INTO, onTrace)
+	ON_COMMAND(IDM_STEP_OVER, onTrace)
 	ON_COMMAND(IDM_PAUSE, onPause)
 	ON_COMMAND(IDM_RUN, onRun)
 	ON_COMMAND(IDM_PC_UNDO, onPcUndo)
 	ON_COMMAND(IDM_PC_REDO, onPcRedo)
 	ON_COMMAND(IDM_HEX_DEC, onHexDec)
-	ON_COMMAND(IDM_OVER_PROC, onOverProc)
+	ON_COMMAND(IDM_OVER_PROC, onTrace)
 	ON_COMMAND(IDC_BUTTON_TO_PC, onSetPC)
 	ON_COMMAND(IDC_BUTTON_TO_SP, onSetSP)
 	ON_COMMAND(IDC_BUTTON_SET_DATA, onSetData)
@@ -85,7 +83,6 @@ ZX_DEBUGGER dlgElems[] = {
 	{L"ROM", IDC_EDIT_ROM, IDC_STATIC_ROM, &cpuZX[ROM], nullptr, 1},
 	{L"IM", IDC_EDIT_IM, IDC_STATIC_IM, &cpuZX[IM], nullptr, 0x3},
 	{L"VID", IDC_EDIT_VID, IDC_STATIC_VID, &cpuZX[VID], nullptr, 0x7},
-	{L"SCAN", IDC_EDIT_SCAN, IDC_STATIC_SCAN, &cpuZX[SCAN], nullptr, 0xff},
 	{L" I ", IDC_EDIT_I, IDC_STATIC_I, &cpuZX[RI], nullptr, 0xff},
 	{L" R ", IDC_EDIT_R, IDC_STATIC_R, &cpuZX[RR], nullptr, 0xff},
 	{L" S ", IDC_EDIT_S, IDC_STATIC_S, &cpuZX[RF], nullptr, FS, 7},
@@ -120,7 +117,7 @@ void zxDebugger::onNextBreakpoint() {
 
 void zxDebugger::onQuckBreakpoint() {
 	int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
-	auto addr = da->getCmdAddress(sel);
+	auto addr = da.getCmdAddress(sel);
 	if(addr != -1) {
 		quickBP(addr);
 		saveBPS();
@@ -134,26 +131,21 @@ void zxDebugger::onListBreakpoint() {
 	InvalidateRect(hWndDA, nullptr, false);
 }
 
-void zxDebugger::onStepInto() {
+void zxDebugger::onTrace() {
 	int addr1, addr2;
 
-	da->getCmdOperand(da->indexFromAddress(*_PC), true, true, true, &addr1, &addr2);
-	if(addr1 == -1) addr1 = addr2 = da->move(*_PC, 1);
+	if(wmId == IDM_OVER_PROC) addr1 = addr2 = RET_CALL;
+	else da.getCmdOperand(da.indexFromAddress(*_PC), true, wmId == IDM_STEP_INTO, true, &addr1, &addr2);
+	if(addr1 == -1) addr1 = addr2 = da.move(*_PC, 1);
+	int delay = 0;
+	auto tm = timeGetTime();
 	while(true) {
-		theApp->bus.step(true, true);
+		bus->stepDebug();
 		if(*_PC == addr1 || *_PC == addr2) break;
-	}
-	updateRegisters(*_PC, U_REGS | U_PC | U_SP | U_SEL);
-}
-
-void zxDebugger::onStepOver() {
-	int addr1, addr2;
-	
-	da->getCmdOperand(da->indexFromAddress(*_PC), true, false, true, &addr1, &addr2);
-	if(addr1 == -1) addr1 = addr2 = da->move(*_PC, 1);
-	while(true) {
-		theApp->bus.step(true, true);
-		if(*_PC == addr1 || *_PC == addr2) break;
+		delay++;
+		if(delay & 256) {
+			if((timeGetTime() - tm) >= 3000) break;
+		}
 	}
 	updateRegisters(*_PC, U_REGS | U_PC | U_SP | U_SEL);
 }
@@ -163,7 +155,7 @@ void zxDebugger::onPause() {
 }
 
 void zxDebugger::onRun() {
-	theApp->bus.step(true, true);
+	bus->stepDebug();
 	setProgrammPause(false, false);
 }
 
@@ -185,14 +177,8 @@ void zxDebugger::onHexDec() {
 	updateHexDec(true);
 }
 
-void zxDebugger::onOverProc() {
-	auto exit_pc = *_PC_EXIT_CALL;
-	while(*_PC != exit_pc) theApp->bus.step(true, true);
-	updateRegisters(*_PC, U_REGS | U_PC | U_SP | U_SEL);
-}
-
 void zxDebugger::onSetPC() {
-	updateRegisters((*_PC), U_PC | U_SEL | U_TOP);
+	updateRegisters(*_PC, U_PC | U_SEL | U_TOP);
 }
 
 void zxDebugger::onSetSP() {
@@ -214,13 +200,13 @@ void zxDebugger::onSetCmd() {
 	HWND h = GetDlgItem(hWnd, IDC_EDIT_CURRENT_COMMAND);
 	GetWindowText(h, tmpBuf, 260);
 	int posErr = 0;
-	int len = assm->parseCommand(tmpBuf, FASM_LABEL, &posErr);
+	int len = assm.parseCommand(tmpBuf, FASM_LABEL, &posErr);
 	if(len) {
 		// вставить комманду
 		int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
-		auto address = da->getCmdAddress(sel);
-		for(int i = 0 ; i < len; i++) *get_mem(address++) = assm->code[i];
-		da->decode(_pc, countVisibleItems);
+		auto address = da.getCmdAddress(sel);
+		for(int i = 0 ; i < len; i++) *get_mem(address++) = assm.code[i];
+		da.decode(_pc, countVisibleItems);
 		InvalidateRect(hWndDA, nullptr, false);
 	} else {
 		SendMessage(h, EM_SETSEL, posErr, posErr + 100);
@@ -232,10 +218,10 @@ void zxDebugger::onDblkClkListDA() {
 	int addr1, addr2;
 
 	int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
-	da->getCmdOperand(sel, true, true, false, &addr1, &addr2);
+	da.getCmdOperand(sel, true, true, false, &addr1, &addr2);
 	if(addr1 != -1) updateRegisters(addr1, U_PC | U_STORY | U_SEL | U_TOP);
 	else {
-		da->getCmdOperand(sel, false, false, false, &addr1, &addr2);
+		da.getCmdOperand(sel, false, false, false, &addr1, &addr2);
 		if(addr1 != -1) {
 			int dec = theApp->getOpt(OPT_DECIMAL)->dval;
 			fromNum(addr1, radix[dec + 22]);
@@ -253,24 +239,23 @@ void zxDebugger::onDblkClkListSP() {
 
 void zxDebugger::onScrollListDA() {
 	int delta = (int)SendMessage(hWndDA, LB_GETTOPINDEX, 0, 0) - _pc;
-	_pc = da->move(_pc, delta);
-	_lastPC = da->decode(_pc, countVisibleItems);
+	_pc = da.move(_pc, delta);
+	_lastPC = da.decode(_pc, countVisibleItems);
 	SendMessage(hWndDA, LB_SETTOPINDEX, _pc, 0);
 }
 
 void zxDebugger::onSelChangeListDA() {
 	int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
-	SetWindowText(GetDlgItem(hWnd, IDC_EDIT_CURRENT_COMMAND), da->makeCommand(sel, theApp->getOpt(OPT_DECIMAL)->dval));
+	SetWindowText(GetDlgItem(hWnd, IDC_EDIT_CURRENT_COMMAND), da.makeCommand(sel, theApp->getOpt(OPT_DECIMAL)->dval));
 }
 
 void zxDebugger::onChangeEditRegs() {
-	bool isFlag = wmId < IDC_EDIT_BC;
 	for(auto& zx : dlgElems) {
 		if(zx.idMain == wmId) {
 			GetWindowText(zx.hWndMain, tmpBuf, 256);
-			ssh_w v = (ssh_w)*(ssh_u*)(asm_ssh_wton(tmpBuf, (ssh_u)Radix::_dec));
+			ssh_w v = *(ssh_w*)(asm_ssh_wton(tmpBuf, Radix::_dec));
 			if(zx.regb) {
-				if(isFlag) {
+				if(wmId < IDC_EDIT_BC) {
 					*zx.regb &= ~(1 << zx.shift);
 					*zx.regb |= (v ? 1 : 0) << zx.shift;
 				} else *zx.regb = (ssh_b)(v & zx.msk);
@@ -278,6 +263,7 @@ void zxDebugger::onChangeEditRegs() {
 				v &= zx.msk;
 				*zx.regw = v;
 			}
+			break;
 		}
 	}
 }
@@ -294,21 +280,21 @@ void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
 	auto item = dis->itemID;
 	if(id == IDC_LIST_DA) {
 		auto top = SendMessage(hWndDA, LB_GETTOPINDEX, 0, 0);
-		txt = da->makeCommand((int)(item - top), DA_FCODE | DA_FADDR | DA_FPADDR | (int)dec);
+		txt = da.makeCommand((int)(item - top), DA_FCODE | DA_FADDR | DA_FPADDR | (int)dec);
 	} else if(id == IDC_LIST_SP) {
 		// stack
 		auto idx = item * 2;
 		auto val = read_mem16(idx);
 		zxString chars;
 		for(int i = 0; i < 4; i++) {
-			ssh_w v = (ssh_w)read_mem16(val + i);
+			ssh_w v = read_mem8(val + i);
 			if(v < 32) v = 32;
 			chars += (ssh_ws)v;
 		}
 		auto sp = ((idx == (*_SP)) ? L"SP " : L"   ");
 		txt = zxString::fmt(dec ? L"%s%05d %05d %s" : L"%s%04X %04X %s", sp, idx, val, chars.buffer());
 	} else if(id == IDC_LIST_DT) {
-		// адресс 16 значений текстовое представление
+		// адрес 16 значений текстовое представление
 		auto idx = (_dt % 16) + (item * 16);
 		if(idx > 65535) return;
 		zxString vals(fromNum(idx, radix[dec + 22]));
@@ -316,7 +302,7 @@ void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
 		zxString chars;
 		for(int i = 0; i < 16; i++) {
 			if(idx > 65535) break;
-			ssh_w v = read_mem16(idx++);
+			ssh_w v = read_mem8(idx++);
 			fromNum(v, radix[dec + 2]);
 			vals += tmpBuf;
 			if(v < 32) v = 32;
@@ -332,8 +318,6 @@ void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
 }
 
 zxDebugger::~zxDebugger() {
-	SAFE_DELETE(da);
-	SAFE_DELETE(assm);
 	DeleteObject(hFont);
 	DeleteObject(hbrSel);
 	DeleteObject(hbrUnsel);
@@ -345,9 +329,8 @@ int zxDebugger::onInitDialog(HWND hWnd) {
 
 	hbrSel = CreateSolidBrush(GetSysColor(COLOR_HIGHLIGHT));
 	hbrUnsel = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
+	hWndTick = GetDlgItem(hWnd, IDC_EDIT_TICK);
 
-	da = new zxDisAsm;
-	assm = new zxAssembler;
 	// прочитать точки останова из установок
 	int count = 0;
 	for(int i = OPT_BPS0; i <= OPT_BPS9; i++) {
@@ -420,13 +403,11 @@ void zxDebugger::updateRegisters(int newPC, int flags) {
 			GetClientRect(h, &rect);
 			DrawText(hdc, zx.text, -1, &rect, DT_SINGLELINE | DT_CENTER);
 			ReleaseDC(h, hdc);
-			if(zx.idText == IDC_STATIC_I) {
-				val = val;
-			}
 			zx.val = val;
 			auto fmt = (zx.msk < 255 ? L"%d" : (zx.regb ? radix[decimal + 16] : radix[decimal + 22]));
 			SetWindowText(zx.hWndMain, fromNum(val, fmt));
 		}
+		SetWindowText(hWndTick, fromNum(*_TICK, radix[17]));
 		InvalidateRect(hWnd, nullptr, false);
 	}
 	if((flags & U_SP) && _SP && _sp != *_SP) updateStack(*_SP);
@@ -434,13 +415,13 @@ void zxDebugger::updateRegisters(int newPC, int flags) {
 	if(flags & U_PC) {
 		if(_pc != newPC) {
 			if(newPC < _pc || newPC >= _lastPC) {
-				_lastPC = da->decode(newPC, countVisibleItems);
+				_lastPC = da.decode(newPC, countVisibleItems);
 				_pc = newPC;
 			}
 			updateUndoRedo(flags & U_STORY);
 			SendMessage(hWndDA, LB_SETTOPINDEX, _pc, 0);
 		}
-		if(flags & U_SEL) SendMessage(hWndDA, LB_SETCURSEL, _pc + da->indexFromAddress(newPC), 0);
+		if(flags & U_SEL) SendMessage(hWndDA, LB_SETCURSEL, _pc + da.indexFromAddress(newPC), 0);
 	}
 }
 

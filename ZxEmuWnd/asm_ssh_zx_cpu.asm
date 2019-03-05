@@ -126,9 +126,6 @@ PREFIX_ED	= 2
 PREFIX_IX	= 1
 PREFIX_IY	= 2
 
-extern modifyTSTATE:near
-extern writePort:near
-
 prefSP		= 0
 prefAF		= 24
 prefRON		= 48
@@ -144,6 +141,9 @@ preg		dq ?
 limMem		dq ?
 limMemROM	dq ?
 
+extern modifyTSTATE: near
+		
+
 .data
 cnv		db RC, RB, RE, RD, RL, RH, RSPL, RSPH, RC, RB, RE, RD, RXL, RXH, RSPL, RSPH, RC, RB, RE, RD, RYL, RYH, RSPL, RSPH
 		db RC, RB, RE, RD, RL, RH, RF, RA, RC, RB, RE, RD, RXL, RXH, RF, RA, RC, RB, RE, RD, RYL, RYH, RF, RA
@@ -151,6 +151,14 @@ cnv		db RC, RB, RE, RD, RL, RH, RSPL, RSPH, RC, RB, RE, RD, RXL, RXH, RSPL, RSPH
 		db _FZ, _FC, _FPV, _FS
 
 .code
+
+writePort proc
+		ret
+writePort endp
+
+readPort proc
+		ret
+readPort endp
 
 ; regsZX
 ; memZX

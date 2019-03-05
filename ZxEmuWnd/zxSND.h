@@ -27,7 +27,7 @@ public:
 		ssh_u rnd;
 		bool isChannel;
 		bool isNoise;
-		void gen(int i, zxSND* snd);
+		void gen(int i, ssh_i period, ssh_b volume, int ch_vol);
 	};
 	struct AY8910_STEPS {
 		ssh_d tcounter;
@@ -48,8 +48,8 @@ public:
 	void setTicksPerFrame(int delayCpu);
 protected:
 	void applyRegisterAY(int reg, int val);
-	void writeNVRegAY(int reg, int val);
-	void writeRegAY(int reg, int val);
+	void writeValue(int reg, int val);
+	void writeAY(int reg, int val);
 	void envelopeStep();
 	void mix(ssh_w* buf, int freq, int offs, int count, ...);
 
@@ -63,12 +63,10 @@ protected:
 	char nCurrent;
 	int SND_TICKS_PER_FRAME[3];
 
-	int registerLatch;
-
 	ssh_i updateStep;
 
-	ssh_b curRegsAY[countRegAY];
-	ssh_b origRegsAY[countRegAY];
+	// массив оригинатльных значений регистров AY(для чтения из порта - нахрена???)
+	ssh_b ayRegs[countRegAY];
 
 	ssh_i beeperVolume;
 	ssh_b cont, att, alt, hold, up, holded;

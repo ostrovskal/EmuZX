@@ -1,5 +1,8 @@
 #pragma once
 
+#include "zxDisAsm.h"
+#include "zxAssembler.h"
+
 struct ZX_DEBUGGER {
 	ssh_cws text;
 	ssh_d idMain;
@@ -16,8 +19,6 @@ struct ZX_DEBUGGER {
 
 #include "zxListBox.h"
 
-class zxAssembler;
-class zxDisAsm;
 class zxBus;
 
 class zxDebugger : public zxDialog {
@@ -31,9 +32,10 @@ public:
 		U_SEL	= 16,
 		U_TOP	= 32
 	};
-	zxDebugger() : zxDialog(), hWndDA(nullptr), hWndSP(nullptr), da(nullptr), hFont(nullptr), countVisibleItems(0),
+	zxDebugger() : zxDialog(), hWndDA(nullptr), hWndSP(nullptr), hFont(nullptr), countVisibleItems(0),
 					_pc(-1), _sp(-1), _lastPC(-1), _dt(0), curIndexBP(-1), curStoryPC(-1), limitStoryPC(0) { 
 		hAccel = LoadAccelerators(hInst, MAKEINTRESOURCE(IDA_ACCEL_DEBUGGER));
+		bus = &theApp->bus;
 	}
 	virtual ~zxDebugger();
 	bool checkBPS(ssh_w address, bool mem);
@@ -48,14 +50,11 @@ protected:
 	ssh_msg void onNextBreakpoint();
 	ssh_msg void onQuckBreakpoint();
 	ssh_msg void onListBreakpoint();
-	ssh_msg void onStepInto();
-	ssh_msg void onStepOver();
 	ssh_msg void onPause();
 	ssh_msg void onRun();
 	ssh_msg void onPcUndo();
 	ssh_msg void onPcRedo();
 	ssh_msg void onHexDec();
-	ssh_msg void onOverProc();
 	ssh_msg void onSetPC();
 	ssh_msg void onSetSP();
 	ssh_msg void onSetData();
@@ -75,14 +74,17 @@ protected:
 	void quickBP(int adr);
 	void updateStack(int sp);
 	void updateHexDec(bool change);
+	void onTrace();
 	int comparePredefinedNames(ssh_cws buf);
 	int _pc, _sp, _lastPC, _dt;
 	int countVisibleItems;
 	zxListBox zxDA, zxSP, zxDT;
-	zxDisAsm* da;
-	zxAssembler* assm;
+	zxDisAsm da;
+	zxBus* bus;
+	zxAssembler assm;
 	HFONT hFont;
 	HBRUSH hbrSel, hbrUnsel;
+	HWND hWndTick;
 	ZX_BREAK_POINT bps[COUNT_BP];
 	ssh_w storyPC[COUNT_STORY_PC];
 	HWND hWndDA, hWndSP, hWndDT;

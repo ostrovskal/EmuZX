@@ -16,8 +16,12 @@ enum CPU_REG {
 	RSPL, RSPH, RPCL, RPCH,
 	RI, RR, IFF1, IFF2, IM,
 	PORT_FE, PORT_1F, PORT_FD, KEMPSTON,
-	RAM, ROM, VID, SCAN,
-	PC_EXIT_CALL1, PC_EXIT_CALL2,
+	MOUSE0, MOUSE1, MOUSE2,
+	TRDOS0, TRDOS1, TRDOS2, TRDOS3, TRDOS4, TRDOS5, TRDOS6, TRDOS7,
+	FE16, FE8, AY_REG,
+	AY0, AY1, AY2, AY3, AY4, AY5, AY6, AY7, AY8, AY9, AY10, AY11, AY12, AY13, AY14, AY15,
+	TICK0, TICK1, TICK2, TICK3,
+	RAM, ROM, VID,
 	MODEL, TSTATE1, TSTATE2,
 	KEYS0, KEYS1, KEYS2, KEYS3, KEYS4, KEYS5, KEYS6, KEYS7,
 	COUNT_REGS
@@ -44,7 +48,10 @@ enum CPU_FLAGS {
 #define _FC(val1, val2)			(val1 > val2)
 #define _DA(c)					path[pos++] = c
 
-extern int ticks;
+extern long szROM;
+extern ssh_w RET_CALL;
+
+extern ssh_b* _AY;
 extern ssh_b* _I;
 extern ssh_b* _R;
 extern ssh_b* _IM;
@@ -60,24 +67,28 @@ extern ssh_w* _SP;
 extern ssh_w* _PC;
 extern ssh_w* _IX;
 extern ssh_w* _IY;
-extern ssh_w* _PC_EXIT_CALL;
 extern ssh_w* _TSTATE;
 
-extern ssh_b* _PORT_FE;
-extern ssh_b* _PORT_FD;
+extern ssh_d* _TICK;
+
+extern ssh_b* _FE;
+extern ssh_b* _7FFD;
+extern ssh_b* _1FFD;
 extern ssh_b* _MODEL;
+extern ssh_b* _AY_REG;
 
 extern ssh_b* _RAM;
 extern ssh_b* _VID;
 extern ssh_b* _ROM;
-extern ssh_b* _SCAN;
 extern ssh_b* _KEYS;
 extern ssh_b* _KEMPSTON;
 extern ssh_b  cpuZX[COUNT_REGS];
 extern ssh_b* pageROM;
 extern ssh_b* pageRAM;
 extern ssh_b* pageVRAM;
+extern ssh_b* pageATTRIB;
 extern ssh_b* PAGE_RAM[64];
+extern ssh_b* PAGE_ROM[8];
 
 ssh_b* get_mem(ssh_w address);
 
@@ -151,12 +162,9 @@ protected:
 	inline ssh_b read_mem8PC() { return *get_mem((*_PC)++); }
 
 	// пишем в память 8 битное значение
-	inline void write_mem8(ssh_b* address, ssh_b val) { *address = val; }
-
-	// пишем в память 8 битное значение
 	void write_mem8(ssh_w address, ssh_b val);
 
-	// пишем в память 8 битное значение
+	// пишем в память 16 битное значение
 	void write_mem16(ssh_w address, ssh_w val);
 
 	// преобразуем 2 битный номер регистровой пары в указатель на регистр(с учетом SP)
@@ -167,13 +175,16 @@ protected:
 
 	// преобразуем 3 битный номер половинки регистра в указатель на регистр
 	inline ssh_b* fromPrefRON(ssh_b ron) {
-		if(ron == 6) return (preg = get_mem(*fromRP_SP(4) + (char)(prefix ? read_mem8PC() : 0) & 0xffff));
+		if (ron == 6) {
+			ssh_w address = *fromRP_SP(4) + (char)(prefix ? read_mem8PC() : 0);
+			return (preg = get_mem(address));
+		}
 		return &cpuZX[cnvPrefRON[prefix + ron]];
 	}
 
 	// преобразуем 3 битный номер половинки регистра в указатель на регистр
 	inline ssh_b* fromRON(ssh_b ron) {
-		if(ron == 6) return get_mem(*_HL);
+		if (ron == 6) return get_mem(*_HL);
 		return &cpuZX[cnvPrefRON[ron]];
 	}
 
@@ -207,49 +218,3 @@ private:
 };
 
 typedef int (zxCPU::*funcCPU)();
-
-
-// вычисление переполнения
-inline ssh_b calcFV(int o1, int o2, int mx, int mn, ssh_w fn) {
-	if(!fn) {
-		if((o2 > 0 && (o1 > (mx - o2))) ||
-			(o2 < 0 && (o1 < (mn - o2)))) return 4;
-		return 0;
-	}
-	if((o2 > 0 && (o1 < (mn + o2))) ||
-		(o2 < 0 && (o1 >(mx + o2)))) return 4;
-	return 0;
-}
-
-// вычисление переполнения
-inline ssh_b calcFV1(char op1, char op2, ssh_b fc, ssh_w fn) {
-	return calcFV(op1, op2 + fc, CHAR_MAX, CHAR_MIN, fn);
-}
-
-// вычисление переполнения
-inline ssh_b calcFV2(short op1, short op2, ssh_b fc, ssh_w fn) {
-	return calcFV(op1, op2 + fc, SHRT_MAX, SHRT_MIN, fn);
-}
-
-// вычисление полупереноса
-inline ssh_b calcFH(ssh_b op1, ssh_b op2, ssh_b fc, ssh_b fn) {
-	ssh_b v = op1 & 15;
-	ssh_b o = op2 & 15;
-	ssh_b ret = fn ? v - (o + fc) : v + (o + fc);
-	return (ret > 15) << 4;
-}
-
-// обмен регистров
-inline void swapReg(ssh_w* r1, ssh_w* r2) {
-	ssh_w a = *r1;
-	ssh_w b = *r2;
-	*r2 = a;
-	*r1 = b;
-}
-
-// читаем 8 бит из памяти
-inline ssh_b read_mem8(ssh_w address) { return *get_mem(address); }
-
-// читаем 16 бит из памяти
-inline ssh_w read_mem16(ssh_w address) { return (read_mem8(address) + (read_mem8(address + 1) << 8)); }
-

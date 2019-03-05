@@ -5,12 +5,12 @@
 int zxCPU::opsCB00() {
 	// 00 rot SSS. rot=110(SLL); SZ503P0C
 	if(prefix) {
-		write_mem8(preg, rotate(*preg, 255));
+		::write_mem8(preg, rotate(*preg, 255));
 		if(typeOps != 6) *fromRON(typeOps) = *preg;
-		return 23;
+	} else {
+		ssh_b* reg = fromRON(typeOps);
+		::write_mem8(reg, rotate(*reg, 255));
 	}
-	ssh_b* reg = fromRON(typeOps);
-	write_mem8(reg, rotate(*reg, 255));
 	return (typeOps == 6 ? 15 : 8);
 }
 
@@ -24,19 +24,19 @@ int zxCPU::opsCB01() {
 	ssh_b fs = ((ops == 7 && !fz) ? 128 : 0);
 	update_flags(FS | FZ | FH | FN, fs | (fz << 2) | 16 | (fz << 6));
 
-	return (prefix ? 20 : (typeOps == 6 ? 12 : 8));
+	return (typeOps == 6 ? 12 : 8);
 }
 
 int zxCPU::opsCB10() {
 	// 10 RES bit, SSS. SSS <- SSS AND NOT(2^bit)
 	ssh_b val = ~(1 << ops);
 	if(prefix) {
-		write_mem8(preg, *preg & val);
+		::write_mem8(preg, *preg & val);
 		if(typeOps != 6) *fromRON(typeOps) = *preg;
-		return 23;
+	} else {
+		ssh_b* reg = fromRON(typeOps);
+		::write_mem8(reg, *reg & val);
 	}
-	ssh_b* reg = fromRON(typeOps);
-	write_mem8(reg, *reg & val);
 	return (typeOps == 6 ? 15 : 8);
 }
 
@@ -44,12 +44,11 @@ int zxCPU::opsCB11() {
 	// 11 bit SSS; SET bit, SSS; SSS <- SSS OR 2^bit
 	ssh_b val = 1 << ops;
 	if(prefix) {
-		write_mem8(preg, *preg | val);
+		::write_mem8(preg, *preg | val);
 		if(typeOps != 6) *fromRON(typeOps) = *preg;
-		return 23;
+	} else {
+		ssh_b* reg = fromRON(typeOps);
+		::write_mem8(reg, *reg | val);
 	}
-	ssh_b* reg = fromRON(typeOps);
-	write_mem8(reg, *reg | val);
 	return (typeOps == 6 ? 15 : 8);
 }
-
