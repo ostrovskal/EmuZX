@@ -10,6 +10,33 @@ static ssh_u ssh_pow2(ssh_u val, bool nearest) {
 	return ((_val == val || nearest) ? _val : _val << 1ULL);
 }
 
+static ssh_ccs radix1[] = {	"3X", "2X", "3X ", "2X ",
+							"5(X)", "4(#X)", "3(X)", "2(#X)",
+							"3+X)", "2+#X)", "5X", "4X",
+							"5[X]", "4[#X]", "3{X}", "2{#X}",
+							"0X", "2#X", "0X", "0X",
+							"3-X)", "2-#X)", "5X", "4#X" };
+
+zxString::zxString(ssh_u value, int offs, bool hex) {
+	init();
+	ssh_ws ws;
+	ssh_ws* end = nullptr;
+	int rdx = offs + (hex ? HEX : 0);
+	auto res = asm_ssh_ntow(&value, rdx & 1, &end);
+	auto spec = radix1[rdx];
+	auto str = (ssh_ws*)TMP_BUF;
+	auto lnum = (spec[0] - '0') - (end - res);
+	auto ll = (strlen(spec) - 2) + (lnum > 0 ? lnum : 0);
+	auto buf(alloc(ll, false)), tmp = buf;
+	spec++;
+	while((ws = *spec++)) {
+		if(ws == L'X') {
+			while(lnum-- > 0) *tmp++ = L'0';
+			while(*res)* tmp++ = *res++;
+		} else *tmp++ = ws;
+	}
+}
+
 zxString::zxString(ssh_cws cws, ssh_l len) {
 	init();
 	ssh_l t(wcslen(cws));
@@ -221,8 +248,7 @@ zxString* zxString::split(ssh_cws delim, int& count) const {
 zxString zxString::fmt(ssh_cws fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	_vstprintf_s(tmpBuf, 260, fmt, args);
+	_vstprintf_s((ssh_ws*)TMP_BUF, MAX_PATH, fmt, args);
 	va_end(args);
-	return zxString(tmpBuf);
-
+	return zxString((ssh_cws)TMP_BUF);
 }

@@ -3,6 +3,12 @@
 #include "zxKeyboard.h"
 #include "zxGamePad.h"
 
+struct ZX_KEY_EX {
+	ssh_b vk_code;
+	ssh_b vk_codeKey;
+	ssh_b vk_codeKeyEx;
+};
+
 // fe fd fb f7 ef df bf 7f
 //	port[0xfefe] = 255;// CAPS_SHIFT Z X C V
 //	port[0xfdfe] = 255;// A S D F G
@@ -59,7 +65,7 @@ static ZX_KEY_EX keysExShift[] = {
 	{'0', '9', VK_SHIFT}
 };
 
-ZX_KEY keys[] = {
+zxKeyboard::ZX_KEY keys[] = {
 	{IDC_BUTTON_CAPS_LOCK, 0, 0, 0, 0, VK_CAPITAL, L"", L"", L"N/A"},
 	{IDC_BUTTON_K1, 3, 0x1, 0, 0, '1', L"1", L"1", L"1", L"blue", L"DEF FN", L"!", L"edit"},
 	{IDC_BUTTON_K2, 3, 0x2, 0, 0, '2', L"2", L"2", L"2", L"red", L"FN", L"@", L"caps lock"},

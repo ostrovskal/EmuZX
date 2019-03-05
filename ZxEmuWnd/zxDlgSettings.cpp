@@ -1,6 +1,9 @@
 #include "stdafx.h"
 #include "zxDlgSettings.h"
 #include "zxGamePad.h"
+#include "zxKeyboard.h"
+
+extern zxKeyboard::ZX_KEY keys[];
 
 static SHEET_DATA sheetCommon[] = {
 	{IDC_SLIDER_PERIOD_CPU, OPT_PERIOD_CPU, (ssh_cws)0x0110},
@@ -435,8 +438,7 @@ void zxDlgSheetJoystick::onOK() {
 	for(int i = 0; i < 2; i++) {
 		zxString val;
 		for(int j = 0; j < 28; j++) {
-			_itow_s(status[i][j], tmpBuf, 260, 16);
-			val += tmpBuf;
+			val += zxString(status[i][j], RFMT_NUM + 1, false);
 			if(j < 27) val += L',';
 		}
 		theApp->getOpt(i + OPT_JOY1_STATUS)->sval = val;

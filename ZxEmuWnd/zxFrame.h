@@ -10,6 +10,19 @@ class zxKeyboard;
 class zxFrame : public zxWnd {
 	friend class zxBus;
 public:
+	enum States {
+		ST_EXECUTE		= 0x01,
+		ST_TURBO		= 0x02,
+		ST_JOYSTICK		= 0x04,
+		ST_SOUND		= 0x08,
+		ST_DEBUGGER		= 0x10,
+		ST_KEYBOARD		= 0x20,
+		ST_MODEL		= 0x40,
+		ST_ASPECT		= 0x80,
+		ST_FILTER		= 0x100,
+		STS_EXECUTE		= 0x200,
+		ST_EXECUTE_GO	= 0x400
+	};
 	zxFrame();
 	virtual ~zxFrame();
 	
@@ -61,7 +74,8 @@ protected:
 
 	bool changeState(int id_opt, int id, bool change);
 	bool checkedSubMenu(HMENU hMenu, int id_opt, ssh_d val, int* ids);
-
+	
+	void setOrGetWndPos(HWND h, int id_opt, bool get);
 	void modifyMRU(zxString path);
 	void processKeys();
 	long makeWndSize();

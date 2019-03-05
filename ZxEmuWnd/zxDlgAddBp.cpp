@@ -20,13 +20,12 @@ int zxDlgAddBp::onInitDialog(HWND hWnd) {
 	SendMessage(h, CB_ADDSTRING, 0, (LPARAM)L"Запись в память");
 
 	if(_bp) {
-		auto dec = theApp->getOpt(OPT_DECIMAL)->dval;
 		SendMessage(h, CB_SETCURSEL, ((_bp->flags & FBP_ACCESS) >> 1), 0);
-		if(_bp->flags & FBP_ADDR) SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS1), fromNum(_bp->address1, radix[dec + 22]));
-		if(_bp->flags & FBP_ADDR) SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS2), fromNum(_bp->address2, radix[dec + 22]));
+		if(_bp->flags & FBP_ADDR) SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS1), zxString(_bp->address1, RFMT_OPS16, true));
+		if(_bp->flags & FBP_ADDR) SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS2), zxString(_bp->address2, RFMT_OPS16, true));
 		if(_bp->flags & FBP_VAL) {
-			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_VALUE), fromNum(_bp->value, radix[dec + 16]));
-			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_MASK), fromNum(_bp->mask, radix[dec + 16]));
+			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_VALUE), zxString(_bp->value, RFMT_OPS8, true));
+			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_MASK), zxString(_bp->mask, RFMT_OPS8, true));
 			SendMessage(GetDlgItem(hWnd, IDC_COMBO_COND), CB_SETCURSEL, ((_bp->flags & FBP_COND) >> 2), 0);
 		}
 	} else {
@@ -39,9 +38,9 @@ int zxDlgAddBp::onInitDialog(HWND hWnd) {
 
 int zxDlgAddBp::getValue(HWND hWnd, int flag) {
 	result.flags &= ~flag;
-	if(GetWindowText(hWnd, tmpBuf, 260) == 0) return 0;
+	if(GetWindowText(hWnd, (ssh_ws*)TMP_BUF, MAX_PATH) == 0) return 0;
 	result.flags |= flag;
-	return *(int*)asm_ssh_wton(tmpBuf, (ssh_u)Radix::_dec);
+	return *(int*)asm_ssh_wton(TMP_BUF, 0);
 }
 
 void zxDlgAddBp::onOK() {

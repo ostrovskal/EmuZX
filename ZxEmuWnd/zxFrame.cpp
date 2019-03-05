@@ -7,7 +7,8 @@
 #include "zxGamepad.h"
 #include "zxDlgSettings.h"
 
-static ssh_w old_tstate = 0;
+CRITICAL_SECTION cs;
+
 static int idsModel[] = {IDM_48K, IDM_128K, IDM_PENTAGON_128K, IDM_SCORPION_256K, 0};
 static int idsPP[] = { IDM_FILTER_NONE, IDM_FILTER_SMOOTH, IDM_FILTER_BILINEAR, IDM_FILTER_BICUBIC, 
 						IDM_FILTER_ROUND_NONE, IDM_FILTER_ROUND_SMOOTH, IDM_FILTER_ROUND_BILINEAR, IDM_FILTER_ROUND_BICUBIC, 0};
@@ -15,74 +16,11 @@ static int idsAR[] = {IDM_1X, IDM_2X, IDM_3X, IDM_4X, IDM_AS_IS, 0};
 
 ssh_cws nameROMs[] = {L"48K", L"128K", L"PENTAGON 128K", L"SCORPION 256K"};
 
-static CRITICAL_SECTION cs;
-
 HMENU hMenu = nullptr;
 HINSTANCE hInst = nullptr;
 
 static void CALLBACK timerProc(HWND, UINT, UINT_PTR, DWORD) {
 	theApp->bus.execute();
-}
-
-static void setOrGetWndPos(HWND h, int id_opt, bool get) {
-	RECT r;
-	auto o = theApp->getOpt(id_opt);
-
-	if(get) {
-		if(GetWindowRect(h, &r))
-			theApp->getOpt(id_opt)->sval = zxString::fmt(L"%d,%d,%d,%d", r.left, r.top, r.right, r.bottom);
-	} else {
-		int count = 0;
-		auto pos = o->sval.split(L",", count);
-		if(count == 4) {
-			r.left = _wtoi(pos[0]);
-			r.top = _wtoi(pos[1]);
-			r.right = _wtoi(pos[2]);
-			r.bottom = _wtoi(pos[3]);
-			MoveWindow(h, r.left, r.top, r.right - r.left, r.bottom - r.top, true);
-		}
-	}
-}
-
-ssh_w modifyTSTATE(int adding, int remove) {
-	EnterCriticalSection(&cs);
-	(*_TSTATE) &= ~remove;
-	(*_TSTATE) |= adding;
-	LeaveCriticalSection(&cs);
-	return (*_TSTATE);
-}
-
-bool dlgSaveOrOpenFile(bool bOpen, ssh_cws title, ssh_cws filter, ssh_cws defExt, zxString& folder) {
-	bool result;
-	static ssh_ws flt[MAX_PATH];
-
-	int flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY;
-
-	OPENFILENAME ofn;
-	memset(&ofn, 0, sizeof(OPENFILENAME));
-
-	if(bOpen) flags |= OFN_FILEMUSTEXIST;
-
-	auto files = new ssh_ws[MAX_PATH];
-	memset(files, 0, MAX_PATH);
-
-	ofn.lStructSize = sizeof(OPENFILENAME);
-	ofn.hwndOwner = theApp->getHWND();
-
-	ofn.lpstrDefExt = defExt;
-	ofn.lpstrFilter = filter;
-	ofn.lpstrInitialDir = folder;
-	ofn.lpstrTitle = title;
-	ofn.lpstrFile = files;
-	ofn.lpstrFileTitle = nullptr;
-	ofn.nFilterIndex = 1;
-	ofn.nMaxFile = MAX_PATH;
-	ofn.Flags = flags;
-
-	result = bOpen ? ::GetOpenFileName(&ofn) : ::GetSaveFileName(&ofn);
-	if(result) folder = ofn.lpstrFile;
-	SAFE_DELETE(files);
-	return result;
 }
 
 BEGIN_MSG_MAP(zxFrame, zxWnd)
@@ -113,9 +51,8 @@ BEGIN_MSG_MAP(zxFrame, zxWnd)
 END_MSG_MAP()
 
 void zxFrame::updateCaption() {
-	zxString::fmt(L"sshZX (%s - %s) %s [%s]", (((*_TSTATE) & ZX_EXEC) ? L"execute" : L"pause"), (getOpt(OPT_TURBO)->dval ? L"turbo" : L"normal"),
-				  nameROMs[getOpt(OPT_MODEL)->dval], opts.nameLoadProg.str());
-	SetWindowText(theApp->getHWND(), (LPCWSTR)tmpBuf);
+	SetWindowText(theApp->getHWND(), zxString::fmt(L"sshZX (%s - %s) %s [%s]", (((*_TSTATE) & ZX_EXEC) ? L"execute" : L"pause"), (getOpt(OPT_TURBO)->dval ? L"turbo" : L"normal"),
+				  nameROMs[getOpt(OPT_MODEL)->dval], opts.nameLoadProg.str()));
 }
 
 bool zxFrame::checkedSubMenu(HMENU hSubMenu, int id_opt, ssh_d val, int* ids) {
@@ -326,7 +263,7 @@ void zxFrame::onProcessMRU() {
 	mii.fMask = MIIM_TYPE;
 	mii.fType = MFT_STRING;
 	mii.cch = MAX_PATH;
-	mii.dwTypeData = tmpBuf;
+	mii.dwTypeData = (ssh_ws*)TMP_BUF;
 	if(GetMenuItemInfo(hMenuMRU, wmId, FALSE, &mii)) {
 		getOpt(OPT_CUR_PATH)->sval = mii.dwTypeData;
 		onOpen();
@@ -455,6 +392,8 @@ int zxFrame::run() {
 	hMenuModel = GetSubMenu(GetSubMenu(hMenu, 2), 6);
 	hMenuPP = GetSubMenu(GetSubMenu(hMenu, 1), 3);
 
+	HEX = getOpt(OPT_DECIMAL)->dval;
+
 	debug = new zxDebugger;
 	debug->create(IDD_DIALOG_DEBUGGER, hWnd, false);
 
@@ -510,3 +449,24 @@ void zxFrame::modifyMRU(zxString path) {
 		}
 	}
 }
+
+void zxFrame::setOrGetWndPos(HWND h, int id_opt, bool get) {
+	RECT r;
+	auto o = theApp->getOpt(id_opt);
+
+	if(get) {
+		if(GetWindowRect(h, &r))
+			theApp->getOpt(id_opt)->sval = zxString::fmt(L"%d,%d,%d,%d", r.left, r.top, r.right, r.bottom);
+	} else {
+		int count = 0;
+		auto pos = o->sval.split(L",", count);
+		if(count == 4) {
+			r.left = _wtoi(pos[0]);
+			r.top = _wtoi(pos[1]);
+			r.right = _wtoi(pos[2]);
+			r.bottom = _wtoi(pos[3]);
+			MoveWindow(h, r.left, r.top, r.right - r.left, r.bottom - r.top, true);
+		}
+	}
+}
+

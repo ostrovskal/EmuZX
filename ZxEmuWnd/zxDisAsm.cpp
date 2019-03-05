@@ -5,14 +5,7 @@
 
 static int operands[] = {4, 2, 6, 1, 8, 1, 16, 1, 22, 2, -1, 2, -1, 2, 18, 1};
 
-ssh_cws radix[] = {	L"%02X", L"%03d", L"%02X ", L"%03d ",
-					L"(#%04X)", L"(%05d)", L"(#%02X)", L"(%03d)",
-					L"+#%02X)", L"%+03d)", L"%04X", L"%05d",
-					L"[#%04X]", L"[%05d]", L"{#%02X}", L"{%03d}",
-					L"#%02X", L"%d", L"%X", L"%d",
-					L"-#%02X)", L"-%03d)", L"#%04X", L"%05d"};
-
-ssh_cws namesCode[] = {	L"B", L"C", L"D", L"E", L"H", L"XH", L"YH", L"L", L"XL", L"YL", L"(HL)", L"(IX", L"(IY", L"A", L"F",
+static ssh_cws namesCode[] = {	L"B", L"C", L"D", L"E", L"H", L"XH", L"YH", L"L", L"XL", L"YL", L"(HL)", L"(IX", L"(IY", L"A", L"F",
 						L"BC", L"DE", L"HL", L"AF", L"SP", L"IX", L"IY", L"R", L"I", L"IM ",
 						L"(BC)", L"(DE)", 
 						L"NZ", L"Z", L"NC", L"C", L"PO", L"PE", L"P", L"M",

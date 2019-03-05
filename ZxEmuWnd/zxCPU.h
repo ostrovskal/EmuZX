@@ -90,7 +90,9 @@ extern ssh_b* pageATTRIB;
 extern ssh_b* PAGE_RAM[64];
 extern ssh_b* PAGE_ROM[8];
 
-ssh_b* get_mem(ssh_w address);
+extern "C" {
+	ssh_b* get_mem(ssh_w address);
+};
 
 class zxCPU {
 	friend class zxBus;

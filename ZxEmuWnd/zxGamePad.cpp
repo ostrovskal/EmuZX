@@ -1,6 +1,9 @@
 
 #include "stdafx.h"
 #include "zxGamePad.h"
+#include "zxKeyboard.h"
+
+extern zxKeyboard::ZX_KEY keys[];
 
 zxGamepad::zxGamepad() {
 	memset(wNowButtons, 0, sizeof(wNowButtons));
@@ -64,11 +67,13 @@ void zxGamepad::update() {
 }
 
 ssh_b* zxGamepad::getPredefinedMode(int mode, int& count) {
-	static ssh_b kempston[5] = {ZX_KEY_KEM_UP, ZX_KEY_KEM_RIGHT, ZX_KEY_KEM_DOWN, ZX_KEY_KEM_LEFT, ZX_KEY_KEM_FIRE};
-	static ssh_b sinclair1[5] = {ZX_KEY_8, ZX_KEY_7, ZX_KEY_9, ZX_KEY_6, ZX_KEY_0};
-	static ssh_b sinclair2[5] = {ZX_KEY_3, ZX_KEY_2, ZX_KEY_4, ZX_KEY_1, ZX_KEY_5};
-	static ssh_b cursor[5] = {ZX_KEY_UP, ZX_KEY_RIGHT, ZX_KEY_DOWN, ZX_KEY_LEFT, ZX_KEY_0};
-	static ssh_b keyboard[9] = {ZX_KEY_Q, ZX_KEY_P, ZX_KEY_A, ZX_KEY_O, ZX_KEY_SPACE, ZX_KEY_M, ZX_KEY_D, ZX_KEY_S, ZX_KEY_E};
+	static ssh_b kempston[5]	= {zxKeyboard::zxKeyboard::KEY_KEM_UP, zxKeyboard::KEY_KEM_RIGHT, zxKeyboard::KEY_KEM_DOWN,
+									zxKeyboard::KEY_KEM_LEFT, zxKeyboard::KEY_KEM_FIRE};
+	static ssh_b sinclair1[5]	= {zxKeyboard::KEY_8, zxKeyboard::KEY_7, zxKeyboard::KEY_9, zxKeyboard::KEY_6, zxKeyboard::KEY_0};
+	static ssh_b sinclair2[5]	= {zxKeyboard::KEY_3, zxKeyboard::KEY_2, zxKeyboard::KEY_4, zxKeyboard::KEY_1, zxKeyboard::KEY_5};
+	static ssh_b cursor[5]		= {zxKeyboard::KEY_UP, zxKeyboard::KEY_RIGHT, zxKeyboard::KEY_DOWN, zxKeyboard::KEY_LEFT, zxKeyboard::KEY_0};
+	static ssh_b keyboard[9]	= {zxKeyboard::KEY_Q, zxKeyboard::KEY_P, zxKeyboard::KEY_A, zxKeyboard::KEY_O, zxKeyboard::KEY_SPACE,
+									zxKeyboard::KEY_M, zxKeyboard::KEY_D, zxKeyboard::KEY_S, zxKeyboard::KEY_E};
 
 	count = 5;
 	
@@ -91,7 +96,7 @@ void zxGamepad::changeMode(bool second, int mode) {
 }
 
 void zxGamepad::updateKey(bool pressed, int k) {
-	ZX_KEY* key = &keys[k];
+	zxKeyboard::ZX_KEY* key = &keys[k];
 	if(key->bitEx) {
 		ssh_b portEx = key->portEx;
 		ssh_b bitEx = key->bitEx;

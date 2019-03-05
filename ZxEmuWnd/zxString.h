@@ -15,6 +15,7 @@ public:
 	zxString(ssh_b* b, ssh_l len = -1) : zxString((ssh_ccs)b, len) {}
 	zxString(const zxString& str) { init(); *this = str; }
 	zxString(ssh_ws ws, ssh_l rep);
+	zxString(ssh_u value, int offs, bool hex);
 	// деструктор
 	~zxString() { empty(); }
 	// привидение типа
@@ -26,12 +27,6 @@ public:
 	friend bool operator == (const zxString& str1, const zxString& str2) { return (wcscmp(str1, str2) == 0); }
 	friend bool operator == (const zxString& str, ssh_cws wcs) { return wcscmp(str, wcs) == 0; }
 	friend bool operator == (ssh_cws wcs, const zxString& str) { return wcscmp(wcs, str) == 0; }
-	friend bool operator < (const zxString& str1, const zxString& str2) { return wcscmp(str1, str2) < 0; }
-	friend bool operator < (const zxString& str, ssh_cws wcs) { return wcscmp(str, wcs) < 0; }
-	friend bool operator < (ssh_cws wcs, const zxString& str) { return wcscmp(wcs, str) < 0; }
-	friend bool operator > (const zxString& str1, const zxString& str2) { return wcscmp(str1, str2) > 0; }
-	friend bool operator > (const zxString& str, ssh_cws wcs) { return wcscmp(str, wcs) > 0; }
-	friend bool operator > (ssh_cws wcs, const zxString& str) { return wcscmp(wcs, str) > 0; }
 	friend bool operator != (const zxString& str1, const zxString& str2) { return !(operator == (str1, str2)); }
 	friend bool operator != (const zxString& str, ssh_cws wcs) { return !(operator == (str, wcs)); }
 	friend bool operator != (ssh_cws wcs, const zxString& str) { return !(operator == (wcs, str)); }

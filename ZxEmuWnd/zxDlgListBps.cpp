@@ -4,6 +4,8 @@
 #include "zxDebugger.h"
 #include "zxDlgAddBp.h"
 
+extern ssh_cws cond_bp[];
+
 static TBBUTTON tbb[] = {
 	{13, IDM_NEW, TBSTATE_ENABLED, BTNS_AUTOSIZE,{0}, 0, (INT_PTR)L"Добавить\\Ctr+N"},
 	{10, -1, TBSTATE_ENABLED, BTNS_SEP,{0}, 0, 0},
@@ -64,11 +66,10 @@ void zxDlgListBps::onNewEdit() {
 			bool is1 = (_bp->address1 <= bp->address1) && (_bp->address2 >= bp->address1);
 			bool is2 = (_bp->address1 <= bp->address2) && (_bp->address2 >= bp->address2);
 			if(is1 || is2) {
-				bool dec = theApp->getOpt(OPT_DECIMAL)->dval;
-				zxString s1(fromNum(_bp->address1, radix[dec + 22]));
-				zxString s2(fromNum(_bp->address2, radix[dec + 22]));
-				zxString d1(fromNum(bp->address1, radix[dec + 22]));
-				zxString d2(fromNum(bp->address2, radix[dec + 22]));
+				zxString s1(fromNum(_bp->address1, radix[HEX + 22]));
+				zxString s2(fromNum(_bp->address2, radix[HEX + 22]));
+				zxString d1(fromNum(bp->address1, radix[HEX + 22]));
+				zxString d2(fromNum(bp->address2, radix[HEX + 22]));
 				MessageBox(hWnd, zxString::fmt(L"Перекрытие точек останова <%s - %s>/<%s - %s>!", s1, s2, d1, d2), L"Ошибка", MB_ICONERROR);
 				break;
 			}
@@ -140,8 +141,6 @@ void zxDlgListBps::updateItems() {
 void zxDlgListBps::setItems() {
 	LVITEM lvi;
 
-	auto dec = theApp->getOpt(OPT_DECIMAL)->dval;
-
 	ListView_DeleteAllItems(hWndList);
 	itemSelected = -1;
 
@@ -160,7 +159,7 @@ void zxDlgListBps::setItems() {
 
 		lvi.iSubItem = 1;
 	
-		auto txt = zxString::fmt(L"%s - %s", zxString(fromNum(bp->address1, radix[dec + 22])), zxString(fromNum(bp->address2, radix[dec + 22])));
+		auto txt = zxString::fmt(L"%s - %s", zxString(fromNum(bp->address1, radix[HEX + 22])), zxString(fromNum(bp->address2, radix[HEX + 22])));
 		lvi.pszText = txt.buffer();
 		SendMessage(hWndList, LVM_SETITEM, 1, (LPARAM)&lvi);
 
@@ -169,11 +168,11 @@ void zxDlgListBps::setItems() {
 		SendMessage(hWndList, LVM_SETITEM, 2, (LPARAM)&lvi);
 
 		lvi.iSubItem = 3;
-		lvi.pszText = (bp->flags & FBP_VAL) ? fromNum(bp->value, radix[dec + 16]) : L"";
+		lvi.pszText = (bp->flags & FBP_VAL) ? fromNum(bp->value, radix[HEX + 16]) : L"";
 		SendMessage(hWndList, LVM_SETITEM, 3, (LPARAM)&lvi);
 
 		lvi.iSubItem = 4;
-		lvi.pszText = (bp->flags & (FBP_VAL | FBP_MASK)) == (FBP_VAL | FBP_MASK) ? fromNum(bp->mask, radix[dec + 16]) : L"";
+		lvi.pszText = (bp->flags & (FBP_VAL | FBP_MASK)) == (FBP_VAL | FBP_MASK) ? fromNum(bp->mask, radix[HEX + 16]) : L"";
 		SendMessage(hWndList, LVM_SETITEM, 4, (LPARAM)&lvi);
 
 		lvi.iSubItem = 5;

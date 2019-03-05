@@ -3,20 +3,6 @@
 #include "zxDisAsm.h"
 #include "zxAssembler.h"
 
-struct ZX_DEBUGGER {
-	ssh_cws text;
-	ssh_d idMain;
-	ssh_d idText;
-	ssh_b* regb;
-	ssh_w* regw;
-	ssh_w msk;
-	ssh_b shift;
-	ssh_w val;
-	HWND hWndMain;
-	HWND hWndText;
-	bool change;
-};
-
 #include "zxListBox.h"
 
 class zxBus;

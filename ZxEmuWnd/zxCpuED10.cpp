@@ -39,7 +39,7 @@ int zxCPU::opsED10() {
 		case 2:
 			do {
 				if (is) { incrementR(); incrementR(); tks += 21; }
-				write_mem8(*_HL, readPort(c, *_B));
+				write_mem8(*_HL, theApp->bus.readPort(c, *_B));
 				(*_HL) += dir; (*_B)--;
 				is = ((*_B) == 0);
 			} while(rep && !is);
@@ -49,7 +49,7 @@ int zxCPU::opsED10() {
 		case 3:
 			do {
 				if (is) { incrementR(); incrementR(); tks += 21; }
-				writePort(c, *_B, read_mem8(*_HL));
+				theApp->bus.writePort(c, *_B, read_mem8(*_HL));
 				(*_HL) += dir; (*_B)--;
 				is = ((*_B) == 0);
 			} while(rep && !is);

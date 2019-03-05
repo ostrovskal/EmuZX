@@ -152,8 +152,7 @@ void zxSettings::save(const zxString& path) {
 					value = o.sval;
 					break;
 			}
-			auto ret = swprintf_s(tmpBuf, MAX_PATH, L"%s=%s\n", o.name, value);
-			fputws(tmpBuf, hf);
+			fputws(zxString::fmt(L"%s=%s\n", o.name, value), hf);
 		}
 		fclose(hf);
 	}

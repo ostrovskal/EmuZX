@@ -7,6 +7,20 @@
 #include "zxDlgListBps.h"
 #include "zxDlgAddBp.h"
 
+struct ZX_DEBUGGER {
+	ssh_cws text;
+	ssh_d idMain;
+	ssh_d idText;
+	ssh_b* regb;
+	ssh_w* regw;
+	ssh_w msk;
+	ssh_b shift;
+	ssh_w val;
+	HWND hWndMain;
+	HWND hWndText;
+	bool change;
+};
+
 struct ZX_REG_TMP {
 	ssh_w* ptr;
 	ssh_cws name;
@@ -223,8 +237,7 @@ void zxDebugger::onDblkClkListDA() {
 	else {
 		da.getCmdOperand(sel, false, false, false, &addr1, &addr2);
 		if(addr1 != -1) {
-			int dec = theApp->getOpt(OPT_DECIMAL)->dval;
-			fromNum(addr1, radix[dec + 22]);
+			fromNum(addr1, radix[HEX + 22]);
 			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ADDRESS_DATA), tmpBuf);
 			_dt = addr1; SendMessage(hWndDT, LB_SETTOPINDEX, _dt / 16, 0);
 			InvalidateRect(hWndDT, nullptr, false);
@@ -246,7 +259,7 @@ void zxDebugger::onScrollListDA() {
 
 void zxDebugger::onSelChangeListDA() {
 	int sel = (int)SendMessage(hWndDA, LB_GETCURSEL, 0, 0) - _pc;
-	SetWindowText(GetDlgItem(hWnd, IDC_EDIT_CURRENT_COMMAND), da.makeCommand(sel, theApp->getOpt(OPT_DECIMAL)->dval));
+	SetWindowText(GetDlgItem(hWnd, IDC_EDIT_CURRENT_COMMAND), da.makeCommand(sel, HEX));
 }
 
 void zxDebugger::onChangeEditRegs() {
@@ -270,17 +283,16 @@ void zxDebugger::onChangeEditRegs() {
 
 void zxDebugger::onClose() {
 	modifyTSTATE(0, ZX_DEBUG);
-	theApp->updateData(ST_DEBUGGER);
+	theApp->updateData(zxFrame::ST_DEBUGGER);
 }
 
 void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
 	zxString txt;
 
-	auto dec = theApp->getOpt(OPT_DECIMAL)->dval;
 	auto item = dis->itemID;
 	if(id == IDC_LIST_DA) {
 		auto top = SendMessage(hWndDA, LB_GETTOPINDEX, 0, 0);
-		txt = da.makeCommand((int)(item - top), DA_FCODE | DA_FADDR | DA_FPADDR | (int)dec);
+		txt = da.makeCommand((int)(item - top), DA_FCODE | DA_FADDR | DA_FPADDR | HEX);
 	} else if(id == IDC_LIST_SP) {
 		// stack
 		auto idx = item * 2;
@@ -292,18 +304,18 @@ void zxDebugger::onDrawItem(int id, LPDRAWITEMSTRUCT dis) {
 			chars += (ssh_ws)v;
 		}
 		auto sp = ((idx == (*_SP)) ? L"SP " : L"   ");
-		txt = zxString::fmt(dec ? L"%s%05d %05d %s" : L"%s%04X %04X %s", sp, idx, val, chars.buffer());
+		txt = zxString::fmt(HEX ? L"%s%05d %05d %s" : L"%s%04X %04X %s", sp, idx, val, chars.buffer());
 	} else if(id == IDC_LIST_DT) {
 		// адрес 16 значений текстовое представление
 		auto idx = (_dt % 16) + (item * 16);
 		if(idx > 65535) return;
-		zxString vals(fromNum(idx, radix[dec + 22]));
+		zxString vals(fromNum(idx, radix[HEX + 22]));
 		vals += L"  ";
 		zxString chars;
 		for(int i = 0; i < 16; i++) {
 			if(idx > 65535) break;
 			ssh_w v = read_mem8(idx++);
-			fromNum(v, radix[dec + 2]);
+			fromNum(v, radix[HEX + 2]);
 			vals += tmpBuf;
 			if(v < 32) v = 32;
 			chars += (ssh_ws)v;
@@ -388,7 +400,6 @@ void zxDebugger::show(bool visible) {
 }
 
 void zxDebugger::updateRegisters(int newPC, int flags) {
-	bool decimal = theApp->getOpt(OPT_DECIMAL)->dval;
 	HWND h;
 	RECT rect;
 	if(flags & U_REGS) {
@@ -404,7 +415,7 @@ void zxDebugger::updateRegisters(int newPC, int flags) {
 			DrawText(hdc, zx.text, -1, &rect, DT_SINGLELINE | DT_CENTER);
 			ReleaseDC(h, hdc);
 			zx.val = val;
-			auto fmt = (zx.msk < 255 ? L"%d" : (zx.regb ? radix[decimal + 16] : radix[decimal + 22]));
+			auto fmt = (zx.msk < 255 ? L"%d" : (zx.regb ? radix[HEX + 16] : radix[HEX + 22]));
 			SetWindowText(zx.hWndMain, fromNum(val, fmt));
 		}
 		SetWindowText(hWndTick, fromNum(*_TICK, radix[17]));
@@ -460,15 +471,16 @@ void zxDebugger::updateUndoRedo(bool set) {
 }
 
 void zxDebugger::updateHexDec(bool change) {
-	auto opt = theApp->getOpt(OPT_DECIMAL);
 	if(change) {
+		auto opt = theApp->getOpt(OPT_DECIMAL);
 		opt->dval = !opt->dval;
+		HEX = opt->dval;
 		updateRegisters(_pc, U_PC | U_SP | U_REGS);
 		InvalidateRect(hWndSP, nullptr, false);
 		InvalidateRect(hWndDA, nullptr, false);
 		InvalidateRect(hWndDT, nullptr, true);
 	}
-	if(hWndToolbar) SendMessage(hWndToolbar, TB_SETSTATE, IDM_HEX_DEC, TBSTATE_ENABLED | opt->dval);
+	if(hWndToolbar) SendMessage(hWndToolbar, TB_SETSTATE, IDM_HEX_DEC, TBSTATE_ENABLED | HEX);
 }
 
 int zxDebugger::comparePredefinedNames(ssh_cws buf) {
@@ -495,7 +507,7 @@ void zxDebugger::setProgrammPause(bool pause, bool activate) {
 		int state1 = pause << 2;
 		int state2 = (!pause) << 2;
 
-		theApp->updateData((!pause) * STS_EXECUTE | ST_EXECUTE);
+		theApp->updateData((!pause) * zxFrame::STS_EXECUTE | zxFrame::ST_EXECUTE);
 
 		updateUndoRedo(false);
 		updatePrevNextBP();

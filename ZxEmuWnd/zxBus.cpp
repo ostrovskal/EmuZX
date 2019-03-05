@@ -7,6 +7,8 @@
 #include "zxDebugger.h"
 #include "zxKeyboard.h"
 
+extern ssh_cws nameROMs[];
+
 #pragma pack(push, 1)
 struct HEAD1_Z80 {
 	ssh_w AF, BC, HL, PC, SP;
@@ -243,7 +245,6 @@ void zxBus::signalRESET() {
 }
 
 bool zxBus::loadState(ssh_cws path) {
-	ssh_b pageTMP[16384];
 	ssh_b tmp[COUNT_REGS];
 	ssh_d size;
 	zxFile f;
@@ -260,15 +261,15 @@ bool zxBus::loadState(ssh_cws path) {
 	int banks = countPages(false);
 	for(int i = 0; i < banks; i++) {
 		if(!f.read(&size, 4)) return false;
-		if(!f.read(pageTMP, size)) return false;
-		if(!unpackBlock(pageTMP, PAGE_RAM[i], PAGE_RAM[i] + 16384, size, true, false)) return false;
+		if(!f.read(TMP_BUF, size)) return false;
+		if(!unpackBlock(TMP_BUF, PAGE_RAM[i], PAGE_RAM[i] + 16384, size, true, false)) return false;
 	}
 	// восстанавливаем страницы
 	setPages();
 	// грузим имя сохраненной проги
 	l -= f.getPos();
-	if(!f.read(tmpBuf, l)) return false;
-	theApp->opts.nameLoadProg = tmpBuf;
+	if(!f.read(TMP_BUF, l)) return false;
+	theApp->opts.nameLoadProg = (ssh_cws)TMP_BUF;
 	return true;
 }
 
